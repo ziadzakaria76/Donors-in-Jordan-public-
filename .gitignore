@@ -5,9 +5,17 @@
 # Local databases
 *.db
 
-# Generated reports -- keep the directory, ignore its contents
-output/*
-!output/.gitkeep
+# Generated reports -- keep the directory, ignore its contents.
+# The ** prefix matters: a pattern containing a slash is anchored to this
+# file's directory, so a bare "output/*" would only cover a top-level output/
+# and would happily commit every report written to
+# jordan_tender_monitor/output/.
+**/output/*
+!**/output/.gitkeep
+
+# Local state -- keep the directory, ignore the database
+**/data/*
+!**/data/.gitkeep
 
 # Logs
 *.log
