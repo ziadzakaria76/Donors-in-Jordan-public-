@@ -154,13 +154,14 @@ Other flags:
 ### Testing offline
 
 ```bash
-python tests/run_all.py             # 130 checks, no network, no credentials
+python tests/run_all.py             # 164 checks, no network, no credentials
 ```
 
 | Suite | Covers |
 |---|---|
 | `test_extraction.py` (84) | Getting tenders *out of a page* — every extraction layer, the quality gate, failure diagnosis, pagination, multilingual dates and values, real notice-URL patterns |
-| `test_pipeline.py` (46) | What happens *afterwards* — filters, scoring, eligibility penalty, deduplication, report rendering, Excel/CSV/JSON writers, email fallback, the seen-tender tracker |
+| `test_pipeline.py` (54) | What happens *afterwards* — filters, scoring, eligibility penalty, deduplication, report rendering, Excel/CSV/JSON writers, email fallback, the seen-tender tracker |
+| `test_capture.py` (26) | `--capture` itself — every HTML portal captures each source, reports all six layers, names the winner and suggests selectors taken from the page; plus unreachable sources, bot walls, and API portals being refused |
 
 `tests/fixtures/` holds pages in the CMS shapes the donor portals actually use —
 Drupal views, Bootstrap cards, header tables, Next.js `__NEXT_DATA__`, JSON-LD,
