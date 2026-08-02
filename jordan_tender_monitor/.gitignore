@@ -1,0 +1,41 @@
+# Credentials -- never commit
+.env
+.env.local
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+data/seen_tenders.db
+
+# Generated reports -- keep the directory, ignore its contents
+output/*
+!output/.gitkeep
+*.xlsx
+*.csv
+
+# Logs
+*.log
+tender_monitor.log
+cron.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+!.gitkeep

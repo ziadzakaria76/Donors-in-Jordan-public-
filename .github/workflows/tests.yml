@@ -1,0 +1,75 @@
+name: tests
+
+# Branch pushes are covered by the pull_request trigger, so `push` is limited to
+# main. Listing both for all branches would run every PR commit twice: the two
+# events land in different concurrency groups, so neither cancels the other.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes an in-flight run obsolete.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # README states Python 3.11+; test the floor and one version above it.
+        python-version: ["3.11", "3.12"]
+
+    defaults:
+      run:
+        working-directory: jordan_tender_monitor
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: jordan_tender_monitor/requirements.txt
+
+      - name: Install dependencies
+        # Installing the real requirements.txt also checks that it stays
+        # complete and resolvable. Playwright's browsers are deliberately not
+        # downloaded: the suite is offline and never launches one.
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint
+        run: |
+          pip install pyflakes
+          python -m pyflakes .
+
+      - name: Run test suites
+        # 130 checks: extraction layers and the downstream pipeline.
+        # No network access and no credentials are required.
+        run: python tests/run_all.py
+
+      - name: Verify the pipeline runs end to end
+        # Exercises orchestration, scoring, and all four output writers against
+        # the built-in fixtures. --save-only guarantees no email is attempted.
+        run: python run.py --self-test --save-only
+
+      - name: Check no credentials were committed
+        working-directory: .
+        run: |
+          if git ls-files --error-unmatch jordan_tender_monitor/.env 2>/dev/null; then
+            echo "::error::.env is tracked by git - it must never be committed"
+            exit 1
+          fi
+          echo ".env is not tracked"

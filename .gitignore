@@ -1,0 +1,20 @@
+# Credentials
+.env
+.env.local
+
+# Local databases
+*.db
+
+# Generated reports -- keep the directory, ignore its contents
+output/*
+!output/.gitkeep
+
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
