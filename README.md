@@ -6,24 +6,40 @@ scores them for relevance, and delivers a structured report by email.
 
 Full documentation: **[`jordan_tender_monitor/README.md`](jordan_tender_monitor/README.md)**
 
-## What it does
+## Status — the scrapers have never run against a live page
 
-Four agents run in sequence:
+This was built in an environment whose egress policy blocked **all 13 portal
+domains** with `HTTP 403` at the proxy. That is a policy denial, and it was not
+worked around.
+
+- **Verified against the live web:** nothing
+- **Verified offline against fixtures:** extraction, parsing, filtering,
+  scoring, reporting, delivery fallback — 318 checks
+- **Not verified:** every portal URL, every CSS selector, every API response
+  shape, and email delivery
+
+**The CSS selectors are guesses.** The quality gate stops a wrong selector from
+producing bad data — it falls through to a class-independent layer. It cannot
+make a wrong selector right. Run `python run.py --capture PORTAL` against each
+HTML portal before trusting it.
+
+## What it does
 
 | Agent | Responsibility |
 |---|---|
-| Scrapers | Fetch notices from each portal, normalise to one schema |
+| Scrapers | Fetch notices from each portal, normalise to one record schema |
 | Filter & scorer | Filter, score 0–100, deduplicate across portals |
-| Reporter | Build the email body and Word / Excel / JSON / CSV / HTML outputs |
+| Reporter | Build the email body plus Word, Excel, JSON, CSV and HTML files |
 | Emailer | Send via Microsoft Graph, falling back to SMTP, then to disk |
 
-**Portals covered:** World Bank, EU TED and SAM.gov (REST APIs); UK Find a
-Tender (OCDS API); UNGM — covering UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA —
-plus EBRD, EIB, GIZ, KfW and IsDB (HTML); Saudi Fund, ADFD and JICA
-(announcements).
+**Portals:** World Bank, EU TED, SAM.gov and UK Find a Tender (REST APIs); UNGM
+— covering UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA — plus EBRD, EIB, GIZ, KfW
+(via Germany Trade & Invest) and IsDB (HTML); Saudi Fund, ADFD and JICA
+(announcements only).
 
-A portal that fails is skipped with a diagnosed reason and reported as
-unavailable. It never aborts the run, and never silently reports zero tenders.
+A failing portal is skipped with a diagnosed reason and reported as unavailable
+with the URL to check by hand. It never aborts the run, and a broken run never
+looks like a quiet one — portal health is in the email subject line.
 
 ## Quick start
 
@@ -32,51 +48,44 @@ pip install -r jordan_tender_monitor/requirements.txt
 cp jordan_tender_monitor/.env.example jordan_tender_monitor/.env   # then fill it in
 cd jordan_tender_monitor
 
-python run.py --check-portals   # are the portals reachable from here?
+python run.py --check-portals   # can this machine reach the portals?
 python run.py --dry-run         # scrape and print, send nothing
 python run.py --send            # build, save, and email
 ```
 
-Everything is configured in [`config.py`](jordan_tender_monitor/config.py):
-sectors, keywords, minimum contract value, notice types, lookback window,
-language handling, eligibility rules, which portals to poll, report format and
-schedule.
+Everything is configured in
+[`config.py`](jordan_tender_monitor/config.py), with each setting labelled by
+the interview question it answers.
 
-## Design note: surviving site redesigns
+## Surviving site redesigns
 
 The HTML scrapers do not depend on CSS class names alone. Each page runs through
 a six-layer cascade — RSS feed, embedded JSON, CSS selectors, header-aware
 tables, structural inference, anchor URL patterns — and the first layer whose
 rows score as a genuine notice listing wins. Three of those layers use no class
-names at all, so a site has to change substantially before a portal goes dark.
+names at all.
 
-`python run.py --capture PORTAL` fetches a portal's live pages, saves them as
-test fixtures, and reports which layer worked and what selectors the page
-actually uses.
-
-## Status
-
-**The scrapers have not been run against live pages.** They were built in an
-environment whose network policy blocked all 13 portal domains.
-
-- Verified against the live web: source URLs and notice-link patterns
-- Verified offline against fixtures: extraction, parsing, filtering, scoring,
-  reporting, delivery fallback — 187 checks via `python tests/run_all.py`
-- **Not verified: CSS selectors and DOM structure**
-
-Expect to run `--capture` against each HTML portal on first use. The selector
-hints are informed guesses; the quality gate keeps a wrong guess from producing
-bad data, but it cannot make a wrong guess right.
+The quality gate matters more than the layers. Selectors run first, so an
+over-broad guess like bare `article` would otherwise match a navigation menu and
+short-circuit the layer that works. Rows are scored for listing-likeness, with
+carrying a date weighted most heavily and gated outright.
 
 ## Tests
 
 ```bash
-cd jordan_tender_monitor
-python tests/run_all.py    # 187 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 318 checks, no network, no credentials
 ```
 
-CI runs the same suites on every push and pull request across Python 3.11
-and 3.12.
+CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`
+and on pull requests.
+
+## Security
+
+`.env` is never committed; recipients live there rather than in `config.py`
+because this repository is public. If `Mail.Send` is granted as an Azure
+*application* permission it is **tenant-wide** — scope it to a single mailbox
+with an `ApplicationAccessPolicy`. See the
+[full README](jordan_tender_monitor/README.md#security).
 
 ## License
 

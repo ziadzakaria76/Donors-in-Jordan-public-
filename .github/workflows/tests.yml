@@ -1,0 +1,44 @@
+name: tests
+
+# push is restricted to main, NOT "**". With push on every branch, each commit
+# on a pull-request branch would trigger the workflow twice -- once for the push
+# and once for the pull_request event -- doubling CI cost and log noise for no
+# extra coverage.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r jordan_tender_monitor/requirements.txt
+          pip install pyflakes
+
+      - name: Lint
+        run: python -m pyflakes jordan_tender_monitor/
+
+      # The suite uses no network and no credentials, and redirects its state
+      # to a temp directory, so it is safe to run anywhere.
+      - name: Offline test suite
+        run: python jordan_tender_monitor/tests/run_all.py
+
+      - name: Pipeline self-test on fixtures
+        run: python jordan_tender_monitor/run.py --self-test

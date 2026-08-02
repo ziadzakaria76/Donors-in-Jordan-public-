@@ -303,6 +303,14 @@ def deduplicate(records: list[dict]) -> tuple[list[dict], int]:
     A World Bank-financed assignment routinely shows up on the World Bank site
     and on UNGM. The surviving copy keeps the better data and records where
     else it was seen, so nothing is hidden by the merge.
+
+    Fuzzy title matching applies ONLY across portals. Within a single portal,
+    two notices must share a URL to be treated as the same thing. Donor portals
+    publish numbered lots and near-identical sister assignments -- "Governance
+    Advisory Assignment 5" and "Assignment 6" score 97 on token similarity and
+    would collapse into one, silently deleting a real tender. Cross-portal
+    duplication is what this function exists to fix; same-portal similarity is
+    usually a genuinely different contract.
     """
     if not records:
         return [], 0
@@ -319,6 +327,8 @@ def deduplicate(records: list[dict]) -> tuple[list[dict], int]:
             if record.get("url") and record["url"] == existing.get("url"):
                 duplicate = existing
                 break
+            if record.get("portal") == existing.get("portal"):
+                continue  # same portal: only an identical URL counts
             other = clean(existing.get("title")).lower()
             if not title or not other:
                 continue
