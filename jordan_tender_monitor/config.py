@@ -305,9 +305,10 @@ def _addresses(name: str) -> list[str]:
 # several). With none set, the report is written to output/ and no mail is sent.
 EMAIL_RECIPIENTS = _addresses("EMAIL_RECIPIENTS")
 EMAIL_CC = _addresses("EMAIL_CC")
-EMAIL_SUBJECT_TEMPLATE = (
-    "Jordan Tender Intelligence - {date} | {count} opportunities found"
-)
+# The subject is assembled in reporter.build_subject() so it can reflect the
+# run's health, not just the count -- a run where every portal was unreachable
+# must not look like a quiet day in the inbox.
+EMAIL_SUBJECT_PREFIX = "Jordan Tender Intelligence"
 
 # --------------------------------------------------------------------------
 # Q12 -- REPORT FORMAT

@@ -61,7 +61,7 @@ environment whose network policy blocked all 13 portal domains.
 
 - Verified against the live web: source URLs and notice-link patterns
 - Verified offline against fixtures: extraction, parsing, filtering, scoring,
-  reporting, delivery fallback — 179 checks via `python tests/run_all.py`
+  reporting, delivery fallback — 187 checks via `python tests/run_all.py`
 - **Not verified: CSS selectors and DOM structure**
 
 Expect to run `--capture` against each HTML portal on first use. The selector
@@ -72,7 +72,7 @@ bad data, but it cannot make a wrong guess right.
 
 ```bash
 cd jordan_tender_monitor
-python tests/run_all.py    # 179 checks, no network, no credentials
+python tests/run_all.py    # 187 checks, no network, no credentials
 ```
 
 CI runs the same suites on every push and pull request across Python 3.11

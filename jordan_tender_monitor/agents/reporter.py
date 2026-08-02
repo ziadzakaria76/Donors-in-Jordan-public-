@@ -303,10 +303,35 @@ def build_email_html(
     return head + body + footer
 
 
-def build_subject(tenders: list[dict], scan_time: datetime) -> str:
-    return config.EMAIL_SUBJECT_TEMPLATE.format(
-        date=scan_time.strftime("%d %b %Y"), count=len(tenders)
-    )
+def build_subject(
+    tenders: list[dict], scan_time: datetime, statuses: list[dict] | None = None
+) -> str:
+    """
+    Subject line that distinguishes a quiet market from a broken monitor.
+
+    Both produce zero tenders, and with new-only mode on a quiet day is normal,
+    so "0 opportunities found" every morning is exactly what a silently dead
+    scraper looks like. The subject therefore carries the portal health, not
+    just the count -- a degraded run is visible in the inbox without opening it.
+    """
+    date = scan_time.strftime("%d %b %Y")
+    statuses = statuses or []
+    total = len(statuses)
+    failed = sum(1 for s in statuses if not s.get("ok"))
+
+    if total and failed == total:
+        return (f"{config.EMAIL_SUBJECT_PREFIX} - {date} | "
+                f"ACTION NEEDED: all {total} portals unreachable")
+
+    if tenders:
+        headline = f"{len(tenders)} new opportunit{'y' if len(tenders) == 1 else 'ies'}"
+    else:
+        headline = "no new opportunities"
+
+    if failed:
+        headline += f" ({failed} of {total} portals unavailable)"
+
+    return f"{config.EMAIL_SUBJECT_PREFIX} - {date} | {headline}"
 
 
 # --------------------------------------------------------------------------
@@ -545,7 +570,7 @@ def build_outputs(
 ) -> dict:
     """Render the email body and write every configured output file."""
     body = build_email_html(tenders, statuses, stats, scan_time)
-    subject = build_subject(tenders, scan_time)
+    subject = build_subject(tenders, scan_time, statuses)
     stamp = scan_time.strftime("%Y%m%d_%H%M")
     files: dict[str, Path] = {}
 

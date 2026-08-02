@@ -272,6 +272,37 @@ def test_emailer_fallback() -> None:
         config.EMAIL_RECIPIENTS = original
 
 
+def test_subject_reflects_run_health() -> None:
+    print("\nSubject line separates a quiet market from a broken monitor")
+    when = datetime(2026, 8, 2)
+
+    def statuses(total: int, failed: int):
+        return [
+            scraper.PortalStatus(key=f"p{i}", name=f"P{i}", ok=(i >= failed),
+                                 count=0, error=None if i >= failed else "boom",
+                                 seconds=1.0)
+            for i in range(total)
+        ]
+
+    healthy_hits = reporter.build_subject([{"t": 1}] * 7, when, statuses(13, 0))
+    healthy_none = reporter.build_subject([], when, statuses(13, 0))
+    degraded = reporter.build_subject([], when, statuses(13, 3))
+    dead = reporter.build_subject([], when, statuses(13, 13))
+
+    check("healthy run with hits states the count", "7 new opportunities" in healthy_hits)
+    check("healthy run with none says so", "no new opportunities" in healthy_none)
+    check("a quiet day is not alarming", "ACTION NEEDED" not in healthy_none)
+    check("partial outage is visible", "3 of 13 portals unavailable" in degraded, degraded)
+    check("total outage demands action", "ACTION NEEDED" in dead and "13 portals unreachable" in dead,
+          dead)
+    check("a quiet day and a dead monitor read differently",
+          healthy_none != dead)
+    check("singular is not mangled",
+          "1 new opportunity" in reporter.build_subject([{"t": 1}], when, statuses(13, 0)))
+    check("missing status info degrades gracefully",
+          "7 new opportunities" in reporter.build_subject([{"t": 1}] * 7, when, []))
+
+
 def test_word_document() -> None:
     print("\nWord (.docx) export")
     from docx import Document
@@ -442,6 +473,7 @@ def main() -> int:
     test_email_overflow()
     test_no_results_email()
     test_emailer_fallback()
+    test_subject_reflects_run_health()
     test_word_document()
     test_email_attachments()
     test_tracker_and_new_only()
