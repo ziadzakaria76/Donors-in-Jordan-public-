@@ -250,7 +250,7 @@ def test_emailer_fallback() -> None:
     try:
         # No recipients: a fresh clone, before .env is filled in.
         config.EMAIL_RECIPIENTS = []
-        result = emailer.dispatch("subject", "<p>body</p>", attachment=None,
+        result = emailer.dispatch("subject", "<p>body</p>", attachments=None,
                                   saved_files={"html": _TMP / "r.html"})
         check("never raises", isinstance(result, dict))
         check("reports not sent", result["sent"] is False)
@@ -261,7 +261,7 @@ def test_emailer_fallback() -> None:
 
         # Recipients set, but still no Graph or SMTP credentials.
         config.EMAIL_RECIPIENTS = ["someone@example.com"]
-        result = emailer.dispatch("subject", "<p>body</p>", attachment=None,
+        result = emailer.dispatch("subject", "<p>body</p>", attachments=None,
                                   saved_files={"html": _TMP / "r.html"})
         check("still falls back to file", result["method"] == "file"
               and result["sent"] is False)
@@ -270,6 +270,69 @@ def test_emailer_fallback() -> None:
               str(result["attempts"]))
     finally:
         config.EMAIL_RECIPIENTS = original
+
+
+def test_word_document() -> None:
+    print("\nWord (.docx) export")
+    from docx import Document
+
+    scored = filter_agent.score_tenders([
+        dict(tender(id="w:1", title="Advisory services for Jordan public financial management")),
+        dict(tender(id="w:2", language="ar",
+                    title="خدمات استشارية في الأردن", eligibility="National firms only")),
+    ])
+    statuses = [
+        scraper.PortalStatus(key="worldbank", name="World Bank", ok=True,
+                             count=2, error=None, seconds=1.0),
+        scraper.PortalStatus(key="ungm", name="UNGM (UN agencies)", ok=False,
+                             count=0, error="board could not be parsed", seconds=8.0),
+    ]
+    stats = dict(EMPTY_STATS, raw=2, final=2)
+
+    path = reporter.write_docx(scored, statuses, stats, datetime.now(), _TMP / "report.docx")
+    check("file written", path.exists() and path.stat().st_size > 5000)
+
+    document = Document(path)
+    text = "\n".join(p.text for p in document.paragraphs)
+    headings = [p.text for p in document.paragraphs
+                if p.style.name.startswith("Heading") or p.style.name == "Title"]
+    check("has a scan summary", any("Scan summary" in h for h in headings), str(headings[:4]))
+    check("has portal status", any("Portal status" in h for h in headings))
+    check("lists every tender", any("All 2 matching tenders" in h for h in headings), str(headings))
+    check("one detail table per tender plus summary and portals",
+          len(document.tables) == 4, f"{len(document.tables)} tables")
+    check("names the failed portal",
+          any("UNGM" in c.text for t in document.tables for r in t.rows for c in r.cells))
+    check("Arabic title preserved", any("الأردن" in h for h in headings), str(headings))
+    check("eligibility flag carried over", "NATIONAL ONLY" in text, text[:200])
+
+    empty = reporter.write_docx([], statuses, EMPTY_STATS, datetime.now(), _TMP / "empty.docx")
+    empty_text = "\n".join(p.text for p in Document(empty).paragraphs)
+    check("zero tenders does not crash", empty.exists())
+    check("zero tenders says so", "No matching tenders" in empty_text, empty_text[:150])
+
+
+def test_email_attachments() -> None:
+    print("\nEmail attachments: Word document plus workbook")
+    files = {
+        "docx": _TMP / "report.docx",
+        "excel": _TMP / "none.xlsx",
+        "json": _TMP / "ar.json",
+    }
+    chosen = reporter.attachments_for(files)
+    names = [p.name for p in chosen]
+    check("attaches exactly the configured formats",
+          names == ["report.docx", "none.xlsx"], str(names))
+    check("Word document first", names and names[0].endswith(".docx"))
+
+    check("Word MIME type is correct",
+          emailer._mime_for(Path("x.docx"))
+          == ("application",
+              "vnd.openxmlformats-officedocument.wordprocessingml.document"))
+    check("a single path is still accepted",
+          len(emailer._normalise(_TMP / "report.docx")) == 1)
+    check("missing files are dropped",
+          emailer._normalise([_TMP / "does-not-exist.docx"]) == [])
 
 
 def test_tracker_and_new_only() -> None:
@@ -379,6 +442,8 @@ def main() -> int:
     test_email_overflow()
     test_no_results_email()
     test_emailer_fallback()
+    test_word_document()
+    test_email_attachments()
     test_tracker_and_new_only()
     test_self_test_does_not_touch_the_database()
     test_new_only_mode_is_enabled()

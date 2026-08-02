@@ -10,7 +10,7 @@ Four agents run in sequence:
 |---|---|---|
 | 1. Scrapers | `portals/*.py` | Fetch notices from each portal, normalise to one schema |
 | 2. Filter & scorer | `agents/filter.py` | Filter, score 0–100, deduplicate across portals |
-| 3. Reporter | `agents/reporter.py` | Build the email body and the Excel/JSON/CSV/HTML files |
+| 3. Reporter | `agents/reporter.py` | Build the email body and the Word/Excel/JSON/CSV/HTML files |
 | 4. Emailer | `agents/emailer.py` | Send via Microsoft Graph, falling back to SMTP, then to disk |
 
 ---
@@ -34,7 +34,7 @@ changed without touching any other file.
 | Portals | All 13 |
 | Email | Microsoft Graph → Office 365 SMTP → save-to-disk |
 | Report format | Full details per tender |
-| Outputs | Excel (colour-coded), JSON, CSV, HTML |
+| Outputs | Word (.docx), Excel (colour-coded), JSON, CSV, HTML |
 | Schedule | Daily at 07:00 |
 
 ### Two deliberate deviations from a literal reading of the brief
@@ -154,13 +154,13 @@ Other flags:
 ### Testing offline
 
 ```bash
-python tests/run_all.py             # 164 checks, no network, no credentials
+python tests/run_all.py             # 179 checks, no network, no credentials
 ```
 
 | Suite | Covers |
 |---|---|
 | `test_extraction.py` (84) | Getting tenders *out of a page* — every extraction layer, the quality gate, failure diagnosis, pagination, multilingual dates and values, real notice-URL patterns |
-| `test_pipeline.py` (54) | What happens *afterwards* — filters, scoring, eligibility penalty, deduplication, report rendering, Excel/CSV/JSON writers, email fallback, the seen-tender tracker |
+| `test_pipeline.py` (69) | What happens *afterwards* — filters, scoring, eligibility penalty, deduplication, report rendering, Excel/CSV/JSON writers, email fallback, the seen-tender tracker |
 | `test_capture.py` (26) | `--capture` itself — every HTML portal captures each source, reports all six layers, names the winner and suggests selectors taken from the page; plus unreachable sources, bot walls, and API portals being refused |
 
 `tests/fixtures/` holds pages in the CMS shapes the donor portals actually use —

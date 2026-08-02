@@ -323,8 +323,13 @@ DESCRIPTION_CHAR_LIMIT = 1500  # per tender, in the email body only
 # --------------------------------------------------------------------------
 # Q13 -- OUTPUT FILES
 # --------------------------------------------------------------------------
-OUTPUT_FORMATS = ["excel", "json", "csv", "html"]
-EXCEL_ATTACH = True  # attach the workbook to the email
+OUTPUT_FORMATS = ["excel", "json", "csv", "html", "docx"]
+
+# Which of the generated files are attached to the email, in this order.
+# The Word document circulates and annotates more easily than the workbook;
+# the workbook is better for working the pipeline. Both are attached.
+EMAIL_ATTACH_FORMATS = ["docx", "excel"]
+EXCEL_ATTACH = True  # kept for backwards compatibility; see EMAIL_ATTACH_FORMATS
 
 # Excel row colours by score band
 COLOR_HIGH = "C6EFCE"    # >= 70  light green

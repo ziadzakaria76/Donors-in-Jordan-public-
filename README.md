@@ -14,7 +14,7 @@ Four agents run in sequence:
 |---|---|
 | Scrapers | Fetch notices from each portal, normalise to one schema |
 | Filter & scorer | Filter, score 0–100, deduplicate across portals |
-| Reporter | Build the email body and Excel / JSON / CSV / HTML outputs |
+| Reporter | Build the email body and Word / Excel / JSON / CSV / HTML outputs |
 | Emailer | Send via Microsoft Graph, falling back to SMTP, then to disk |
 
 **Portals covered:** World Bank, EU TED and SAM.gov (REST APIs); UK Find a
@@ -61,7 +61,7 @@ environment whose network policy blocked all 13 portal domains.
 
 - Verified against the live web: source URLs and notice-link patterns
 - Verified offline against fixtures: extraction, parsing, filtering, scoring,
-  reporting, delivery fallback — 164 checks via `python tests/run_all.py`
+  reporting, delivery fallback — 179 checks via `python tests/run_all.py`
 - **Not verified: CSS selectors and DOM structure**
 
 Expect to run `--capture` against each HTML portal on first use. The selector
@@ -72,7 +72,7 @@ bad data, but it cannot make a wrong guess right.
 
 ```bash
 cd jordan_tender_monitor
-python tests/run_all.py    # 164 checks, no network, no credentials
+python tests/run_all.py    # 179 checks, no network, no credentials
 ```
 
 CI runs the same suites on every push and pull request across Python 3.11

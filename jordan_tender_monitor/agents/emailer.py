@@ -37,13 +37,28 @@ def smtp_configured() -> bool:
     return bool(config.SMTP_USER and config.SMTP_PASS)
 
 
-def _attachment_bytes(path: Path | None) -> tuple[str, bytes] | None:
-    if not path or not config.EXCEL_ATTACH:
-        return None
-    path = Path(path)
-    if not path.exists():
-        return None
-    return path.name, path.read_bytes()
+MIME_BY_SUFFIX = {
+    ".xlsx": ("application",
+              "vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ".docx": ("application",
+              "vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ".csv": ("text", "csv"),
+    ".json": ("application", "json"),
+    ".html": ("text", "html"),
+}
+
+
+def _normalise(attachments) -> list[Path]:
+    """Accept a single path or a list; drop anything missing."""
+    if attachments is None:
+        return []
+    if isinstance(attachments, (str, Path)):
+        attachments = [attachments]
+    return [Path(a) for a in attachments if a and Path(a).exists()]
+
+
+def _mime_for(path: Path) -> tuple[str, str]:
+    return MIME_BY_SUFFIX.get(path.suffix.lower(), ("application", "octet-stream"))
 
 
 # --------------------------------------------------------------------------
@@ -65,7 +80,7 @@ def _graph_token() -> str:
     return result["access_token"]
 
 
-def send_via_graph(subject: str, body_html: str, attachment: Path | None = None) -> None:
+def send_via_graph(subject: str, body_html: str, attachments=None) -> None:
     token = _graph_token()
     message: dict = {
         "subject": subject,
@@ -79,24 +94,24 @@ def send_via_graph(subject: str, body_html: str, attachment: Path | None = None)
             {"emailAddress": {"address": address}} for address in config.EMAIL_CC
         ]
 
-    attached = _attachment_bytes(attachment)
-    if attached:
-        name, blob = attached
+    parts = []
+    for path in _normalise(attachments):
+        blob = path.read_bytes()
         if len(blob) > MAX_GRAPH_ATTACHMENT_BYTES:
             log.warning(
-                "Attachment %s is %.1f MB, above the inline Graph limit - sending without it",
-                name, len(blob) / 1e6,
+                "Attachment %s is %.1f MB, above the inline Graph limit - omitting it",
+                path.name, len(blob) / 1e6,
             )
-        else:
-            message["attachments"] = [
-                {
-                    "@odata.type": "#microsoft.graph.fileAttachment",
-                    "name": name,
-                    "contentType": "application/vnd.openxmlformats-officedocument."
-                                   "spreadsheetml.sheet",
-                    "contentBytes": base64.b64encode(blob).decode("ascii"),
-                }
-            ]
+            continue
+        maintype, subtype = _mime_for(path)
+        parts.append({
+            "@odata.type": "#microsoft.graph.fileAttachment",
+            "name": path.name,
+            "contentType": f"{maintype}/{subtype}",
+            "contentBytes": base64.b64encode(blob).decode("ascii"),
+        })
+    if parts:
+        message["attachments"] = parts
 
     response = requests.post(
         GRAPH_SENDMAIL.format(sender=config.SENDER_EMAIL),
@@ -113,7 +128,7 @@ def send_via_graph(subject: str, body_html: str, attachment: Path | None = None)
 # --------------------------------------------------------------------------
 # Office 365 SMTP
 # --------------------------------------------------------------------------
-def send_via_smtp(subject: str, body_html: str, attachment: Path | None = None) -> None:
+def send_via_smtp(subject: str, body_html: str, attachments=None) -> None:
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = config.SMTP_USER
@@ -125,14 +140,10 @@ def send_via_smtp(subject: str, body_html: str, attachment: Path | None = None) 
     )
     message.add_alternative(body_html, subtype="html")
 
-    attached = _attachment_bytes(attachment)
-    if attached:
-        name, blob = attached
+    for path in _normalise(attachments):
+        maintype, subtype = _mime_for(path)
         message.add_attachment(
-            blob,
-            maintype="application",
-            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            filename=name,
+            path.read_bytes(), maintype=maintype, subtype=subtype, filename=path.name
         )
 
     with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=config.REQUEST_TIMEOUT) as server:
@@ -149,7 +160,7 @@ def send_via_smtp(subject: str, body_html: str, attachment: Path | None = None) 
 def dispatch(
     subject: str,
     body_html: str,
-    attachment: Path | None = None,
+    attachments=None,
     saved_files: dict | None = None,
 ) -> dict:
     """Try Graph, then SMTP, then fall back to files. Returns a status dict."""
@@ -184,7 +195,7 @@ def dispatch(
             log.info("Email method '%s' skipped - credentials not set", name)
             continue
         try:
-            sender(subject, body_html, attachment)
+            sender(subject, body_html, attachments)
             log.info("Report emailed via %s at %s to %s",
                      name, timestamp, ", ".join(config.EMAIL_RECIPIENTS))
             return {

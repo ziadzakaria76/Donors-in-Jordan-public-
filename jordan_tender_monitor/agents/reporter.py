@@ -390,6 +390,156 @@ def write_html(body_html: str, path: Path, subject: str) -> Path:
     return path
 
 
+def _shade(cell, rgb: str) -> None:
+    """Fill a table cell. python-docx has no API for this, so set the XML."""
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    shading = OxmlElement("w:shd")
+    shading.set(qn("w:val"), "clear")
+    shading.set(qn("w:fill"), rgb)
+    cell._tc.get_or_add_tcPr().append(shading)
+
+
+def _kv_table(document, rows: list[tuple[str, str]]):
+    table = document.add_table(rows=0, cols=2)
+    table.style = "Table Grid"
+    for label, value in rows:
+        cells = table.add_row().cells
+        cells[0].text = label
+        cells[0].paragraphs[0].runs[0].bold = True
+        cells[1].text = value or ""
+    return table
+
+
+def write_docx(
+    tenders: list[dict], statuses: list[dict], stats: dict, scan_time: datetime, path: Path
+) -> Path:
+    """
+    Word version of the report: the same content as the email, in a document
+    that can be circulated, annotated or dropped into a bid-review pack.
+    """
+    from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt, RGBColor
+
+    document = Document()
+
+    title = document.add_heading("Jordan Tender Intelligence", level=0)
+    subtitle = document.add_paragraph(
+        f"Automated donor and IFI procurement scan · {scan_time.strftime('%d %B %Y, %H:%M')}"
+    )
+    subtitle.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    subtitle.runs[0].font.size = Pt(10)
+    subtitle.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+    del title  # heading object not needed beyond insertion
+
+    # ---- Scan summary -----------------------------------------------------
+    document.add_heading("Scan summary", level=1)
+    ok_count = sum(1 for s in statuses if s.get("ok"))
+    _kv_table(document, [
+        ("Scan completed", scan_time.strftime("%d %b %Y, %H:%M")),
+        ("Portals checked", f"{ok_count} of {len(statuses)} reachable"),
+        ("Raw tenders scraped", str(stats.get("raw", 0))),
+        ("After filtering", f"{stats.get('final', 0)} matched "
+                            f"({stats.get('duplicates_merged', 0)} duplicate(s) merged)"),
+        ("Flagged", f"{stats.get('national_only', 0)} national-only · "
+                    f"{stats.get('arabic', 0)} Arabic-language"),
+    ])
+
+    # ---- Portal status ----------------------------------------------------
+    document.add_heading("Portal status", level=1)
+    portal_table = document.add_table(rows=1, cols=3)
+    portal_table.style = "Table Grid"
+    for cell, heading in zip(portal_table.rows[0].cells, ("", "Portal", "Result")):
+        cell.text = heading
+        if cell.paragraphs[0].runs:
+            cell.paragraphs[0].runs[0].bold = True
+    for status in statuses:
+        cells = portal_table.add_row().cells
+        cells[0].text = "OK" if status.get("ok") else "FAIL"
+        cells[1].text = str(status.get("name", ""))
+        cells[2].text = (
+            f"{status.get('count', 0)} notice(s)" if status.get("ok")
+            else f"unavailable - {str(status.get('error') or '')[:180]}"
+        )
+        _shade(cells[0], "C6EFCE" if status.get("ok") else "FFC7CE")
+
+    if not tenders:
+        document.add_heading("No matching tenders this run", level=1)
+        document.add_paragraph(
+            "The scan completed successfully but no tenders passed the current "
+            "filters. Portal-by-portal results are listed above."
+        )
+        document.save(path)
+        log.info("Word document written: %s", path)
+        return path
+
+    # ---- Top 3 ------------------------------------------------------------
+    document.add_heading("Top 3 by score", level=1)
+    for tender in tenders[:3]:
+        para = document.add_paragraph(style="List Number")
+        run = para.add_run(tender.get("title", ""))
+        run.bold = True
+        para.add_run(
+            f"\n{tender.get('portal', '')} · score {tender.get('score')} · "
+            f"closes {_deadline_text(tender)}"
+        ).font.size = Pt(9)
+
+    # ---- Every tender in full --------------------------------------------
+    document.add_heading(f"All {len(tenders)} matching tenders", level=1)
+    for tender in tenders:
+        heading = document.add_heading(
+            f"{tender.get('rank')}. {tender.get('title', '')}", level=2
+        )
+        band = _score_rgb(tender.get("score", 0))
+        if heading.runs:
+            heading.runs[0].font.color.rgb = RGBColor.from_string(
+                {"C6EFCE": "1E7B34", "FFEB9C": "8A6D00"}.get(band, "C00000")
+            )
+
+        for flag in ("eligibility_flag", "language_flag", "deadline_flag", "duplicate_note"):
+            if tender.get(flag):
+                para = document.add_paragraph()
+                run = para.add_run(str(tender[flag]))
+                run.italic = True
+                run.font.size = Pt(9)
+
+        _kv_table(document, [
+            ("Portal", tender.get("portal", "")),
+            ("Notice type", tender.get("notice_type") or "Not stated"),
+            ("Sector (inferred)", tender.get("sector") or "Unclassified"),
+            ("Posted", _fmt_date(tender.get("posted_date"), "Not published")),
+            ("Deadline", _deadline_text(tender)),
+            ("Estimated value", _fmt_value(tender.get("estimated_value_usd"))),
+            ("Eligibility", tender.get("eligibility") or "Not stated in notice"),
+            ("Contact", tender.get("contact") or "See notice"),
+            ("Language", "Arabic" if tender.get("language") == "ar" else "English"),
+            ("Relevance score", f"{tender.get('score')} / 100"),
+            ("Link", tender.get("url") or ""),
+        ])
+
+        description = tender.get("description") or ""
+        if len(description) > config.DESCRIPTION_CHAR_LIMIT:
+            description = description[: config.DESCRIPTION_CHAR_LIMIT].rstrip() + " [...]"
+        para = document.add_paragraph()
+        para.add_run("Description: ").bold = True
+        para.add_run(description or "Not provided in the notice.")
+
+    document.add_paragraph()
+    footer = document.add_paragraph(
+        "Generated automatically by the Jordan Tender Monitor. Scores are a "
+        "relevance heuristic, not a bid/no-bid decision. Always verify deadlines, "
+        "eligibility and scope against the original notice before acting."
+    )
+    footer.runs[0].font.size = Pt(8)
+    footer.runs[0].font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+
+    document.save(path)
+    log.info("Word document written: %s", path)
+    return path
+
+
 def build_outputs(
     tenders: list[dict], statuses: list[dict], stats: dict, scan_time: datetime
 ) -> dict:
@@ -410,5 +560,18 @@ def build_outputs(
         files["csv"] = write_csv(tenders, config.OUTPUT_DIR / f"jordan_tenders_{stamp}.csv")
     if "html" in config.OUTPUT_FORMATS:
         files["html"] = write_html(body, config.OUTPUT_DIR / f"jordan_tenders_{stamp}.html", subject)
+    if "docx" in config.OUTPUT_FORMATS:
+        files["docx"] = write_docx(
+            tenders, statuses, stats, scan_time,
+            config.OUTPUT_DIR / f"jordan_tenders_{stamp}.docx",
+        )
 
     return {"subject": subject, "body_html": body, "files": files}
+
+
+def attachments_for(files: dict) -> list[Path]:
+    """Output files to attach to the email, in the order configured."""
+    return [
+        files[kind] for kind in config.EMAIL_ATTACH_FORMATS
+        if kind in files and files[kind]
+    ]

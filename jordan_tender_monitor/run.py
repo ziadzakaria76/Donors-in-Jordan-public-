@@ -358,7 +358,8 @@ def execute(
     if send and not save_only:
         delivery = emailer.dispatch(
             outputs["subject"], outputs["body_html"],
-            attachment=outputs["files"].get("excel"), saved_files=outputs["files"],
+            attachments=reporter.attachments_for(outputs["files"]),
+            saved_files=outputs["files"],
         )
         if delivery["sent"]:
             print(f"\n{GREEN}Email sent via {delivery['method']} to "
@@ -462,7 +463,8 @@ def main() -> int:
             outputs = result["outputs"]
             delivery = emailer.dispatch(
                 outputs["subject"], outputs["body_html"],
-                attachment=outputs["files"].get("excel"), saved_files=outputs["files"],
+                attachments=reporter.attachments_for(outputs["files"]),
+            saved_files=outputs["files"],
             )
             print(f"{GREEN if delivery['sent'] else YELLOW}"
                   f"{'Sent via ' + delivery['method'] if delivery['sent'] else 'Not sent'}{RESET}")
