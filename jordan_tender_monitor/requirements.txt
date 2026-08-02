@@ -1,14 +1,23 @@
+# HTTP and HTML
 requests>=2.31.0
 beautifulsoup4>=4.12.0
-playwright>=1.40.0
-httpx>=0.25.0
-tenacity>=8.2.0
-rapidfuzz>=3.5.0
-pandas>=2.1.0
-openpyxl>=3.1.0
-python-docx>=1.1.0
-schedule>=1.2.0
+lxml>=4.9.0            # the XML parser the RSS layer needs
+tenacity>=8.2.0        # retry with exponential backoff
+
+# Parsing
+python-dateutil>=2.8.2
+
+# Ranking
+rapidfuzz>=3.5.0       # cross-portal duplicate detection
+
+# Output formats
+openpyxl>=3.1.0        # Excel
+python-docx>=1.1.0     # Word bid-review pack
+
+# Configuration and delivery
 python-dotenv>=1.0.0
-msal>=1.25.0
-lxml>=4.9.0
-colorama>=0.4.6
+msal>=1.25.0           # Microsoft Graph authentication
+
+# Optional -- only needed for portals that turn out to be JavaScript-rendered.
+# Install with: pip install playwright && playwright install chromium
+# playwright>=1.40.0

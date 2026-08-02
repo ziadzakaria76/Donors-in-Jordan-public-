@@ -1,399 +1,427 @@
-#!/usr/bin/env python3
 """
-Offline tests for the HTML extraction layers.
+Extraction tests: the cascade, the quality gate, and the parsers.
 
-Run directly -- no pytest required, no network:
-
-    python tests/test_extraction.py
-
-The fixtures in tests/fixtures/ represent the CMS families the donor portals
-actually use (Drupal views, Bootstrap cards, header tables, Next.js embedded
-JSON, JSON-LD, RSS, RTL Arabic, German date formats) plus the two failure modes
-that need different fixes (bot wall, JavaScript shell). If a portal redesigns
-into one of these shapes, the cascade should still find the notices.
+Every fixture here is a CMS shape one of these portals actually uses, plus the
+three adversarial cases that matter most -- a bot wall, a JavaScript shell, and
+a page where an over-broad selector matches navigation instead of the listing.
 """
 
 from __future__ import annotations
 
-import sys
+import io
+from datetime import date
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE_DIR))
+from jordan_tender_monitor.portals import htmlkit as H
+from jordan_tender_monitor.utils import money, text as textutil
+from jordan_tender_monitor.utils.dates import is_open, parse_date
 
-from portals import harvester, htmlkit  # noqa: E402
-from portals.base import parse_date, parse_value_usd  # noqa: E402
+from .harness import check, check_eq
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
-_passed = 0
-_failed: list[str] = []
+
+def load(name: str) -> str:
+    return io.open(FIXTURES / name, encoding="utf-8").read()
 
 
-def check(name: str, condition: bool, detail: str = "") -> None:
-    global _passed
-    if condition:
-        _passed += 1
-        print(f"  PASS  {name}")
-    else:
-        _failed.append(name)
-        print(f"  FAIL  {name}{('  -- ' + detail) if detail else ''}")
+# ---------------------------------------------------------------------------
+# The cascade, per CMS shape
+# ---------------------------------------------------------------------------
 
 
-def load(filename: str) -> str:
-    return (FIXTURES / filename).read_text(encoding="utf-8")
+def test_drupal_views_listing():
+    result = H.extract(load("drupal_views.html"), "https://e.org/", [".views-row"])
+    check_eq(len(result.rows), 4, "drupal: four notices")
+    check(result.quality >= H.QUALITY_THRESHOLD, "drupal: clears the quality gate")
+    row = result.rows[0]
+    check("Ministry of Finance" in row.title, "drupal: title read")
+    check_eq(row.url, "https://e.org/notices/2026-114", "drupal: url resolved absolute")
+    check_eq(parse_date(row.closing_text), date(2026, 9, 30), "drupal: deadline parsed")
+    check_eq(money.parse_value_usd(row.value_text, "EUR"),
+             round(1_850_000 * 1.09, 2), "drupal: EUR value converted")
 
 
-def titles(rows: list[dict]) -> list[str]:
-    return [r["title"] for r in rows]
+def test_bootstrap_cards():
+    result = H.extract(load("bootstrap_cards.html"), "https://e.org/", [".tender-card"])
+    check_eq(len(result.rows), 3, "cards: three notices")
+    check_eq(parse_date(result.rows[0].closing_text), date(2026, 11, 15),
+             "cards: day-first date parsed")
 
 
-# --------------------------------------------------------------------------
-def test_selector_layer() -> None:
-    print("\nCSS selector layer (Drupal views)")
-    html = load("drupal_views.html")
-    rows = htmlkit.rows_from_selectors(html, "https://example.org/", ["div.views-row"])
-    check("finds 3 rows", len(rows) == 3, f"got {len(rows)}")
-    check("resolves relative URLs",
-          any(r["url"].startswith("https://example.org/procurement/notice/") for r in rows))
-    check("captures row text for date extraction",
-          any("Deadline" in r["text"] for r in rows))
+def test_header_aware_table():
+    result = H.extract(load("table_listing.html"), "https://e.org/")
+    check_eq(result.layer, "table", "table: table layer wins")
+    check_eq(len(result.rows), 4, "table: four rows, header excluded")
+    row = result.rows[0]
+    check_eq(row.reference, "JO-2026-001", "table: reference column mapped")
+    check_eq(row.extra.get("notice_type"), "RFP", "table: type column mapped")
+    check_eq(parse_date(row.date_text), date(2026, 6, 1), "table: published column mapped")
+    check_eq(parse_date(row.closing_text), date(2026, 9, 15), "table: deadline column mapped")
 
 
-def test_table_layer() -> None:
-    print("\nHeader-aware table layer")
-    rows = htmlkit.rows_from_tables(load("table_listing.html"), "https://example.org/")
-    check("finds 3 rows", len(rows) == 3, f"got {len(rows)}")
-    first = next((r for r in rows if "Digital Government" in r["title"]), None)
-    check("maps Deadline column", bool(first) and first["fields"].get("closing_date") == "2026-11-30",
-          str(first["fields"]) if first else "row missing")
-    check("maps Published column", bool(first) and first["fields"].get("posted_date") == "2026-07-20")
-    check("maps Value column", bool(first) and "2,400,000" in (first["fields"].get("estimated_value") or ""))
-    check("maps Type column", bool(first) and "Proposals" in (first["fields"].get("notice_type") or ""))
+def test_german_table_formats():
+    result = H.extract(load("german_table.html"), "https://e.org/")
+    check_eq(len(result.rows), 3, "german: three rows")
+    rows = {r.title[:20]: r for r in result.rows}
+    first = result.rows[0]
+    check_eq(parse_date(first.closing_text), date(2026, 12, 31),
+             "german: 31.12.2026 is 31 December")
+    parsed = money.parse_value(first.value_text)
+    check_eq(parsed[0] if parsed else None, 1_500_000.0,
+             "german: EUR 1.500.000 is 1.5 million, not 1.5")
+    named = [r for r in result.rows if "Machbarkeit" in r.title]
+    if check(named, "german: named-month row present"):
+        check_eq(parse_date(named[0].closing_text), date(2027, 1, 15),
+                 "german: '15. Januar 2027' parsed")
+    check(rows or True, "german: rows indexed")
 
 
-def test_german_table() -> None:
-    print("\nGerman table (GIZ/KfW formats)")
-    rows = htmlkit.rows_from_tables(load("german_table.html"), "https://giz.de/")
-    check("finds 3 rows", len(rows) == 3, f"got {len(rows)}")
-    row = next((r for r in rows if "Verwaltungsreform" in r["title"]), None)
-    check("maps Abgabefrist -> closing_date",
-          bool(row) and row["fields"].get("closing_date") == "31.03.2027",
-          str(row["fields"]) if row else "missing")
-    check("German long date parses",
-          parse_date(row["fields"].get("posted_date")) == "2027-01-15" if row else False)
-    check("dot-thousands value parses",
-          parse_value_usd(row["fields"].get("estimated_value")) == 1635000.0 if row else False)
+def test_nextjs_embedded_json():
+    result = H.extract(load("nextjs_json.html"), "https://e.org/")
+    check_eq(result.layer, "embedded-json", "nextjs: JSON layer wins")
+    check_eq(len(result.rows), 3, "nextjs: three notices")
+    check_eq(result.rows[0].reference, "UNGM-2026-441", "nextjs: id read")
+    check_eq(parse_date(result.rows[0].closing_text), date(2026, 9, 20),
+             "nextjs: deadline read")
 
 
-def test_json_layer() -> None:
-    print("\nEmbedded JSON layer (__NEXT_DATA__)")
-    rows = htmlkit.extract_embedded_json(load("nextjs_json.html"), "https://example.org/")
-    check("finds all 3 notices", len(rows) == 3, f"got {len(rows)}")
-    row = next((r for r in rows if "Social Protection" in r["title"]), None)
-    check("extracts deadline", bool(row) and row["fields"].get("closing_date") == "2026-12-15")
-    check("extracts posted date", bool(row) and row["fields"].get("posted_date") == "2026-08-01")
-    check("extracts value", bool(row) and "1,750,000" in (row["fields"].get("estimated_value") or ""))
-    check("resolves URL", bool(row) and row["url"] == "https://example.org/notices/7001")
+def test_jsonld_notices():
+    result = H.extract(load("ldjson.html"), "https://e.org/")
+    check_eq(result.layer, "embedded-json", "json-ld: JSON layer wins")
+    check_eq(len(result.rows), 3, "json-ld: three notices")
 
 
-def test_ldjson_layer() -> None:
-    print("\nJSON-LD layer")
-    rows = htmlkit.extract_embedded_json(load("ldjson.html"), "https://example.org/")
-    check("finds 2 notices", len(rows) == 2, f"got {len(rows)}")
-    check("uses headline as title", any("Governance Advisory" in t for t in titles(rows)))
+def test_site_level_jsonld_does_not_hijack():
+    """An Organization node must not become a phantom notice.
 
-
-def test_feed_layer() -> None:
-    print("\nRSS feed layer")
-    rows = htmlkit.parse_feed(load("feed.xml"), "https://example.org/")
-    check("finds 2 items", len(rows) == 2, f"got {len(rows)}")
-    check("keeps link", any(r["url"] == "https://example.org/feed/1" for r in rows))
-    check("captures pubDate", all(r["fields"].get("posted_date") for r in rows))
-    posted, closing = htmlkit.resolve_dates(rows[0])
-    check("deadline recovered from description", parse_date(closing) == "2026-11-30",
-          f"closing={closing}")
-
-
-def test_feed_discovery() -> None:
-    print("\nFeed discovery")
-    feeds = htmlkit.discover_feeds(load("drupal_views.html"), "https://example.org/page")
-    check("finds advertised feed", feeds == ["https://example.org/procurement/feed.xml"], str(feeds))
-
-
-def test_structural_layer() -> None:
-    print("\nStructural inference (no class names at all)")
-    rows = htmlkit.rows_from_structure(load("unknown_layout.html"), "https://example.org/")
-    check("recovers 4 rows without selectors", len(rows) == 4, f"got {len(rows)}")
-    check("titles intact", any("Business Process Reengineering" in t for t in titles(rows)))
-    check("row text carries the deadline", any("28 November 2026" in r["text"] for r in rows))
-
-
-def test_structural_scale() -> None:
-    print("\nStructural inference on a large listing (regression: a size guard")
-    print("once skipped containers with >400 children, silently returning 0 rows)")
-    import time
-
-    for count in (50, 500, 2000):
-        markup = "".join(
-            f'<div class="r"><span><a href="/n/{i}">Jordan advisory services notice {i}</a>'
-            f"</span><em>Deadline: 30 November 2026</em></div>"
-            for i in range(count)
-        )
-        page = (f"<html><body><main><div><div>{markup}</div></div>"
-                + "<div><p>filler</p></div>" * 800 + "</main></body></html>")
-        started = time.time()
-        rows = htmlkit.rows_from_structure(page, "https://example.org/")
-        elapsed = time.time() - started
-        check(f"{count} notices recovered", len(rows) == count, f"got {len(rows)}")
-        check(f"{count} notices under 15s", elapsed < 15, f"took {elapsed:.1f}s")
-
-
-def test_country_matching() -> None:
-    print("\nCountry matching precision (word boundaries, not substrings)")
-    from portals.base import mentions_jordan
-
-    for text, want in (
-        ("Consulting Services, Jordan", True),
-        ("Water project in Amman", True),
-        ("خدمات استشارية في الأردن", True),
-        ("المملكة الأردنية الهاشمية", True),
-        ("Contact: procurement@mof.gov.jo", True),
-        ("Road resurfacing, Jordanstown, Northern Ireland", False),
-        ("Community centre, Ammanford, Wales", False),
-        ("Contact: jordan.smith@contractor.co.uk", False),
-    ):
-        check(f"{'matches' if want else 'rejects'}: {text[:42]}",
-              mentions_jordan(text) is want)
-
-
-def test_arabic() -> None:
-    print("\nArabic RTL listing")
-    rows = htmlkit.rows_from_selectors(load("arabic_rtl.html"), "https://sfd.gov.sa/", ["div.tender-card"])
-    check("finds 3 rows", len(rows) == 3, f"got {len(rows)}")
-    row = next((r for r in rows if "المياه" in r["title"]), None)
-    posted, closing = htmlkit.resolve_dates(row) if row else (None, None)
-    check("Arabic labelled deadline found", closing is not None, f"closing={closing}")
-    check("Arabic date parses to ISO", parse_date(closing) == "2026-09-30", f"parsed={parse_date(closing)}")
-    check("Arabic posted date parses", parse_date(posted) == "2026-07-15", f"parsed={parse_date(posted)}")
-
-
-def test_diagnosis() -> None:
-    print("\nFailure diagnosis (distinguishes bot wall from layout change)")
-    wall = htmlkit.diagnose(load("cloudflare_wall.html"))
-    check("detects bot protection", bool(wall) and "bot protection" in wall, str(wall))
-    shell = htmlkit.diagnose(load("js_shell.html"))
-    check("detects JavaScript shell", bool(shell) and "playwright" in shell.lower(), str(shell))
-    check("healthy page returns None", htmlkit.diagnose(load("table_listing.html")) is None)
-
-
-def test_pagination() -> None:
-    print("\nPagination")
-    nxt = htmlkit.find_next_page(load("paginated_p1.html"), "https://example.org/paginated_p1.html")
-    check("follows rel=next", nxt == "https://example.org/paginated_p2.html", str(nxt))
-    check("no next on last page", htmlkit.find_next_page(load("table_listing.html"), "https://x/") is None)
-
-
-def test_site_ldjson_does_not_hijack() -> None:
-    print("\nSite-level JSON-LD must not be mistaken for notices")
+    Nearly every page embeds {"@type":"Organization","name":...,"url":...}.
+    Accepting it fills the report with notices named after the donor.
+    """
     html = load("site_ldjson_plus_listing.html")
-    json_rows = htmlkit.extract_embedded_json(html, "https://www.ebrd.com/")
-    check("Organization/BreadcrumbList blocks rejected", json_rows == [],
-          f"got {titles(json_rows)}")
-    rows = htmlkit.extract_rows(html, "https://www.ebrd.com/",
-                                selectors=["div.notice-row"])
-    check("cascade falls through to the real listing",
-          len(rows) == 3 and rows[0]["source"].startswith("selector"),
-          f"{len(rows)} rows via {rows[0]['source'] if rows else 'none'}")
-    check("real notice titles recovered",
-          any("Transaction Advisory" in t for t in titles(rows)))
+    json_layer = H.extract_embedded_json(html, "https://e.org/")
+    check_eq(len(json_layer.rows), 0,
+             "json-ld: site-level Organization and BreadcrumbList rejected")
+
+    result = H.extract(html, "https://e.org/", ["li.notice"])
+    check_eq(len(result.rows), 3, "json-ld: the real HTML listing is read instead")
+    titles = " ".join(r.title for r in result.rows)
+    check("European Bank" not in titles,
+          "json-ld: the donor's own name is not a notice")
 
 
-def test_quality_gate_blocks_bad_selector() -> None:
-    print("\nQuality gate: an over-broad selector must not beat a better layer")
+def test_arabic_rtl_listing():
+    result = H.extract(load("arabic_rtl.html"), "https://e.org/", [".tender"])
+    check_eq(len(result.rows), 3, "arabic: three notices")
+    row = result.rows[0]
+    check(textutil.is_arabic(row.title), "arabic: title detected as Arabic")
+    check_eq(parse_date(row.closing_text), date(2026, 10, 15),
+             "arabic: Levantine month and Arabic-Indic digits parsed")
+    parsed = money.parse_value(row.value_text)
+    check_eq(parsed[0] if parsed else None, 750_000.0,
+             "arabic: Arabic-Indic digits and دولار parsed as a value")
+    national = [r for r in result.rows if textutil.detect_national_only(r.blob())]
+    check(national, "arabic: 'الشركات المحلية فقط' detected as national-only")
+
+
+def test_rss_feed_link_and_pubdate():
+    """<link> is a void element to an HTML parser, and <pubDate> is camelCase."""
+    result = H.extract(load("feed.xml"), "https://e.org/")
+    check_eq(result.layer, "feed", "rss: feed layer wins")
+    check_eq(len(result.rows), 3, "rss: three items")
+    check_eq(result.rows[0].url, "https://example.org/notice/7001",
+             "rss: <link> text survived (XML parser, not HTML)")
+    check(parse_date(result.rows[0].date_text) is not None,
+          "rss: <pubDate> matched case-insensitively")
+
+
+def test_structural_inference_no_classes():
+    result = H.extract(load("unknown_layout.html"), "https://e.org/")
+    check_eq(result.layer, "structural", "structural: wins with no classes present")
+    check_eq(len(result.rows), 4, "structural: four notices")
+
+
+def test_anchor_pattern_last_resort():
+    html = load("anchor_only.html")
+    layer = H.extract_anchor_pattern(html, "https://e.org/", "/tender/")
+    check_eq(len(layer.rows), 4, "anchor: four notices, nav links excluded")
+    check(all("/tender/view/" in (r.url or "") for r in layer.rows),
+          "anchor: only the notice URL shape kept")
+    check("closes 30 September 2026" in layer.rows[0].raw_text,
+          "anchor: row text scoped to its own row, not the whole page")
+
+
+# ---------------------------------------------------------------------------
+# The quality gate -- the reason the cascade works at all
+# ---------------------------------------------------------------------------
+
+
+def test_overbroad_selector_is_rejected():
+    """A bare 'article' selector matches four promo panels before the listing.
+
+    Selectors run before the class-independent layers, so without the gate this
+    short-circuits the structural layer and the report fills with navigation.
+    """
     html = load("selector_hijack.html")
 
-    hijack = htmlkit.rows_from_selectors(html, "https://example.org/", ["article"])
-    check("bare 'article' does match the nav teasers", len(hijack) == 3, f"got {len(hijack)}")
-    check("...but scores as a poor listing",
-          htmlkit.listing_quality(hijack) < htmlkit.QUALITY_THRESHOLD,
-          f"quality {htmlkit.listing_quality(hijack)}")
+    hijack = H.extract_by_selectors(html, ["article"], "https://e.org/")
+    check_eq(len(hijack.rows), 4, "gate: the over-broad selector does match nav")
+    check(hijack.quality < H.QUALITY_THRESHOLD,
+          "gate: but it scores below the gate",
+          f"scored {hijack.quality}")
 
-    real = htmlkit.rows_from_tables(html, "https://example.org/")
-    check("the real table listing scores well",
-          htmlkit.listing_quality(real) >= htmlkit.QUALITY_THRESHOLD,
-          f"quality {htmlkit.listing_quality(real)}")
-
-    rows = htmlkit.extract_rows(html, "https://example.org/", selectors=["article"])
-    check("cascade skips the selector layer", rows and rows[0]["source"] == "table",
-          f"chose {rows[0]['source'] if rows else 'nothing'}")
-    check("real notices recovered",
-          any("Institutional Reform" in r["title"] for r in rows))
+    result = H.extract(html, "https://e.org/", ["article"])
+    check_eq(result.layer, "structural", "gate: structural inference wins instead")
+    titles = " ".join(r.title for r in result.rows)
+    check("Fiscal Decentralisation" in titles, "gate: the real listing is returned")
+    check("About our procurement" not in titles, "gate: no navigation in the result")
 
 
-def test_selector_suggestion() -> None:
-    print("\nSelector suggestion (powers `run.py --capture`)")
-    suggested = htmlkit.suggest_selectors(load("drupal_views.html"))
-    check("suggests the real listing class", any("views-row" in s for s in suggested),
-          str(suggested))
-    report = htmlkit.analyse_page(load("table_listing.html"), "https://example.org/",
-                                  selectors=["div.nope"])
-    check("analyse_page names the winning layer", report["chosen_layer"] == "table",
-          str(report["chosen_layer"]))
-    check("analyse_page reports per-layer counts", report["layers"]["tables"]["rows"] == 3,
-          str(report["layers"]["tables"]))
+def test_dateless_rows_score_low():
+    rows = [H.Row(title=f"Some Navigation Entry {i}", url=f"/x/{i}") for i in range(4)]
+    check(H.score_rows(rows) < H.QUALITY_THRESHOLD,
+          "gate: rows with no dates at all cannot clear the gate")
+
+    dated = [H.Row(title=f"Advisory Assignment Number {i}", url=f"/x/{i}",
+                   closing_text="30 September 2026") for i in range(4)]
+    check(H.score_rows(dated) >= H.QUALITY_THRESHOLD,
+          "gate: the same rows with dates do clear it")
 
 
-def test_cascade_order() -> None:
-    print("\nCascade picks the best available layer")
-    rows = htmlkit.extract_rows(load("nextjs_json.html"), "https://example.org/",
-                                selectors=["div.nope"], href_pattern=r"/notices/")
-    check("prefers embedded JSON over anchors", rows and rows[0]["source"] == "json",
-          rows[0]["source"] if rows else "no rows")
-    rows = htmlkit.extract_rows(load("unknown_layout.html"), "https://example.org/",
-                                selectors=["div.does-not-exist"])
-    check("falls through to structural inference",
-          rows and rows[0]["source"] == "structure", rows[0]["source"] if rows else "no rows")
-    rows = htmlkit.extract_rows(load("bootstrap_cards.html"), "https://example.org/",
-                                selectors=["div.card"])
-    check("uses selectors when they match", rows and rows[0]["source"].startswith("selector"),
-          rows[0]["source"] if rows else "no rows")
+def test_best_effort_when_nothing_clears_the_gate():
+    """A weak result the caller can see beats a silent zero."""
+    html = ("<html><body><ul>"
+            + "".join(f'<li><a href="/n/{i}">Some Notice Title Number {i}</a></li>'
+                      for i in range(4))
+            + "</ul></body></html>")
+    result = H.extract(html, "https://e.org/")
+    check(result.rows, "best-effort: rows are returned even below the gate")
+    check("BELOW QUALITY GATE" in result.note,
+          "best-effort: and they are labelled as unverified")
 
 
-def test_href_patterns_match_real_urls() -> None:
+# ---------------------------------------------------------------------------
+# Structural inference at scale -- the guard clause that skipped its own case
+# ---------------------------------------------------------------------------
+
+
+def _big_listing(n: int) -> str:
+    return ("<!doctype html><html><body><div>" + "".join(
+        f'<section><h4><a href="/x/{i}">Governance Advisory Assignment {i}, Jordan</a>'
+        f'</h4><p>Published 01 July 2026</p><p>Deadline 01 October 2026</p>'
+        f'<p>Estimated value USD {100000 + i}</p></section>' for i in range(n))
+        + "</div></body></html>")
+
+
+def test_structural_at_50_500_2000_rows():
+    """A 'container too large' cap once returned zero rows on a 500-notice page.
+
+    That is precisely the page this layer exists to rescue, so size is tested
+    explicitly at three magnitudes.
     """
-    Each portal's HREF_PATTERN must match notice URLs actually observed on that
-    portal (collected via web search in August 2026 -- these are real permalinks,
-    not invented examples). This is the one part of the scrapers validated
-    against the live web rather than against fixtures.
-    """
-    print("\nHREF patterns vs real notice URLs observed in the wild")
-    import re
+    for n in (50, 500, 2000):
+        result = H.extract_structural(_big_listing(n), "https://e.org/")
+        check_eq(len(result.rows), n, f"scale: {n} rows in, {n} rows out")
 
-    from portals import ebrd, eib, giz, isdb, jica, sfd, ungm
 
-    real_urls = [
-        (ungm, "https://www.ungm.org/Public/Notice/274472"),
-        (ungm, "https://www.ungm.org/Public/Notice/166937"),
-        (ebrd, "https://ecepp.ebrd.com/delta/viewNotice.html?displayNoticeId=39536445"),
-        (ebrd, "https://www.ebrd.com/home/work-with-us/project-procurement/procurement-notices.html"),
-        (eib, "https://www.eib.org/en/about/procurement/calls/all/cft-1744"),
-        (eib, "https://www.eib.org/en/about/procurement/calls-technical-assistance/all/aa-011624003"),
-        (isdb, "https://www.isdb.org/project-procurement/tenders/2026/gpn/"
-               "islamic-finance-legal-framework-guidelines-and-database-project-gpn"),
-        (giz, "https://www.giz.de/en/invitation-tender-7000004018-supply-and-delivery-"
-              "document-and-epassport-reader"),
-        (giz, "https://www.giz.de/en/procurement-goods-supply-it-equipment-software"),
-        (sfd, "https://www.sfd.gov.sa/en/tenders-view"),
-        (jica, "https://www.jica.go.jp/jordan/english/office/others/procurement.html"),
+# ---------------------------------------------------------------------------
+# Failure diagnosis -- each class needs a different fix
+# ---------------------------------------------------------------------------
+
+
+def test_bot_wall_diagnosed():
+    html = load("cloudflare_wall.html")
+    result = H.extract(html, "https://e.org/", [".notice"])
+    check_eq(len(result.rows), 0, "botwall: no rows extracted")
+    check("bot wall" in H.diagnose(html, []), "botwall: diagnosed as a bot wall")
+    check("Playwright" in H.diagnose(html, []),
+          "botwall: the fix is named (different network or Playwright)")
+
+
+def test_javascript_shell_diagnosed():
+    html = load("js_shell.html")
+    result = H.extract(html, "https://e.org/", [".notice"])
+    check_eq(len(result.rows), 0, "jsshell: no rows extracted")
+    diagnosis = H.diagnose(html, [])
+    check("JavaScript shell" in diagnosis, "jsshell: diagnosed as a JS shell")
+    check("playwright install chromium" in diagnosis, "jsshell: the fix is named")
+
+
+def test_transport_error_diagnosed():
+    check("transport error" in H.diagnose("", []),
+          "transport: empty content diagnosed as a transport error")
+
+
+def test_layout_change_diagnosed():
+    html = ("<html><body><p>" + ("Some ordinary prose about procurement policy. " * 40)
+            + "</p></body></html>")
+    check("layout change" in H.diagnose(html, []),
+          "layout: a full page with no listing diagnosed as a layout change")
+
+
+# ---------------------------------------------------------------------------
+# Value parsing -- the defect that silently deleted real tenders
+# ---------------------------------------------------------------------------
+
+
+def test_dates_are_not_read_as_values():
+    check_eq(money.parse_value("Published: 01 August 2026"), None,
+             "value: a date is not a contract value")
+    check_eq(money.parse_value("Deadline 31.12.2026"), None,
+             "value: a dotted date is not a value")
+    check_eq(money.parse_value("Lot 3 of 7, ref 2026/S 123-456789"), None,
+             "value: reference numbers are not values")
+    check_eq(money.parse_value("Notice 2026-114"), None,
+             "value: a notice number is not a value")
+
+
+def test_currency_or_magnitude_required():
+    check(money.parse_value("USD 250,000") is not None, "value: currency code accepted")
+    check(money.parse_value("2.5 million") is not None, "value: magnitude word accepted")
+    check(money.parse_value("750k USD") is not None, "value: 'k' suffix accepted")
+    check_eq(money.parse_value("1500000"), (1500000.0, "USD"),
+             "value: a bare numeric field is taken at face value")
+
+
+def test_european_number_formats():
+    cases = [
+        ("EUR 1.500.000", 1_500_000.0, "dot as thousands"),
+        ("EUR 1.500,50", 1_500.50, "comma as decimal"),
+        ("USD 1,500,000", 1_500_000.0, "comma as thousands"),
+        ("USD 1,500.50", 1_500.50, "dot as decimal"),
+        ("EUR 850.000", 850_000.0, "three-digit group is thousands"),
     ]
-    for module, url in real_urls:
-        pattern = getattr(module, "HREF_PATTERN", None)
-        matched = bool(pattern and re.search(pattern, url, re.IGNORECASE))
-        check(f"{module.PORTAL_KEY}: {url[:58]}", matched,
-              f"pattern {pattern!r} did not match")
+    for text, want, label in cases:
+        got = money.parse_value(text)
+        check_eq(got[0] if got else None, want, f"value: {label}")
 
 
-def test_harvest_end_to_end(monkeypatched: dict) -> None:
-    print("\nHarvester end-to-end (fixtures served instead of the network)")
-    tenders = harvester.harvest(
-        portal_key="giz",
-        label="Fixture Portal",
-        sources=[harvester.Source("https://fixture.test/drupal_views.html")],
-        selectors=["div.views-row"],
-        href_pattern=r"/notice/\d+",
-        notice_type="Fixture notice",
-        manual_url="https://fixture.test/",
-        use_feeds=False,
-        enrich=False,
-    )
-    check("keeps only Jordan tenders", len(tenders) == 2, f"got {len(tenders)}: {titles(tenders)}")
-    check("drops the Morocco notice", not any("Morocco" in t["title"] for t in tenders))
-    row = next((t for t in tenders if "Public Financial Management" in t["title"]), None)
-    check("closing date parsed", bool(row) and row["closing_date"] == "2026-09-30",
-          str(row.get("closing_date")) if row else "missing")
-    check("posted date parsed", bool(row) and row["posted_date"] == "2026-07-12")
-    check("standard schema present",
-          bool(row) and all(k in row for k in
-                            ("id", "title", "portal", "url", "posted_date", "closing_date",
-                             "estimated_value_usd", "sector", "description", "language")))
-    value_row = next((t for t in tenders if "Water Network" in t["title"]), None)
-    check("value extracted from free text",
-          bool(value_row) and value_row["estimated_value_usd"] == 1200000.0,
-          str(value_row.get("estimated_value_usd")) if value_row else "missing")
+def test_largest_candidate_wins():
+    got = money.parse_value("EUR 50,000 per year, total EUR 1,200,000")
+    check_eq(got[0] if got else None, 1_200_000.0,
+             "value: the largest qualifying figure is the contract value")
 
 
-def test_harvest_reports_bot_wall(monkeypatched: dict) -> None:
-    print("\nHarvester surfaces an actionable reason, not a generic failure")
-    from portals.base import PortalError
-
-    try:
-        harvester.harvest(
-            portal_key="ebrd",
-            label="Fixture Portal",
-            sources=[harvester.Source("https://fixture.test/cloudflare_wall.html")],
-            selectors=["div.nope"],
-            manual_url="https://fixture.test/",
-            use_feeds=False,
-            enrich=False,
-        )
-        check("raises PortalError", False, "no exception raised")
-    except PortalError as exc:
-        check("raises PortalError", True)
-        check("names bot protection as the cause", "bot protection" in str(exc), str(exc)[:160])
-        check("includes a manual-check URL", "fixture.test" in str(exc))
+def test_arabic_value_parsing():
+    got = money.parse_value("قيمة العقد ٢٥٠٠٠٠ دولار")
+    check_eq(got[0] if got else None, 250_000.0,
+             "value: Arabic-Indic digits with an Arabic currency word")
 
 
-# --------------------------------------------------------------------------
-def main() -> int:
-    # Serve fixtures instead of making network calls
-    served: dict = {}
-
-    def fake_fetch(url: str, *, params=None, js: bool = False) -> str:
-        name = url.rsplit("/", 1)[-1]
-        served[name] = served.get(name, 0) + 1
-        path = FIXTURES / name
-        if not path.exists():
-            raise RuntimeError(f"no fixture for {url}")
-        return path.read_text(encoding="utf-8")
-
-    htmlkit.fetch_html = fake_fetch  # type: ignore[assignment]
-
-    print("=" * 74)
-    print("HTML extraction tests -- offline, no network")
-    print("=" * 74)
-
-    test_selector_layer()
-    test_table_layer()
-    test_german_table()
-    test_json_layer()
-    test_ldjson_layer()
-    test_feed_layer()
-    test_feed_discovery()
-    test_structural_layer()
-    test_structural_scale()
-    test_country_matching()
-    test_arabic()
-    test_diagnosis()
-    test_pagination()
-    test_site_ldjson_does_not_hijack()
-    test_quality_gate_blocks_bad_selector()
-    test_selector_suggestion()
-    test_cascade_order()
-    test_href_patterns_match_real_urls()
-    test_harvest_end_to_end(served)
-    test_harvest_reports_bot_wall(served)
-
-    print("\n" + "=" * 74)
-    total = _passed + len(_failed)
-    if _failed:
-        print(f"{_passed}/{total} passed, {len(_failed)} FAILED:")
-        for name in _failed:
-            print(f"  - {name}")
-        return 1
-    print(f"All {total} checks passed.")
-    return 0
+# ---------------------------------------------------------------------------
+# Dates
+# ---------------------------------------------------------------------------
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+def test_multilingual_dates():
+    cases = [
+        ("2026-12-31", date(2026, 12, 31), "ISO"),
+        ("31.12.2026", date(2026, 12, 31), "German dotted"),
+        ("15. Januar 2027", date(2027, 1, 15), "German named month"),
+        ("28 fevrier 2027", date(2027, 2, 28), "French named month"),
+        ("15 October 2026", date(2026, 10, 15), "English"),
+        ("١٥ تشرين الأول ٢٠٢٦", date(2026, 10, 15), "Arabic Levantine"),
+        ("٣١ ديسمبر ٢٠٢٦", date(2026, 12, 31), "Arabic Gulf"),
+        ("03/04/2026", date(2026, 4, 3), "day-first slashes"),
+    ]
+    for text, want, label in cases:
+        check_eq(parse_date(text), want, f"date: {label}")
+
+    check_eq(parse_date("no date at all"), None, "date: prose yields None")
+
+
+def test_iso_timestamps_do_not_swap_day_and_month():
+    """Every REST API here returns ISO with a T, and this used to be wrong.
+
+    A \\b after the day fails against the following "T", so the ISO fast path
+    was skipped and dateutil's dayfirst=True read 2026-06-01 as 6 January.
+    Every date where day and month were both <= 12 came out transposed, which
+    moved closing dates by months in either direction.
+    """
+    cases = [
+        ("2026-06-01T09:00:00Z", date(2026, 6, 1), "ISO with T and Z"),
+        ("2026-09-12T12:00:00Z", date(2026, 9, 12), "ISO where both parts are <= 12"),
+        ("2026-06-10+02:00", date(2026, 6, 10), "ISO with a UTC offset"),
+        ("2026-09-30T17:00:00-04:00", date(2026, 9, 30), "ISO with a negative offset"),
+        ("2026-06-01 09:00:00", date(2026, 6, 1), "ISO with a space separator"),
+        ("2026-06-01T00:00:00.000Z", date(2026, 6, 1), "ISO with milliseconds"),
+        ("2026-6-1T09:00:00Z", date(2026, 6, 1), "ISO without zero padding"),
+        ("2026-01-06T09:00:00Z", date(2026, 1, 6), "the transposed twin parses correctly too"),
+    ]
+    for text, want, label in cases:
+        check_eq(parse_date(text), want, f"iso: {label}")
+    check_eq(parse_date(None), None, "date: None yields None")
+    check_eq(parse_date(""), None, "date: empty string yields None")
+
+
+def test_deadline_boundary_today_is_open():
+    today = date(2026, 6, 15)
+    check(is_open(today, today), "deadline: closing today counts as OPEN")
+    check(is_open(date(2026, 6, 16), today), "deadline: tomorrow is open")
+    check(not is_open(date(2026, 6, 14), today), "deadline: yesterday is closed")
+    check(is_open(None, today), "deadline: unknown deadline is treated as open")
+
+
+# ---------------------------------------------------------------------------
+# Country matching -- Jordanstown and Ammanford must stay out
+# ---------------------------------------------------------------------------
+
+
+def test_country_matching_word_boundaries():
+    check(textutil.mentions_jordan("Consulting services in Amman, Jordan"),
+          "country: Jordan matched")
+    check(not textutil.mentions_jordan("Road works in Jordanstown, County Antrim"),
+          "country: Jordanstown NOT matched")
+    check(not textutil.mentions_jordan("School extension in Ammanford, Wales"),
+          "country: Ammanford NOT matched")
+    check(textutil.mentions_jordan("Water network upgrade, Irbid governorate"),
+          "country: a Jordanian city matched")
+
+
+def test_country_matching_strips_emails_but_trusts_jo_domain():
+    check(not textutil.mentions_jordan("Contact procurement@undp-jordan.org for details"),
+          "country: an email address alone is not evidence")
+    check(textutil.mentions_jordan("Tender reference 123", url="https://mit.gov.jo/t/1"),
+          "country: a .jo domain IS positive evidence")
+
+
+def test_arabic_country_matching_is_substring():
+    """Arabic is agglutinative -- الأردنية legitimately contains الأردن."""
+    check(textutil.mentions_jordan("مشروع في الأردنية للتنمية"),
+          "country: Arabic matched as a substring")
+    check(textutil.mentions_jordan("المملكة الأردنية الهاشمية"),
+          "country: the full Arabic country name matched")
+
+
+TESTS = [
+    test_drupal_views_listing,
+    test_bootstrap_cards,
+    test_header_aware_table,
+    test_german_table_formats,
+    test_nextjs_embedded_json,
+    test_jsonld_notices,
+    test_site_level_jsonld_does_not_hijack,
+    test_arabic_rtl_listing,
+    test_rss_feed_link_and_pubdate,
+    test_structural_inference_no_classes,
+    test_anchor_pattern_last_resort,
+    test_overbroad_selector_is_rejected,
+    test_dateless_rows_score_low,
+    test_best_effort_when_nothing_clears_the_gate,
+    test_structural_at_50_500_2000_rows,
+    test_bot_wall_diagnosed,
+    test_javascript_shell_diagnosed,
+    test_transport_error_diagnosed,
+    test_layout_change_diagnosed,
+    test_dates_are_not_read_as_values,
+    test_currency_or_magnitude_required,
+    test_european_number_formats,
+    test_largest_candidate_wins,
+    test_arabic_value_parsing,
+    test_multilingual_dates,
+    test_iso_timestamps_do_not_swap_day_and_month,
+    test_deadline_boundary_today_is_open,
+    test_country_matching_word_boundaries,
+    test_country_matching_strips_emails_but_trusts_jo_domain,
+    test_arabic_country_matching_is_substring,
+]

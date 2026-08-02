@@ -1,48 +1,45 @@
 """
-JICA procurement notices -- LIMITED RELIABILITY for this use case.
+JICA -- Japan International Cooperation Agency. Tier 3.
 
-JICA's consultant procurement is largely restricted to Japanese firms and its
-English-language Jordan content is sparse. Included for completeness; expect few
-or no results, and treat anything found as a lead to verify manually.
+Procurement is published per country office rather than centrally, so the
+Jordan office page is the source. Some JICA calls are restricted to Japanese
+firms; those are flagged by the eligibility detector (Q9).
+
+VERIFICATION STATUS: never run against the live site; selectors unverified.
 """
 
 from __future__ import annotations
 
-from .harvester import Source, harvest
+from . import harvester
+from .harvester import HtmlSpec
 
-PORTAL_KEY = "jica"
-LABEL = "JICA"
-MANUAL_URL = "https://www.jica.go.jp/english/our_work/procurement/"
+KEY = "jica"
 
-# URLs verified August 2026. JICA posts most procurement on its country-office
-# pages, which follow /<country>/english/office/others/procurement.html, plus a
-# central notices index.
-SOURCES = [
-    Source("https://www.jica.go.jp/english/notice/index.html"),
-    Source("https://www.jica.go.jp/announce/notice/index.html"),
-    Source("https://www.jica.go.jp/jordan/english/office/others/procurement.html"),
-    Source("https://www.jica.go.jp/jordan/english/office/others/bidding.html"),
-    Source("https://www.jica.go.jp/english/our_work/types_of_assistance/oda_loans/"
-           "oda_op_info/guide/tender/index.html"),
-]
-
-SELECTORS = [
-    "div.tender-list li", "ul.list-news li", "table tbody tr",
-    "div.js-accordion-content li", "article", "div.section li",
-    "div[class*='tender']", "ul[class*='list'] li",
-]
-
-HREF_PATTERN = r"(tender|procurement|announce|notice)"
+SPEC = HtmlSpec(
+    key=KEY,
+    urls=[
+        "https://www.jica.go.jp/jordan/english/office/others/procurement.html",
+    ],
+    # SELECTOR HINTS ONLY -- written without access to the live pages, which
+    # were blocked from the build environment. If a hint is wrong the quality
+    # gate rejects it and a class-independent layer takes over. Confirm with:
+    #     python run.py --capture jica
+    selectors=[
+        "div.js-accordion-content li",
+        "ul.list-normal li",
+        "table tbody tr",
+        "div.section li",
+    ],
+    anchor_hint="procurement",
+    currency="JPY",
+    filter_to_jordan=False,
+    notes="Jordan country-office page; already Jordan-specific",
+)
 
 
 def fetch_tenders() -> list[dict]:
-    return harvest(
-        portal_key=PORTAL_KEY,
-        label=LABEL,
-        sources=SOURCES,
-        selectors=SELECTORS,
-        href_pattern=HREF_PATTERN,
-        notice_type="JICA notice",
-        manual_url=MANUAL_URL,
-        default_eligibility="Often restricted to Japanese firms - verify eligibility",
-    )
+    return harvester.harvest(SPEC)
+
+
+def capture():
+    return harvester.capture(SPEC)

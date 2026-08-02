@@ -1,166 +1,173 @@
 """
-Built-in sample tenders for `python run.py --self-test`.
+Offline sample data for --self-test and the test suite.
 
-These exist so the filter, scorer, deduplicator, report builder and file writers
-can be exercised end-to-end without touching the network -- useful on a machine
-behind a restrictive egress policy, and as a regression check after editing the
-scoring rules.
-
-The set deliberately includes one of each edge case: an expired tender, a
-below-threshold tender, an Arabic notice, a national-only notice, an
-undated notice, and the same tender published on two portals.
+Deliberately includes the awkward cases: a tender with every optional field
+None, an Arabic notice, a national-only restriction, a duplicate across two
+portals, a deadline of exactly today, and a value published in a European
+format. These are the shapes that break pipelines, so they belong in the
+sample rather than a tidy set of well-formed records.
 """
 
 from __future__ import annotations
 
 from datetime import date, timedelta
 
-_today = date.today()
+from .agents.scraper import PortalHealth
+from .portals import base
 
 
-def _in(days: int) -> str:
-    return (_today + timedelta(days=days)).isoformat()
+def sample_records(today: date | None = None) -> list[dict]:
+    today = today or date.today()
+
+    def d(days: int) -> date:
+        return today + timedelta(days=days)
+
+    records = [
+        base.build_record(
+            portal="worldbank",
+            title="Institutional Strengthening of the Ministry of Finance, Jordan",
+            url="https://example.org/wb/1",
+            posted=d(-10), closing=d(45),
+            value_text="USD 1,850,000",
+            description="Consulting services to support public financial management "
+                        "reform, including budget execution and treasury operations.",
+            notice_type="Request for Expression of Interest",
+            contact="procurement@example.org",
+            reference="WB-JO-2026-114",
+        ),
+        base.build_record(
+            portal="ungm",
+            # Same assignment as above, published on a second portal. The
+            # deduplicator must collapse these into one.
+            title="Institutional Strengthening of the Ministry of Finance (Jordan)",
+            url="https://example.org/ungm/1",
+            posted=d(-9), closing=d(45),
+            value_text=None,
+            description="UNDP Jordan: PFM reform advisory.",
+            notice_type="Request for Proposal",
+            reference="UNGM-2026-441",
+        ),
+        base.build_record(
+            portal="giz",
+            title="Beratungsleistungen zur Verwaltungsreform, Jordanien",
+            url="https://example.org/giz/2",
+            posted=d(-20), closing=d(60),
+            # European format: 1.5 million, not 1.5.
+            value_text="EUR 1.500.000",
+            description="Technische Zusammenarbeit zur Verwaltungsreform in Amman.",
+            notice_type="Ausschreibung",
+            reference="GIZ-2026-77",
+            default_currency="EUR",
+        ),
+        base.build_record(
+            portal="sfd",
+            title="خدمات استشارية لتطوير القطاع المالي في الأردن",
+            url="https://example.org/sfd/3",
+            posted=d(-5), closing=d(30),
+            value_text="٧٥٠٠٠٠ دولار",
+            description="دراسة جدوى وبناء القدرات لوزارة المالية. الشركات المحلية فقط.",
+            notice_type="مناقصة",
+            reference="SFD-2026-9",
+        ),
+        base.build_record(
+            portal="ebrd",
+            # Deadline exactly today: must be KEPT. An off-by-one here throws
+            # away the most urgent tender in the report.
+            title="Energy Efficiency Investment Programme Advisory, Amman",
+            url="https://example.org/ebrd/4",
+            posted=d(-30), closing=today,
+            value_text="EUR 900,000",
+            description="Advisory services for an energy efficiency facility.",
+            notice_type="Expression of Interest",
+            reference="EBRD-2026-900",
+            default_currency="EUR",
+        ),
+        base.build_record(
+            portal="isdb",
+            # Every optional field absent. Nothing downstream may assume a
+            # field exists.
+            title="Consulting Services for Water Sector Study, Jordan",
+            url=None, posted=None, closing=None,
+            value_text=None, description=None, notice_type=None,
+            contact=None, reference=None,
+        ),
+        base.build_record(
+            portal="fcdo",
+            # Already closed: must be dropped.
+            title="Trade Facilitation Advisory, Aqaba, Jordan",
+            url="https://example.org/fcdo/5",
+            posted=d(-90), closing=d(-3),
+            value_text="GBP 400,000",
+            description="Closed notice, retained in the fixture to prove it is dropped.",
+            notice_type="Contract notice",
+            reference="FT-2026-5",
+            default_currency="GBP",
+        ),
+        base.build_record(
+            portal="worldbank",
+            # Published value below the $100k floor: must be dropped.
+            title="Small Equipment Supply for Clinics, Jordan",
+            url="https://example.org/wb/6",
+            posted=d(-4), closing=d(20),
+            value_text="USD 40,000",
+            description="Supply and delivery of small equipment.",
+            notice_type="Request for Quotation",
+            reference="WB-JO-2026-200",
+        ),
+        base.build_record(
+            portal="kfw",
+            title="Digital Transformation Advisory, Government of Jordan",
+            url="https://example.org/gtai/7",
+            posted=d(-2), closing=d(75),
+            value_text="EUR 2.400.000",
+            description="Advisory services for an e-government platform rollout, "
+                        "including business process reengineering.",
+            notice_type="Tender",
+            reference="GTAI-2026-7",
+            default_currency="EUR",
+        ),
+    ]
+    return records
 
 
-def _ago(days: int) -> str:
-    return (_today - timedelta(days=days)).isoformat()
+def sample_health() -> list[PortalHealth]:
+    """A realistic mix: healthy portals, a broken one, an unconfigured one."""
+    return [
+        PortalHealth("worldbank", "World Bank", 1, "ok", count=2, layer="api"),
+        PortalHealth("ted", "EU TED", 1, "ok", count=0, layer="api"),
+        PortalHealth(
+            "samgov", "SAM.gov (USAID / US Gov)", 1, "unconfigured",
+            reason="not configured - no SAM_API_KEY in .env",
+            urls=["https://api.sam.gov/prod/opportunities/v2/search"]),
+        PortalHealth("fcdo", "UK Find a Tender", 1, "ok", count=1, layer="api"),
+        PortalHealth("ungm", "UNGM (UNDP, UNICEF, WFP, UNOPS, UNHCR, UNRWA)", 2,
+                     "ok", count=1, layer="embedded-json", quality=0.92),
+        PortalHealth(
+            "ebrd", "EBRD", 2, "unavailable",
+            reason="bot wall (Cloudflare/Incapsula) - needs a different network "
+                   "or Playwright",
+            urls=["https://www.ebrd.com/home/work-with-us/project-procurement/"
+                  "procurement-notices.html"]),
+        PortalHealth("eib", "EIB", 2, "ok", count=0, layer="structural", quality=0.71),
+        PortalHealth("giz", "GIZ", 2, "ok", count=1, layer="table", quality=0.88),
+        PortalHealth("kfw", "KfW (via Germany Trade & Invest)", 2, "ok", count=1,
+                     layer="selectors", quality=0.95),
+        PortalHealth("isdb", "IsDB", 2, "ok", count=1, layer="structural", quality=0.64),
+        PortalHealth("sfd", "Saudi Fund for Development", 3, "ok", count=1,
+                     layer="selectors", quality=0.79),
+        PortalHealth("adfd", "Abu Dhabi Fund for Development", 3, "ok", count=0,
+                     layer="anchor-pattern", quality=0.41),
+        PortalHealth("jica", "JICA", 3, "ok", count=0, layer="structural", quality=0.55),
+    ]
 
 
-SAMPLE_TENDERS: list[dict] = [
-    {
-        "id": "worldbank:FIXTURE-001",
-        "title": "Consulting Services for Public Financial Management Reform "
-                 "and Budget Execution Modernisation",
-        "portal": "World Bank", "portal_key": "worldbank",
-        "url": "https://projects.worldbank.org/en/projects-operations/procurement-detail/FIXTURE-001",
-        "posted_date": _ago(6), "closing_date": _in(9),
-        "estimated_value_usd": 2_400_000.0,
-        "sector": "Public Financial Management",
-        "description": "The Ministry of Finance seeks a consulting firm to provide "
-                       "technical assistance for public financial management reform, "
-                       "covering budget execution, treasury single account rollout, "
-                       "institutional reform and capacity building.",
-        "eligibility": "Open to international consulting firms.",
-        "contact": "procurement@mof.gov.jo", "notice_type": "Request for Proposals (RFP)",
-        "language": "en",
-    },
-    {
-        # Same assignment, published on a second portal -> should be merged
-        "id": "ungm:FIXTURE-001-DUP",
-        "title": "Consulting Services for Public Financial Management Reform and "
-                 "Budget Execution Modernization",
-        "portal": "UNGM (UN agencies)", "portal_key": "ungm",
-        "url": "https://www.ungm.org/Public/Notice/999001",
-        "posted_date": _ago(5), "closing_date": _in(9),
-        "estimated_value_usd": None, "sector": "Public Financial Management",
-        "description": "UNDP Jordan seeks a firm for PFM reform technical assistance.",
-        "eligibility": None, "contact": "UNDP", "notice_type": "Request for Proposals (RFP)",
-        "language": "en",
-    },
-    {
-        "id": "ted:FIXTURE-002",
-        "title": "Technical Assistance for Digital Government Transformation "
-                 "and e-Services Architecture, Jordan",
-        "portal": "EU TED", "portal_key": "ted",
-        "url": "https://ted.europa.eu/en/notice/-/detail/FIXTURE-002",
-        "posted_date": _ago(18), "closing_date": _in(26),
-        "estimated_value_usd": 1_150_000.0, "sector": "Digital Government",
-        "description": "Advisory services covering digital transformation strategy, "
-                       "e-government service design, enterprise architecture and "
-                       "institutional capacity building for the Ministry of Digital Economy.",
-        "eligibility": "Open to firms established in the EU and partner countries.",
-        "contact": "EU Delegation to Jordan", "notice_type": "Contract notice - services",
-        "language": "en",
-    },
-    {
-        "id": "fcdo:FIXTURE-003",
-        "title": "Monitoring, Evaluation and Learning Partner - Jordan Governance Programme",
-        "portal": "UK FCDO / Find a Tender", "portal_key": "fcdo",
-        "url": "https://www.find-tender.service.gov.uk/Notice/FIXTURE-003",
-        "posted_date": _ago(40), "closing_date": _in(48),
-        "estimated_value_usd": 3_800_000.0, "sector": "Governance",
-        "description": "FCDO seeks a supplier to deliver monitoring and evaluation, "
-                       "impact evaluation and learning services across its Jordan "
-                       "governance and institutional reform portfolio.",
-        "eligibility": None, "contact": "FCDO Commercial", "notice_type": "Services",
-        "language": "en",
-    },
-    {
-        # National-only -> flagged and penalised
-        "id": "worldbank:FIXTURE-004",
-        "title": "Supply and Installation of Laboratory Equipment, Ministry of Health",
-        "portal": "World Bank", "portal_key": "worldbank",
-        "url": "https://projects.worldbank.org/en/projects-operations/procurement-detail/FIXTURE-004",
-        "posted_date": _ago(11), "closing_date": _in(21),
-        "estimated_value_usd": 640_000.0, "sector": "Health",
-        "description": "National Competitive Bidding. Participation is restricted to "
-                       "national firms only, registered in Jordan.",
-        "eligibility": "National firms only", "contact": "MoH Procurement Unit",
-        "notice_type": "Invitation for Bids (IFB)", "language": "en",
-    },
-    {
-        # Arabic notice -> included and flagged
-        "id": "sfd:FIXTURE-005",
-        "title": "إعلان طرح استشارات لمشروع تطوير قطاع المياه في الأردن",
-        "portal": "Saudi Fund for Development", "portal_key": "sfd",
-        "url": "https://www.sfd.gov.sa/ar/tenders/fixture-005",
-        "posted_date": _ago(3), "closing_date": _in(33),
-        "estimated_value_usd": 900_000.0, "sector": "Energy & Water",
-        "description": "الصندوق السعودي للتنمية يعلن عن طرح خدمات استشارية لمشروع "
-                       "تطوير قطاع المياه في المملكة الأردنية الهاشمية.",
-        "eligibility": None, "contact": None, "notice_type": "SFD announcement",
-        "language": "ar",
-    },
-    {
-        # Expired -> filtered out
-        "id": "ebrd:FIXTURE-006",
-        "title": "Feasibility Study for Amman Urban Transport Corridor",
-        "portal": "EBRD", "portal_key": "ebrd",
-        "url": "https://www.ebrd.com/work-with-us/procurement/fixture-006",
-        "posted_date": _ago(120), "closing_date": _ago(20),
-        "estimated_value_usd": 480_000.0, "sector": "Infrastructure",
-        "description": "Feasibility study and transaction advisory for a bus rapid "
-                       "transit corridor.",
-        "eligibility": None, "contact": None, "notice_type": "EBRD procurement notice",
-        "language": "en",
-    },
-    {
-        # Below the USD 100k threshold -> filtered out
-        "id": "giz:FIXTURE-007",
-        "title": "Short-term Trainer for Workshop Facilitation, GIZ Jordan",
-        "portal": "GIZ", "portal_key": "giz",
-        "url": "https://www.giz.de/en/mediacenter/fixture-007.html",
-        "posted_date": _ago(2), "closing_date": _in(12),
-        "estimated_value_usd": 35_000.0, "sector": "Education",
-        "description": "Facilitation of a two-day workshop.",
-        "eligibility": None, "contact": None, "notice_type": "GIZ tender", "language": "en",
-    },
-    {
-        # No deadline published -> kept and flagged
-        "id": "isdb:FIXTURE-008",
-        "title": "General Procurement Notice - Jordan Renewable Energy and "
-                 "Water Efficiency Programme",
-        "portal": "IsDB", "portal_key": "isdb",
-        "url": "https://www.isdb.org/procurement/fixture-008",
-        "posted_date": _ago(9), "closing_date": None,
-        "estimated_value_usd": None, "sector": "Energy & Water",
-        "description": "General Procurement Notice announcing forthcoming consulting "
-                       "and works packages under an IsDB-financed programme.",
-        "eligibility": None, "contact": "IsDB Procurement", "notice_type": "General Procurement Notice",
-        "language": "en",
-    },
-    {
-        "id": "ungm:FIXTURE-009",
-        "title": "Institutional Capacity Assessment and Organisational Review, UNICEF Jordan",
-        "portal": "UNGM (UN agencies)", "portal_key": "ungm",
-        "url": "https://www.ungm.org/Public/Notice/999009",
-        "posted_date": _ago(1), "closing_date": _in(6),
-        "estimated_value_usd": None, "sector": "Social Protection",
-        "description": "UNICEF Jordan requires a consulting firm to conduct an "
-                       "institutional capacity assessment and organisational review "
-                       "of a national social protection agency, including business "
-                       "process mapping and a reform roadmap.",
-        "eligibility": None, "contact": "UNICEF Jordan", "notice_type": "Request for Proposals (RFP)",
-        "language": "en",
-    },
-]
+def all_broken_health() -> list[PortalHealth]:
+    """Every portal down -- the case the subject line must not hide."""
+    health = sample_health()
+    for h in health:
+        if h.status == "unconfigured":
+            continue
+        h.status = "unavailable"
+        h.count = 0
+        h.reason = "transport error - ConnectionError (the host is blocked)"
+    return health

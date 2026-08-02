@@ -1,78 +1,133 @@
 """
-Agent 1 -- portal scrapers.
+Scraper agent: run every enabled portal and record how each one fared.
 
-Runs every enabled portal module in a bounded thread pool and returns both the
-raw tenders and a per-portal status record. A portal that fails never aborts the
-run: the error is captured and surfaced in the report as
-"Portal X unavailable - check manually".
+A failing portal must never abort the run. It is skipped, its reason is
+diagnosed and kept, and it is reported as unavailable with the URL to check by
+hand. The distinction between "this portal worked and found nothing" and "this
+portal could not be read" is carried all the way through to the email subject
+line -- collapsing the two is how a dead monitor goes unnoticed for weeks.
 """
 
 from __future__ import annotations
 
 import logging
-import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 
-import config
-import portals
+from .. import config, portals
+from ..portals.base import PortalError
 
 log = logging.getLogger(__name__)
 
 
-class PortalStatus(dict):
-    """Per-portal outcome. A plain dict so it serialises straight to JSON."""
+@dataclass
+class PortalHealth:
+    key: str
+    name: str
+    tier: int
+    status: str              # "ok" | "unavailable" | "unconfigured"
+    count: int = 0
+    reason: str = ""
+    urls: list[str] = field(default_factory=list)
+    layer: str = ""
+    quality: float = 0.0
 
     @property
     def ok(self) -> bool:
-        return bool(self["ok"])
+        return self.status == "ok"
+
+    @property
+    def broken(self) -> bool:
+        """Unconfigured is not broken.
+
+        SAM.gov needs an API key whose approval takes weeks. Reporting a
+        paperwork delay as a scraper failure would cry wolf for a month and
+        train the reader to ignore the alert that matters.
+        """
+        return self.status == "unavailable"
 
 
-def _run_one(portal_key: str) -> tuple[list[dict], PortalStatus]:
-    name = config.PORTAL_NAMES.get(portal_key, portal_key)
-    started = time.monotonic()
-    status = PortalStatus(
-        key=portal_key, name=name, ok=False, count=0, error=None, seconds=0.0
+@dataclass
+class ScrapeResult:
+    records: list[dict]
+    health: list[PortalHealth]
+
+    @property
+    def ok_portals(self) -> list[PortalHealth]:
+        return [h for h in self.health if h.ok]
+
+    @property
+    def broken_portals(self) -> list[PortalHealth]:
+        return [h for h in self.health if h.broken]
+
+    @property
+    def unconfigured_portals(self) -> list[PortalHealth]:
+        return [h for h in self.health if h.status == "unconfigured"]
+
+    @property
+    def all_broken(self) -> bool:
+        considered = [h for h in self.health if h.status != "unconfigured"]
+        return bool(considered) and all(h.broken for h in considered)
+
+
+def _run_one(key: str, module) -> PortalHealth:
+    health = PortalHealth(
+        key=key,
+        name=portals.name(key),
+        tier=portals.tier(key),
+        status="ok",
+        urls=portals.source_urls(key),
     )
     try:
-        module = portals.load(portal_key)
-        tenders = module.fetch_tenders() or []
-        status["ok"] = True
-        status["count"] = len(tenders)
-        log.info("%s: OK, %d tenders in %.1fs", name, len(tenders), time.monotonic() - started)
-        return tenders, status
-    except Exception as exc:  # noqa: BLE001 - one portal must never kill the run
-        message = str(exc).strip() or exc.__class__.__name__
-        status["error"] = message[:400]
-        log.warning("%s: FAILED - %s", name, message[:400])
-        return [], status
-    finally:
-        status["seconds"] = round(time.monotonic() - started, 1)
+        records = module.fetch_tenders()
+    except PortalError as exc:
+        reason = exc.reason
+        health.status = "unconfigured" if reason.startswith("not configured") else "unavailable"
+        health.reason = reason
+        if exc.url and exc.url not in health.urls:
+            health.urls.insert(0, exc.url)
+        log.warning("portal %s %s: %s", key, health.status, reason)
+        return health
+    except Exception as exc:  # noqa: BLE001 -- one portal must not kill the run
+        health.status = "unavailable"
+        health.reason = f"unexpected {type(exc).__name__}: {exc}"
+        log.exception("portal %s raised unexpectedly", key)
+        return health
+
+    health.count = len(records)
+    if records:
+        health.layer = records[0].get("_layer", "")
+        health.quality = records[0].get("_quality", 0.0)
+    health._records = records  # type: ignore[attr-defined]
+    return health
 
 
-def scrape_all(portal_keys: list[str] | None = None) -> tuple[list[dict], list[PortalStatus]]:
-    """Scrape every enabled portal in parallel."""
-    keys = portal_keys or [
-        key for key in portals.PORTAL_MODULES if config.ENABLED_PORTALS.get(key, False)
-    ]
-    log.info("Scraping %d portals with %d workers", len(keys), config.MAX_WORKERS)
+def scrape(only: list[str] | None = None) -> ScrapeResult:
+    """Poll every enabled portal in parallel and collect the results."""
+    selected = portals.enabled()
+    if only:
+        selected = {k: v for k, v in selected.items() if k in only}
 
-    all_tenders: list[dict] = []
-    statuses: list[PortalStatus] = []
+    records: list[dict] = []
+    health: list[PortalHealth] = []
 
     with ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as pool:
-        futures = {pool.submit(_run_one, key): key for key in keys}
+        futures = {pool.submit(_run_one, key, module): key
+                   for key, module in selected.items()}
         for future in as_completed(futures):
-            tenders, status = future.result()
-            all_tenders.extend(tenders)
-            statuses.append(status)
+            result = future.result()
+            health.append(result)
+            records.extend(getattr(result, "_records", []))
 
-    # Keep report ordering stable and predictable
-    order = {key: i for i, key in enumerate(portals.PORTAL_MODULES)}
-    statuses.sort(key=lambda s: order.get(s["key"], 999))
+    order = list(portals.MODULES)
+    health.sort(key=lambda h: order.index(h.key) if h.key in order else 99)
+    return ScrapeResult(records=records, health=health)
 
-    ok = sum(1 for s in statuses if s["ok"])
-    log.info(
-        "Scrape complete: %d raw tenders, %d/%d portals succeeded",
-        len(all_tenders), ok, len(statuses),
-    )
-    return all_tenders, statuses
+
+def check_portals() -> list[PortalHealth]:
+    """Reachability check only -- fetch each portal and report, parse nothing.
+
+    Used by --check-portals to answer "can this machine even see these sites?"
+    before anything else is debugged.
+    """
+    return scrape().health

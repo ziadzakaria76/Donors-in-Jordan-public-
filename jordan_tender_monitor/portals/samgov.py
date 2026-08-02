@@ -1,155 +1,96 @@
 """
-SAM.gov contract opportunities (covers USAID and other US government buyers).
+SAM.gov -- US Government and USAID opportunities. REST API, Tier 1.
 
-  GET https://api.sam.gov/prod/opportunities/v2/search
-      ?api_key=KEY&keyword=Jordan&limit=100&offset=0&postedFrom=...&postedTo=...
+Needs a free API key, and approval takes one to four weeks. Until SAM_API_KEY
+is set in .env this portal reports itself as unconfigured rather than failed --
+the two are different, and conflating them would make a paperwork delay look
+like a broken scraper for a month.
 
-An API key is required. Registration is free but approval can take 1-4 weeks --
-see README section 3. Without a key this module raises PortalError with the
-registration instructions, and run.py reports the portal as unavailable rather
-than failing the run.
-
-Note: the API requires postedFrom/postedTo and rejects ranges wider than one
-year, so the "all currently open" lookback is implemented as a rolling
-`SEARCH_WINDOW_DAYS` window plus `active=true`.
+VERIFICATION STATUS: never run against the live API (no key, and the host is
+blocked from the build environment).
 """
 
 from __future__ import annotations
 
-import logging
-from datetime import timedelta
+from datetime import date, timedelta
 
-import config
+from .. import config
+from . import base
 
-from .base import PortalError, clean_text, http_get, make_record, utcnow
-
-log = logging.getLogger(__name__)
-
-PORTAL_KEY = "samgov"
-ENDPOINT = "https://api.sam.gov/prod/opportunities/v2/search"
-PAGE_SIZE = 100
-MAX_PAGES = 10
-SEARCH_WINDOW_DAYS = 364  # API rejects ranges of a year or more
-
-REGISTRATION_HELP = (
-    "SAM.gov API key missing. Register free at https://sam.gov -> create a "
-    "login.gov account -> sign in -> Account Details -> Request Public API Key. "
-    "Approval typically takes 1-4 weeks. Then set SAM_API_KEY in .env."
-)
-
-
-def _extract_rows(payload) -> list[dict]:
-    if isinstance(payload, dict):
-        for key in ("opportunitiesData", "opportunities", "data", "results"):
-            block = payload.get(key)
-            if isinstance(block, list):
-                return [r for r in block if isinstance(r, dict)]
-    if isinstance(payload, list):
-        return [r for r in payload if isinstance(r, dict)]
-    return []
-
-
-def _place(row: dict) -> str:
-    place = row.get("placeOfPerformance")
-    if isinstance(place, dict):
-        country = place.get("country")
-        country = country.get("name") if isinstance(country, dict) else country
-        city = place.get("city")
-        city = city.get("name") if isinstance(city, dict) else city
-        return clean_text(" ".join(str(p) for p in (city, country) if p))
-    return clean_text(place)
-
-
-def _contact(row: dict) -> str:
-    contacts = row.get("pointOfContact")
-    if isinstance(contacts, list) and contacts:
-        first = contacts[0]
-        if isinstance(first, dict):
-            return clean_text(
-                " ".join(
-                    str(first.get(k))
-                    for k in ("fullName", "email", "phone")
-                    if first.get(k)
-                )
-            )
-    return clean_text(contacts)
+API = "https://api.sam.gov/prod/opportunities/v2/search"
+KEY = "samgov"
 
 
 def fetch_tenders() -> list[dict]:
     if not config.SAM_API_KEY:
-        raise PortalError(REGISTRATION_HELP)
+        raise base.PortalError(
+            "not configured - no SAM_API_KEY in .env. Request a free key at "
+            "sam.gov (approval takes 1-4 weeks), then set SAM_API_KEY.", API)
 
-    today = utcnow().date()
-    posted_from = today - timedelta(days=SEARCH_WINDOW_DAYS)
+    # SAM requires an explicit posted-from/to window and rejects ranges over a
+    # year. This is a mandatory API parameter, not a lookback filter -- the
+    # configured policy is no date cutoff (Q5).
+    today = date.today()
+    params = {
+        "api_key": config.SAM_API_KEY,
+        "limit": 500,
+        "offset": 0,
+        "postedFrom": (today - timedelta(days=364)).strftime("%m/%d/%Y"),
+        "postedTo": today.strftime("%m/%d/%Y"),
+        "ncode": "JO",           # place-of-performance country
+    }
 
-    tenders: list[dict] = []
-    for page in range(MAX_PAGES):
-        params = {
-            "api_key": config.SAM_API_KEY,
-            "keyword": "Jordan",
-            "limit": PAGE_SIZE,
-            "offset": page * PAGE_SIZE,
-            "postedFrom": posted_from.strftime("%m/%d/%Y"),
-            "postedTo": today.strftime("%m/%d/%Y"),
-            "active": "true",
-        }
-        resp = http_get(ENDPOINT, params=params)
-        if resp.status_code in (401, 403):
-            raise PortalError(
-                f"SAM.gov rejected the API key (HTTP {resp.status_code}). "
-                "Check SAM_API_KEY in .env is current and approved."
-            )
-        if resp.status_code == 429:
-            raise PortalError(
-                "SAM.gov rate limit reached (public keys are capped at 10 "
-                "requests/day). Try again tomorrow or request a higher tier."
-            )
-        if resp.status_code != 200:
-            raise PortalError(f"SAM.gov API returned HTTP {resp.status_code}")
-        try:
-            payload = resp.json()
-        except ValueError as exc:
-            raise PortalError(f"SAM.gov returned non-JSON content: {exc}") from exc
+    data = base.fetch_json(API, params=params)
+    items = data.get("opportunitiesData") if isinstance(data, dict) else None
+    if items is None and isinstance(data, dict):
+        items = data.get("results") or data.get("data") or []
+    if not items:
+        # A genuinely empty window is normal for Jordan on SAM.gov.
+        return []
 
-        rows = _extract_rows(payload)
-        if not rows:
-            break
+    records = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title") or ""
+        if not title:
+            continue
 
-        for row in rows:
-            title = clean_text(row.get("title"))
-            if not title:
-                continue
-            place = _place(row)
-            description = clean_text(row.get("description") or row.get("synopsis"))
-            detail = " | ".join(
-                b for b in (
-                    description,
-                    f"Place of performance: {place}" if place else "",
-                    f"Agency: {clean_text(row.get('fullParentPathName'))}"
-                    if row.get("fullParentPathName") else "",
-                    f"NAICS: {clean_text(row.get('naicsCode'))}"
-                    if row.get("naicsCode") else "",
-                ) if b
-            )
-            tenders.append(
-                make_record(
-                    portal_key=PORTAL_KEY,
-                    native_id=clean_text(row.get("noticeId")),
-                    title=title,
-                    url=clean_text(row.get("uiLink") or row.get("link")),
-                    posted_date=row.get("postedDate"),
-                    closing_date=row.get("responseDeadLine") or row.get("archiveDate"),
-                    estimated_value=row.get("award", {}).get("amount")
-                    if isinstance(row.get("award"), dict) else None,
-                    description=detail,
-                    contact=_contact(row),
-                    notice_type=clean_text(row.get("type") or row.get("baseType")),
-                    eligibility=clean_text(row.get("typeOfSetAsideDescription")),
-                )
-            )
+        award = item.get("award") or {}
+        value_text = None
+        if isinstance(award, dict):
+            value_text = award.get("amount")
 
-        if len(rows) < PAGE_SIZE:
-            break
+        place = item.get("placeOfPerformance") or {}
+        country = ""
+        if isinstance(place, dict):
+            country = ((place.get("country") or {}).get("name")
+                       if isinstance(place.get("country"), dict)
+                       else place.get("country")) or ""
 
-    log.info("SAM.gov: %d notices retrieved", len(tenders))
-    return tenders
+        records.append(base.build_record(
+            portal=KEY,
+            title=title,
+            url=item.get("uiLink") or item.get("link"),
+            posted=item.get("postedDate"),
+            closing=item.get("responseDeadLine") or item.get("responseDeadline"),
+            value_text=value_text,
+            description=item.get("description") or country,
+            notice_type=item.get("type") or item.get("baseType"),
+            contact=_contact(item),
+            reference=item.get("noticeId") or item.get("solicitationNumber"),
+            default_currency="USD",
+        ))
+
+    return base.jordan_only(records)
+
+
+def _contact(item: dict) -> str | None:
+    contacts = item.get("pointOfContact")
+    if isinstance(contacts, list) and contacts:
+        first = contacts[0]
+        if isinstance(first, dict):
+            return " ".join(
+                str(first.get(k)) for k in ("fullName", "email") if first.get(k)
+            ) or None
+    return None

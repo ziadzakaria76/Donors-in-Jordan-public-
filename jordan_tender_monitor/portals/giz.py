@@ -1,48 +1,47 @@
 """
-GIZ (Deutsche Gesellschaft fuer Internationale Zusammenarbeit) tender notices.
+GIZ -- Deutsche Gesellschaft fuer Internationale Zusammenarbeit. Tier 2.
 
-GIZ runs a large Jordan portfolio. International tenders appear on the GIZ site
-and on its own e-procurement platform; both are tried. Dates here are typically
-German-format (31.12.2026, "15. Januar 2027"), which base.parse_date handles.
+Two sources: the English contractor page and the German tender portal, which
+carries considerably more. German formatting is the reason utils.money handles
+dot-as-thousands and utils.dates handles "15. Januar 2027" -- EUR 1.500.000
+read as 1.5 would put a real contract below the minimum value and delete it.
+
+VERIFICATION STATUS: never run against the live site; selectors unverified.
 """
 
 from __future__ import annotations
 
-from .harvester import Source, harvest
+from . import harvester
+from .harvester import HtmlSpec
 
-PORTAL_KEY = "giz"
-LABEL = "GIZ"
-MANUAL_URL = "https://www.giz.de/en/mediacenter/117.html"
+KEY = "giz"
 
-# URLs verified August 2026. The tenders index is /en/partner/contractor/tenders
-# -- the /en/mediacenter/117.html path from the original brief is the old media
-# centre and carries no tender listings. GIZ also runs country tender pages
-# under /en/regions/<region>/<country>/tenders.
-SOURCES = [
-    Source("https://www.giz.de/en/partner/contractor/tenders"),
-    Source("https://ausschreibungen.giz.de", js=True),
-    Source("https://www.giz.de/en/regions/middle-east/jordan/tenders"),
-    Source("https://www.giz.de/en/worldwide/jordan.html"),
-]
-
-SELECTORS = [
-    "div.tender-item", "li.tender", "table.tenders tbody tr",
-    "div.c-teaser", "article", "table tbody tr", "div.list-item",
-    "div[class*='tender']", "div[class*='ausschreibung']",
-]
-
-# Real notice permalinks look like /en/invitation-tender-7000004018-supply-...
-# and /en/procurement-goods-supply-it-equipment-software
-HREF_PATTERN = r"(invitation-tender|procurement-|ausschreibung|tender|vergabe|/\d{2,6}\.html)"
+SPEC = HtmlSpec(
+    key=KEY,
+    urls=[
+        "https://www.giz.de/en/partner/contractor/tenders",
+        "https://ausschreibungen.giz.de/Satellite/company/welcome.do",
+    ],
+    # SELECTOR HINTS ONLY -- written without access to the live pages, which
+    # were blocked from the build environment. If a hint is wrong the quality
+    # gate rejects it and a class-independent layer takes over. Confirm with:
+    #     python run.py --capture giz
+    selectors=[
+        "div.tender-item",
+        "tr.tableRow",
+        "table.publicationTable tbody tr",
+        "li.result",
+    ],
+    anchor_hint="/Satellite/notice",
+    currency="EUR",
+    filter_to_jordan=True,
+    notes="English page plus the German ausschreibungen portal",
+)
 
 
 def fetch_tenders() -> list[dict]:
-    return harvest(
-        portal_key=PORTAL_KEY,
-        label=LABEL,
-        sources=SOURCES,
-        selectors=SELECTORS,
-        href_pattern=HREF_PATTERN,
-        notice_type="GIZ tender",
-        manual_url=MANUAL_URL,
-    )
+    return harvester.harvest(SPEC)
+
+
+def capture():
+    return harvester.capture(SPEC)

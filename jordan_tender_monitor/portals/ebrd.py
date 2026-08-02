@@ -1,49 +1,46 @@
 """
-EBRD procurement notices (HTML).
+EBRD -- European Bank for Reconstruction and Development. Tier 2.
 
-EBRD publishes notices on ebrd.com and runs its full tendering system on ECEPP.
-Both are tried. Jordan is a relatively recent EBRD country of operation, so
-volumes are usually low.
+Two sources: the notices page on ebrd.com, and ECEPP, which is where the
+tender documents and many of the consultancy assignments actually live. Either
+one failing is tolerated as long as the other works.
+
+VERIFICATION STATUS: never run against the live site; selectors unverified.
 """
 
 from __future__ import annotations
 
-from .harvester import Source, harvest
+from . import harvester
+from .harvester import HtmlSpec
 
-PORTAL_KEY = "ebrd"
-LABEL = "EBRD"
-MANUAL_URL = "https://www.ebrd.com/work-with-us/procurement.html"
+KEY = "ebrd"
 
-# URLs verified August 2026. EBRD moved project procurement under
-# /home/work-with-us/project-procurement/ and runs live tendering on ECEPP,
-# whose search results page is noticeSearchResults.html (not the
-# searchContractNotice.html this module previously targeted).
-SOURCES = [
-    Source("https://www.ebrd.com/home/work-with-us/project-procurement/procurement-notices.html"),
-    Source("https://ecepp.ebrd.com/delta/noticeSearchResults.html", js=True),
-    Source("https://www.ebrd.com/home/work-with-us/corporate-procurement-consultancy-services.html"),
-    # Legacy paths, kept as fallbacks in case of redirects
-    Source("https://www.ebrd.com/work-with-us/procurement/notices.html"),
-]
-
-SELECTORS = [
-    "div.procurement-notice", "li.search-result", "article.notice",
-    "table.notices tbody tr", "div.result-item", "div.views-row",
-    "div[class*='notice']", "li[class*='result']",
-]
-
-# ECEPP notice permalinks look like:
-#   https://ecepp.ebrd.com/delta/viewNotice.html?displayNoticeId=39536445
-HREF_PATTERN = r"(viewNotice\.html|displayNoticeId=|procurement-notices|(procurement|notice|tender|contract).*(\.html|/\d+))"
+SPEC = HtmlSpec(
+    key=KEY,
+    urls=[
+        "https://www.ebrd.com/home/work-with-us/project-procurement/procurement-notices.html",
+        "https://ecepp.ebrd.com/delta/noticeSearchResults.html",
+    ],
+    # SELECTOR HINTS ONLY -- written without access to the live pages, which
+    # were blocked from the build environment. If a hint is wrong the quality
+    # gate rejects it and a class-independent layer takes over. Confirm with:
+    #     python run.py --capture ebrd
+    selectors=[
+        "div.procurement-notice",
+        "article.notice",
+        "li.search-result",
+        "table.noticeTable tbody tr",
+    ],
+    anchor_hint="/procurement",
+    currency="EUR",
+    filter_to_jordan=True,
+    notes="ebrd.com plus ECEPP; ECEPP carries the consultancy assignments",
+)
 
 
 def fetch_tenders() -> list[dict]:
-    return harvest(
-        portal_key=PORTAL_KEY,
-        label=LABEL,
-        sources=SOURCES,
-        selectors=SELECTORS,
-        href_pattern=HREF_PATTERN,
-        notice_type="EBRD procurement notice",
-        manual_url=MANUAL_URL,
-    )
+    return harvester.harvest(SPEC)
+
+
+def capture():
+    return harvester.capture(SPEC)

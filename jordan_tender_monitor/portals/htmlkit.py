@@ -1,797 +1,882 @@
 """
-Extraction primitives for the HTML-scraping portals.
+Class-independent HTML extraction.
 
-The hard problem is that donor sites redesign without notice, so any scraper
-pinned to CSS class names is one relaunch away from silently returning nothing.
-This module therefore extracts through a cascade, most structured first:
+Donor sites redesign without notice, and a scraper pinned to CSS class names is
+one relaunch away from silently returning nothing -- which looks exactly like a
+quiet week. Every page therefore runs through a cascade of six layers, and the
+first layer whose rows score as a genuine notice listing wins:
 
-  1. RSS/Atom feed         -- a published contract; survives redesigns entirely
-  2. Embedded JSON         -- JSON-LD, __NEXT_DATA__, drupalSettings
-  3. CSS selectors         -- fast and precise while the markup holds
-  4. Header-aware tables   -- maps "Deadline"/"Published" columns to fields
-  5. Structural inference  -- finds the repeated sibling block, ignoring classes
-  6. Anchor pattern match  -- last resort
+  1. RSS / Atom feed        -- a published contract, survives redesigns
+  2. Embedded JSON          -- JSON-LD, __NEXT_DATA__, drupalSettings
+  3. CSS selectors          -- fast while the markup holds
+  4. Header-aware tables    -- map Deadline/Published/Value columns to fields
+  5. Structural inference   -- the repeated sibling block, ignoring classes
+  6. Anchor URL pattern     -- last resort
 
-Layers 1, 2 and 5 are the ones that keep working after a redesign: none of them
-depends on a class name.
+Layers 1, 2 and 5 use no class names at all.
 
-`diagnose()` separates the two failure modes that need different fixes -- a bot
-wall or JavaScript shell (install Playwright / the site is blocking us) from a
-genuine layout change (update the selectors) -- so the report says something
-actionable instead of "unavailable".
+THE QUALITY GATE IS THE POINT. Selectors (layer 3) run before the
+class-independent layers, so an over-broad guess like bare `article` or
+`table tbody tr` will happily match a navigation menu or a related-documents
+table and short-circuit the layer that would actually have worked. Each layer's
+rows are therefore scored for "listing-likeness" and must clear a threshold to
+win. Carrying a parseable date is weighted most heavily, because that is what
+separates a notice listing from a nav menu. If no layer clears the bar, the
+best-scoring layer is returned rather than nothing -- a weak result the caller
+can see beats a silent zero.
 """
 
 from __future__ import annotations
 
 import json
-import logging
 import re
-from urllib.parse import urljoin, urlparse
+from dataclasses import dataclass, field
+from urllib.parse import urljoin
 
-import config
+import warnings
 
-from .base import PortalError, clean_text, http_get, parse_date, soup_of
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 
-log = logging.getLogger(__name__)
+# The cascade deliberately feeds every layer the same content, so the HTML
+# layers legitimately see an RSS document when the feed layer is the right one.
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
-MIN_TITLE_LENGTH = 12
-MIN_GROUP_SIZE = 3
-MAX_ELEMENTS_SCANNED = 30_000  # structural inference guard on very large pages
+from ..utils.dates import parse_date
+from ..utils.text import clean
 
-DATE_TEXT_RE = re.compile(
-    r"\b(\d{1,2}[\s/.-][A-Za-z؀-ۿ]{3,14}[\s/.-]\d{4}"
-    r"|\d{4}-\d{2}-\d{2}"
-    r"|\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}"
-    r"|[A-Za-z]{3,9}\s+\d{1,2},\s*\d{4}"
-    r"|[٠-٩]{1,2}[\s/.-][؀-ۿ]{3,14}[\s/.-][٠-٩]{4})\b"
-)
+# ---------------------------------------------------------------------------
+# Row model
+# ---------------------------------------------------------------------------
 
-DEADLINE_LABELS = (
-    "deadline", "closing", "closes", "submission", "expiry", "expires",
-    "due", "response date", "last date", "bid closing", "offers by",
-    "abgabefrist", "frist", "angebotsfrist", "date limite",
-    "الموعد النهائي", "آخر موعد", "تاريخ الإغلاق", "اخر موعد",
-)
-POSTED_LABELS = (
-    "published", "posted", "publication", "issued", "release date",
-    "date of publication", "veröffentlicht", "veroeffentlicht",
-    "date de publication", "تاريخ النشر", "نشر بتاريخ",
-)
 
-# Column-header -> canonical field, for table extraction
-HEADER_FIELD_MAP = {
-    "closing_date": ("deadline", "closing", "closes", "submission", "due",
-                     "expiry", "abgabefrist", "frist", "date limite",
-                     "الموعد النهائي", "تاريخ الإغلاق"),
-    "posted_date": ("published", "posted", "publication", "issued", "date",
-                    "veröffentlicht", "تاريخ النشر"),
-    "estimated_value": ("value", "amount", "budget", "estimated", "contract value",
-                        "wert", "montant", "القيمة"),
-    "notice_type": ("type", "notice type", "procurement type", "category",
-                    "art", "النوع"),
-    "reference": ("reference", "ref", "reference no", "notice no", "id",
-                  "referenz", "المرجع"),
-    "country": ("country", "location", "place", "land", "pays", "الدولة"),
+@dataclass
+class Row:
+    """One candidate notice, before it is normalised into a tender record."""
+
+    title: str = ""
+    url: str | None = None
+    date_text: str | None = None
+    closing_text: str | None = None
+    value_text: str | None = None
+    description: str | None = None
+    reference: str | None = None
+    raw_text: str = ""
+    extra: dict = field(default_factory=dict)
+
+    def blob(self) -> str:
+        return " ".join(
+            p for p in (self.title, self.description, self.raw_text,
+                        self.reference, self.value_text) if p
+        )
+
+
+@dataclass
+class LayerResult:
+    layer: str
+    rows: list[Row]
+    quality: float = 0.0
+    note: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Quality scoring
+# ---------------------------------------------------------------------------
+
+# Titles that mean "this is the site chrome, not the listing".
+_NAV_WORDS = {
+    "home", "about", "about us", "contact", "contact us", "login", "log in",
+    "sign in", "register", "search", "menu", "next", "previous", "back",
+    "skip to main content", "privacy", "cookies", "terms", "sitemap",
+    "newsletter", "careers", "faq", "help", "more", "read more", "download",
+    "share", "print", "english", "français", "deutsch", "العربية",
+    "accessibility", "legal notice", "imprint", "subscribe", "follow us",
 }
 
-# Pages that loaded but are unusable, and why
-_BOT_WALL_MARKERS = (
-    "just a moment", "attention required", "cf-browser-verification",
-    "captcha", "are you a robot", "access denied", "request unsuccessful",
-    "incapsula incident", "ddos protection", "checking your browser",
+_MIN_TITLE_LEN = 12
+QUALITY_THRESHOLD = 0.36
+
+
+def _title_is_navish(title: str) -> bool:
+    t = clean(title).lower().strip(" .:|-–")
+    if not t:
+        return True
+    if t in _NAV_WORDS:
+        return True
+    if len(t) < _MIN_TITLE_LEN and not any(ch.isdigit() for ch in t):
+        return True
+    return False
+
+
+def score_rows(rows: list[Row]) -> float:
+    """Score 0..1 for how much these rows look like a real notice listing.
+
+    A date carries the most weight deliberately. Navigation menus, breadcrumb
+    trails and related-document tables all have titles and links; what they do
+    not have is a publication or closing date on every row.
+    """
+    if not rows:
+        return 0.0
+    n = len(rows)
+
+    with_title = sum(1 for r in rows if not _title_is_navish(r.title))
+    with_date = sum(1 for r in rows
+                    if parse_date(r.closing_text) or parse_date(r.date_text)
+                    or _looks_dated(r.raw_text))
+    with_url = sum(1 for r in rows if r.url)
+    distinct = len({clean(r.title).lower() for r in rows if r.title})
+
+    title_frac = with_title / n
+    date_frac = with_date / n
+    url_frac = with_url / n
+    distinct_frac = (distinct / n) if n else 0.0
+
+    score = (0.45 * date_frac + 0.25 * title_frac
+             + 0.15 * url_frac + 0.15 * distinct_frac)
+
+    # A hard gate on dates, not just a heavy weight.
+    #
+    # Weighting alone is not enough: a navigation block of four promo panels
+    # scores 1.0 on titles, links and distinctness, which reaches 0.55 on
+    # weights alone and sails past the threshold while carrying no dates at
+    # all. Every real notice listing dates its rows; almost no nav menu does.
+    # So a low date fraction multiplies the whole score down rather than
+    # merely failing to add to it.
+    if date_frac == 0:
+        score *= 0.30
+    elif date_frac < 0.25:
+        score *= 0.45
+    elif date_frac < 0.50:
+        score *= 0.75
+
+    # Two rows could be anything; a listing usually has several.
+    if n < 3:
+        score *= 0.75
+    return round(min(score, 1.0), 4)
+
+
+def _drop_navish(rows: list[Row]) -> list[Row]:
+    """Remove rows whose title is site chrome rather than a notice.
+
+    Applied to the class-independent layers, where a repeated-sibling match can
+    legitimately pick up a trailing "About | Contact" paragraph alongside the
+    real rows. Left in place, that becomes a phantom tender.
+    """
+    return [r for r in rows if not _title_is_navish(r.title)]
+
+
+_DATE_HINT_RE = re.compile(
+    r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b"
+    r"|\b\d{1,2}\s+\w{3,}\s+\d{4}\b|[٠-٩]{1,2}\s",
 )
-_JS_REQUIRED_MARKERS = (
-    "please enable javascript", "enable javascript to", "javascript is required",
-    "you need to enable javascript", "<noscript>you need",
-)
 
 
-# --------------------------------------------------------------------------
-# Fetching
-# --------------------------------------------------------------------------
-def fetch_html(url: str, *, params: dict | None = None, js: bool = False) -> str:
-    """Fetch a page as text, with encoding repaired and JS rendering optional."""
-    if js:
-        rendered = render_js(url)
-        if rendered:
-            return rendered
-    resp = http_get(url, params=params)
-    if resp.status_code >= 400:
-        raise PortalError(f"HTTP {resp.status_code} from {url}")
-    # requests guesses latin-1 for text/* without a charset, which mangles Arabic
-    if not resp.encoding or resp.encoding.lower() in ("iso-8859-1", "ascii"):
-        resp.encoding = resp.apparent_encoding or "utf-8"
-    return resp.text
+def _looks_dated(text: str) -> bool:
+    return bool(text) and bool(_DATE_HINT_RE.search(text))
 
 
-def render_js(url: str, wait_selector: str | None = None, timeout_ms: int = 30_000) -> str | None:
-    """Render a JS-dependent page with headless Chromium. None if unavailable."""
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        log.info("Playwright not installed; using static HTML for %s", url)
-        return None
-    try:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            try:
-                page = browser.new_page(user_agent=config.USER_AGENT)
-                page.goto(url, timeout=timeout_ms, wait_until="domcontentloaded")
-                if wait_selector:
-                    try:
-                        page.wait_for_selector(wait_selector, timeout=timeout_ms // 2)
-                    except Exception:
-                        pass
-                page.wait_for_timeout(2500)
-                return page.content()
-            finally:
-                browser.close()
-    except Exception as exc:  # noqa: BLE001 - a browser failure is never fatal
-        log.warning("Playwright render failed for %s: %s", url, exc)
-        return None
+# ---------------------------------------------------------------------------
+# Failure diagnosis -- these need different fixes, so they are named apart
+# ---------------------------------------------------------------------------
+
+_BOT_MARKERS = [
+    "cloudflare", "cf-browser-verification", "checking your browser",
+    "incapsula", "_incapsula_resource", "access denied", "attention required",
+    "captcha", "ddos protection", "please enable javascript and cookies",
+    "request unsuccessful", "akamai", "bot detection",
+]
+_JS_SHELL_MARKERS = [
+    "you need to enable javascript", "enable javascript to run this app",
+    "__next_data__", "ng-app", "id=\"root\"", "id='root'", "id=\"app\"",
+    "noscript",
+]
 
 
-# --------------------------------------------------------------------------
-# Diagnosis
-# --------------------------------------------------------------------------
-def diagnose(html: str) -> str | None:
-    """Why is this page unusable? None means the page looks fine."""
-    if not html or len(html) < 200:
-        return "empty response"
-    lowered = html.lower()
-    for marker in _BOT_WALL_MARKERS:
-        if marker in lowered:
-            return (f"blocked by bot protection ({marker!r}) - the site is refusing "
-                    "automated access; try running with Playwright installed or from "
-                    "a different network")
-    for marker in _JS_REQUIRED_MARKERS:
-        if marker in lowered:
-            return ("page requires JavaScript - run `playwright install chromium` "
-                    "so this portal can be rendered")
-    text = clean_text(soup_of(html).get_text(" "))
-    if len(text) < 400 and lowered.count("<script") > 2:
-        return ("page returned a JavaScript shell with no server-rendered content - "
-                "run `playwright install chromium` so this portal can be rendered")
-    return None
+def diagnose(html: str, rows: list[Row]) -> str:
+    """Name the failure class, because each one needs a different fix."""
+    if rows:
+        return "ok"
+    if not html:
+        return "transport error - no content returned (check the URL or host access)"
+
+    low = html.lower()
+    if any(m in low for m in _BOT_MARKERS):
+        return "bot wall (Cloudflare/Incapsula) - needs a different network or Playwright"
+
+    text_len = len(clean(BeautifulSoup(html, "html.parser").get_text(" ")))
+    if text_len < 600 and any(m in low for m in _JS_SHELL_MARKERS):
+        return "JavaScript shell - content is rendered client-side; run: playwright install chromium"
+    if text_len < 250:
+        return "JavaScript shell or empty response - almost no text in the HTML"
+
+    return "layout change - the page loaded but no layer found a listing; run --capture to inspect"
 
 
-# --------------------------------------------------------------------------
-# Layer 1: RSS / Atom
-# --------------------------------------------------------------------------
-def discover_feeds(html: str, base_url: str) -> list[str]:
-    """Feed URLs advertised in <link rel="alternate">."""
-    soup = soup_of(html)
-    feeds = []
-    for link in soup.find_all("link", href=True):
-        rel = " ".join(link.get("rel") or []).lower()
-        ftype = (link.get("type") or "").lower()
-        if "alternate" in rel and ("rss" in ftype or "atom" in ftype or "xml" in ftype):
-            feeds.append(urljoin(base_url, link["href"]))
-    return feeds
+# ---------------------------------------------------------------------------
+# Layer 1 -- RSS / Atom
+# ---------------------------------------------------------------------------
 
 
-def _feed_tag(entry, names: tuple[str, ...]):
-    """First child tag whose name matches, ignoring case and namespace prefix."""
+def _find_ci(node, *names):
+    """Find a child tag by name, case-insensitively.
+
+    BeautifulSoup's XML parser preserves case, so a search for 'pubdate' will
+    not match <pubDate>. Every feed in the wild uses the camelCase spelling.
+    """
     wanted = {n.lower() for n in names}
-    for child in entry.find_all(True):
-        if child.name.lower() in wanted:
+    for child in node.find_all(True, recursive=True):
+        if child.name and child.name.lower().split(":")[-1] in wanted:
             return child
     return None
 
 
-def _feed_text(entry, names: tuple[str, ...]) -> str:
-    tag = _feed_tag(entry, names)
-    return clean_text(tag.get_text(" ")) if tag is not None else ""
+def _all_ci(soup, *names):
+    wanted = {n.lower() for n in names}
+    return [t for t in soup.find_all(True)
+            if t.name and t.name.lower().split(":")[-1] in wanted]
 
 
-def parse_feed(xml: str, base_url: str = "") -> list[dict]:
-    """Rows from an RSS or Atom feed. Tag names are matched case-insensitively
-    because XML parsing preserves case (<pubDate>, not <pubdate>)."""
+def extract_feed(content: str, base_url: str = "") -> LayerResult:
+    """Parse an RSS or Atom feed.
+
+    Parsed as XML, not HTML. Under an HTML parser BeautifulSoup treats <link>
+    as a void element, so <link>https://…</link> yields an empty string and
+    every notice loses its URL.
+    """
+    rows: list[Row] = []
+    if not content or "<" not in content:
+        return LayerResult("feed", rows, 0.0, "not XML")
     try:
-        # Must parse as XML: the HTML parser treats <link> as a void element,
-        # which silently empties every feed item's URL.
-        soup = soup_of(xml, xml=True)
+        soup = BeautifulSoup(content, "xml")
     except Exception:
-        return []
-    rows = []
-    for entry in soup.find_all(lambda t: t.name.lower() in ("item", "entry")):
-        title = _feed_text(entry, ("title",))
-        if len(title) < MIN_TITLE_LENGTH:
-            continue
+        return LayerResult("feed", rows, 0.0, "XML parse failed")
 
-        url = ""
-        link_tag = _feed_tag(entry, ("link",))
-        if link_tag is not None:
-            url = clean_text(link_tag.get("href") or link_tag.get_text(" "))
+    items = _all_ci(soup, "item", "entry")
+    for item in items:
+        title_tag = _find_ci(item, "title")
+        title = clean(title_tag.get_text() if title_tag else "")
+
+        # Atom puts the URL in link/@href; RSS puts it in the element text.
+        url = None
+        for link in _all_ci(item, "link"):
+            href = link.get("href") or clean(link.get_text())
+            if href:
+                url = urljoin(base_url, href)
+                break
         if not url:
-            url = _feed_text(entry, ("guid", "id"))
+            guid = _find_ci(item, "guid", "id")
+            if guid:
+                text = clean(guid.get_text())
+                if text.startswith("http"):
+                    url = text
 
-        description = _feed_text(entry, ("description", "summary", "content"))
-        published = _feed_text(entry, ("pubdate", "published", "updated", "date"))
-        rows.append({
-            "title": title,
-            "url": urljoin(base_url, url) if url else base_url,
-            "text": f"{title} | {description}",
-            "fields": {"posted_date": published} if published else {},
-            "source": "feed",
-        })
-    return rows
+        date_tag = _find_ci(item, "pubDate", "published", "updated", "date")
+        desc_tag = _find_ci(item, "description", "summary", "content")
+
+        if not title:
+            continue
+        rows.append(Row(
+            title=title,
+            url=url,
+            date_text=clean(date_tag.get_text()) if date_tag else None,
+            description=clean(desc_tag.get_text()) if desc_tag else None,
+            raw_text=clean(item.get_text(" ")),
+        ))
+
+    return LayerResult("feed", rows, score_rows(rows))
 
 
-# --------------------------------------------------------------------------
-# Layer 2: embedded JSON
-# --------------------------------------------------------------------------
-_TITLE_KEYS = ("title", "name", "headline", "noticetitle", "subject", "label")
-_URL_KEYS = ("url", "link", "href", "permalink", "detailurl", "noticeurl")
-_DEADLINE_KEYS = ("deadline", "closingdate", "closing_date", "enddate", "expirydate",
-                  "submissiondeadline", "responsedeadline", "tenderdeadline")
-_POSTED_KEYS = ("datepublished", "published", "posteddate", "publicationdate",
-                "startdate", "created", "date")
-_DESC_KEYS = ("description", "summary", "abstract", "body", "text", "content")
-_VALUE_KEYS = ("value", "amount", "estimatedvalue", "budget", "contractvalue")
+# ---------------------------------------------------------------------------
+# Layer 2 -- embedded JSON
+# ---------------------------------------------------------------------------
 
-# schema.org types that describe the site rather than a notice
-_NON_NOTICE_TYPES = {
-    "Organization", "WebSite", "WebPage", "BreadcrumbList", "SearchAction",
-    "ImageObject", "Person", "SiteNavigationElement", "LocalBusiness",
-    "CollectionPage", "Corporation", "GovernmentOrganization", "Logo",
-    "ContactPoint", "PostalAddress", "ListItem",
+# schema.org types that describe the SITE, not a notice. Nearly every page
+# embeds {"@type":"Organization","name":…,"url":…}; accepting those fills the
+# report with phantom notices named after the donor.
+_SITE_TYPES = {
+    "organization", "website", "webpage", "breadcrumblist", "sitenavigationelement",
+    "searchaction", "imageobject", "logo", "collegeoruniversity", "corporation",
+    "governmentorganization", "ngo", "person", "contactpoint", "postaladdress",
+    "wpheader", "wpfooter", "itemlist",
 }
 
+_TITLE_KEYS = ("title", "name", "headline", "noticetitle", "subject",
+               "projectname", "tendertitle", "contracttitle", "label")
+_URL_KEYS = ("url", "link", "href", "detailurl", "noticeurl", "permalink",
+             "weburl", "documenturl")
+_DATE_KEYS = ("date", "datepublished", "publisheddate", "publicationdate",
+              "posteddate", "created", "startdate", "noticedate", "pubdate")
+_CLOSE_KEYS = ("deadline", "closingdate", "closedate", "enddate", "expirydate",
+               "duedate", "submissiondeadline", "responsedeadline", "validuntil")
+_VALUE_KEYS = ("value", "amount", "estimatedvalue", "contractvalue", "budget",
+               "price", "estimatedcost", "totalvalue")
+_DESC_KEYS = ("description", "summary", "abstract", "details", "text", "body")
+_REF_KEYS = ("id", "reference", "referencenumber", "noticeid", "noticenumber",
+             "projectid", "tenderid", "solicitationnumber")
 
-def _walk(node, depth: int = 0):
-    """Yield every dict inside a nested JSON structure."""
-    if depth > 12:
-        return
-    if isinstance(node, dict):
-        yield node
-        for value in node.values():
-            yield from _walk(value, depth + 1)
-    elif isinstance(node, list):
-        for item in node[:400]:
-            yield from _walk(item, depth + 1)
 
-
-def _pick(obj: dict, keys: tuple[str, ...]) -> str:
-    lowered = {k.lower().replace("-", "").replace("_", ""): v for k, v in obj.items()}
+def _first_key(obj: dict, keys: tuple[str, ...]) -> str | None:
+    lowered = {str(k).lower().replace("_", "").replace("-", ""): v
+               for k, v in obj.items()}
     for key in keys:
-        value = lowered.get(key.replace("_", ""))
-        if isinstance(value, (str, int, float)) and str(value).strip():
-            return clean_text(value)
-        if isinstance(value, dict):
-            inner = _pick(value, ("value", "name", "url", "text", "en", "eng"))
-            if inner:
-                return inner
-    return ""
-
-
-def extract_embedded_json(html: str, base_url: str) -> list[dict]:
-    """Rows from JSON-LD, __NEXT_DATA__ or other inline JSON blobs."""
-    soup = soup_of(html)
-    blobs: list = []
-
-    for script in soup.find_all("script"):
-        stype = (script.get("type") or "").lower()
-        sid = (script.get("id") or "").lower()
-        raw = script.string or script.get_text() or ""
-        raw = raw.strip()
-        if not raw:
-            continue
-        if "ld+json" in stype or sid in ("__next_data__", "__nuxt_data__"):
-            try:
-                blobs.append(json.loads(raw))
-            except (ValueError, TypeError):
-                continue
-        elif "json" in stype and len(raw) < 2_000_000:
-            try:
-                blobs.append(json.loads(raw))
-            except (ValueError, TypeError):
-                continue
-        else:
-            # drupalSettings / window.__INITIAL_STATE__ style assignments
-            match = re.search(
-                r"(?:drupalSettings|__INITIAL_STATE__|__PRELOADED_STATE__)\s*=\s*(\{.*?\});?\s*$",
-                raw, re.DOTALL,
-            )
-            if match:
-                try:
-                    blobs.append(json.loads(match.group(1)))
-                except (ValueError, TypeError):
-                    continue
-
-    rows, seen = [], set()
-    for blob in blobs:
-        for obj in _walk(blob):
-            if str(obj.get("@type") or obj.get("type") or "") in _NON_NOTICE_TYPES:
-                continue
-            title = _pick(obj, _TITLE_KEYS)
-            if len(title) < MIN_TITLE_LENGTH:
-                continue
-            url = _pick(obj, _URL_KEYS)
-            fields = {}
-            for field, keys in (("closing_date", _DEADLINE_KEYS),
-                                ("posted_date", _POSTED_KEYS),
-                                ("estimated_value", _VALUE_KEYS)):
-                value = _pick(obj, keys)
-                if value:
-                    fields[field] = value
-            description = _pick(obj, _DESC_KEYS)
-
-            # Almost every real page embeds JSON-LD describing the site itself
-            # ({"@type":"Organization","name":...,"url":...}). Accepting those
-            # would hand the whole cascade a page full of phantom notices, so a
-            # candidate must look like a record: a title plus at least two other
-            # signals.
-            signals = sum(bool(x) for x in (url, description, fields))
-            if signals < 2:
-                continue
-
-            key = (title.lower(), url)
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append({
-                "title": title,
-                "url": urljoin(base_url, url) if url else "",
-                "text": f"{title} | {description}",
-                "fields": fields,
-                "source": "json",
-            })
-    return rows
-
-
-# --------------------------------------------------------------------------
-# Layer 3: CSS selectors
-# --------------------------------------------------------------------------
-def rows_from_selectors(html: str, base_url: str, selectors: list[str]) -> list[dict]:
-    soup = soup_of(html)
-    for selector in selectors:
-        try:
-            found = soup.select(selector)
-        except Exception:
-            continue
-        rows = []
-        for element in found:
-            anchor = element.find("a", href=True)
-            if not anchor:
-                continue
-            title = clean_text(anchor.get_text(" "))
-            if len(title) < MIN_TITLE_LENGTH:
-                title = clean_text(element.get_text(" "))[:200]
-            if len(title) < MIN_TITLE_LENGTH:
-                continue
-            rows.append({
-                "title": title,
-                "url": urljoin(base_url, anchor["href"]),
-                "text": clean_text(element.get_text(" | ")),
-                "fields": {},
-                "source": f"selector:{selector}",
-            })
-        if len(rows) >= 1:
-            log.debug("selector %r matched %d rows", selector, len(rows))
-            return rows
-    return []
-
-
-# --------------------------------------------------------------------------
-# Layer 4: header-aware tables
-# --------------------------------------------------------------------------
-def _header_field(header: str) -> str | None:
-    header = header.strip().lower()
-    if not header:
-        return None
-    for field, aliases in HEADER_FIELD_MAP.items():
-        if any(alias in header for alias in aliases):
-            return field
+        val = lowered.get(key)
+        if isinstance(val, (str, int, float)) and clean(str(val)):
+            return clean(str(val))
+        if isinstance(val, dict):
+            for sub in ("name", "value", "text", "@value", "amount"):
+                if isinstance(val.get(sub), (str, int, float)):
+                    return clean(str(val[sub]))
     return None
 
 
-def rows_from_tables(html: str, base_url: str) -> list[dict]:
-    """Extract tabular listings, mapping column headers onto tender fields."""
-    soup = soup_of(html)
-    rows: list[dict] = []
+def _json_obj_to_row(obj: dict, base_url: str) -> Row | None:
+    """Turn a JSON object into a Row, but only on corroborating evidence.
+
+    A title alone is not enough -- an Organization node has a name and a url.
+    Two further signals (a date, a value, a reference, a description or a
+    deadline) are required before the object is believed to be a notice.
+    """
+    types = obj.get("@type") or obj.get("type") or ""
+    if isinstance(types, list):
+        types = " ".join(str(t) for t in types)
+    if str(types).lower() in _SITE_TYPES:
+        return None
+
+    title = _first_key(obj, _TITLE_KEYS)
+    if not title or _title_is_navish(title):
+        return None
+
+    url = _first_key(obj, _URL_KEYS)
+    date_text = _first_key(obj, _DATE_KEYS)
+    closing = _first_key(obj, _CLOSE_KEYS)
+    value = _first_key(obj, _VALUE_KEYS)
+    desc = _first_key(obj, _DESC_KEYS)
+    ref = _first_key(obj, _REF_KEYS)
+
+    corroborating = sum(1 for v in (date_text, closing, value, desc, ref) if v)
+    if corroborating < 2:
+        return None
+
+    return Row(
+        title=title,
+        url=urljoin(base_url, url) if url else None,
+        date_text=date_text,
+        closing_text=closing,
+        value_text=value,
+        description=desc,
+        reference=ref,
+        raw_text=clean(json.dumps(obj, ensure_ascii=False))[:4000],
+    )
+
+
+def _walk_json(node, out: list[dict], depth: int = 0) -> None:
+    if depth > 12 or len(out) > 5000:
+        return
+    if isinstance(node, dict):
+        out.append(node)
+        for v in node.values():
+            _walk_json(v, out, depth + 1)
+    elif isinstance(node, list):
+        for v in node:
+            _walk_json(v, out, depth + 1)
+
+
+def extract_embedded_json(html: str, base_url: str = "") -> LayerResult:
+    """Pull notices out of JSON-LD, __NEXT_DATA__ or drupalSettings."""
+    rows: list[Row] = []
+    if not html:
+        return LayerResult("embedded-json", rows, 0.0, "no html")
+
+    soup = BeautifulSoup(html, "html.parser")
+    blobs: list = []
+
+    for tag in soup.find_all("script"):
+        text = tag.string or tag.get_text() or ""
+        text = text.strip()
+        if not text:
+            continue
+        stype = (tag.get("type") or "").lower()
+        tid = (tag.get("id") or "").lower()
+
+        if "ld+json" in stype or tid == "__next_data__" or "json" in stype:
+            try:
+                blobs.append(json.loads(text))
+            except (ValueError, TypeError):
+                continue
+        elif "drupalsettings" in text[:400] or "drupal-settings-json" in tid:
+            match = re.search(r"\{.*\}", text, re.DOTALL)
+            if match:
+                try:
+                    blobs.append(json.loads(match.group()))
+                except (ValueError, TypeError):
+                    continue
+
+    objects: list[dict] = []
+    for blob in blobs:
+        _walk_json(blob, objects)
+
+    seen: set[tuple] = set()
+    for obj in objects:
+        row = _json_obj_to_row(obj, base_url)
+        if row is None:
+            continue
+        key = (clean(row.title).lower(), row.url)
+        if key in seen:
+            continue
+        seen.add(key)
+        rows.append(row)
+
+    return LayerResult("embedded-json", rows, score_rows(rows))
+
+
+# ---------------------------------------------------------------------------
+# Layer 3 -- CSS selectors
+# ---------------------------------------------------------------------------
+
+# Field hints used when reading a selected node.
+_DATE_HINT_ATTRS = ("datetime", "data-date", "data-published", "content")
+_CLOSING_LABELS = ("deadline", "closing", "closes", "close date", "due",
+                   "submission", "expiry", "expires", "frist", "abgabe",
+                   "الموعد النهائي", "آخر موعد", "تاريخ الإغلاق")
+_POSTED_LABELS = ("published", "posted", "date of publication", "release",
+                  "veröffentlicht", "datum", "تاريخ النشر")
+_VALUE_LABELS = ("value", "budget", "amount", "estimated", "contract value",
+                 "wert", "القيمة", "قيمة العقد")
+
+
+def _node_to_row(node, base_url: str) -> Row:
+    text = clean(node.get_text(" "))
+
+    link = node.find("a", href=True)
+    url = urljoin(base_url, link["href"]) if link else None
+
+    heading = node.find(["h1", "h2", "h3", "h4", "h5"])
+    if heading and clean(heading.get_text()):
+        title = clean(heading.get_text())
+    elif link and clean(link.get_text()):
+        title = clean(link.get_text())
+    else:
+        title = text[:160]
+
+    row = Row(title=title, url=url, raw_text=text)
+
+    # <time datetime="…"> and friends are unambiguous when present.
+    for t in node.find_all(["time", "span", "div", "p", "td"]):
+        for attr in _DATE_HINT_ATTRS:
+            if t.has_attr(attr) and parse_date(t[attr]):
+                row.date_text = row.date_text or clean(t[attr])
+    if not row.date_text:
+        time_tag = node.find("time")
+        if time_tag:
+            row.date_text = clean(time_tag.get_text())
+
+    _assign_labelled_fields(row, text)
+    return row
+
+
+_DATE_SPAN_RE = re.compile(
+    r"\d{4}-\d{1,2}-\d{1,2}"
+    r"|\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{2,4}"
+    r"|\d{1,2}\.?\s+[^\W\d_]{3,}(?:\s+[^\W\d_]{3,})?\s+\d{4}"
+    r"|[^\W\d_]{3,}\s+\d{1,2},?\s+\d{4}",
+    re.UNICODE,
+)
+
+
+def _first_date_text(tail: str) -> str | None:
+    """The first date-shaped substring, so a label does not drag the whole row.
+
+    Without this, "Deadline: 30 September 2026 Estimated value: EUR 1,850,000"
+    is stored whole and the fuzzy date parser is left to guess which of the
+    numbers is the deadline.
+    """
+    m = _DATE_SPAN_RE.search(tail)
+    if m and parse_date(m.group()):
+        return clean(m.group())
+    return clean(tail) if parse_date(tail) else None
+
+
+def _assign_labelled_fields(row: Row, text: str) -> None:
+    """Read 'Deadline: 31.12.2026'-style labels out of a block of text."""
+    low = text.lower()
+    for label in _CLOSING_LABELS:
+        idx = low.find(label)
+        if idx != -1:
+            found = _first_date_text(text[idx + len(label): idx + len(label) + 60])
+            if found:
+                row.closing_text = found
+                break
+    for label in _POSTED_LABELS:
+        idx = low.find(label)
+        if idx != -1:
+            found = _first_date_text(text[idx + len(label): idx + len(label) + 60])
+            if found:
+                row.date_text = row.date_text or found
+                break
+    for label in _VALUE_LABELS:
+        idx = low.find(label)
+        if idx != -1:
+            row.value_text = clean(text[idx: idx + 80])
+            break
+    if not row.value_text:
+        row.value_text = text
+
+
+def extract_by_selectors(html: str, selectors: list[str], base_url: str = "") -> LayerResult:
+    """Try each selector in order; keep the best-scoring result.
+
+    Every selector is scored rather than the first non-empty one being taken,
+    because an over-broad selector matching the nav bar would otherwise win by
+    arriving first.
+    """
+    if not html or not selectors:
+        return LayerResult("selectors", [], 0.0, "no selectors configured")
+
+    soup = BeautifulSoup(html, "html.parser")
+    best = LayerResult("selectors", [], 0.0, "no selector matched")
+
+    for selector in selectors:
+        try:
+            nodes = soup.select(selector)
+        except Exception:
+            continue
+        if not nodes:
+            continue
+        rows = [_node_to_row(n, base_url) for n in nodes[:400]]
+        rows = [r for r in rows if clean(r.title)]
+        quality = score_rows(rows)
+        if quality > best.quality:
+            best = LayerResult("selectors", rows, quality, f"selector: {selector}")
+    return best
+
+
+# ---------------------------------------------------------------------------
+# Layer 4 -- header-aware tables
+# ---------------------------------------------------------------------------
+
+_HEADER_MAP = {
+    "title": _TITLE_KEYS + ("notice", "subject", "opportunity", "tender",
+                            "description of assignment", "bezeichnung"),
+    "closing": ("deadline", "closing date", "closes", "due date", "expiry",
+                "submission deadline", "frist", "الموعد النهائي"),
+    "posted": ("published", "posted", "publication date", "date published",
+               "issue date", "veröffentlicht", "تاريخ النشر"),
+    "value": ("value", "estimated value", "contract value", "budget", "amount",
+              "wert", "القيمة"),
+    "reference": ("reference", "ref", "notice id", "tender no", "number",
+                  "reference number", "id"),
+    "type": ("type", "notice type", "procurement type", "category"),
+}
+
+
+def _match_header(cell: str) -> str | None:
+    c = clean(cell).lower().strip(" :*")
+    if not c:
+        return None
+    for field_name, options in _HEADER_MAP.items():
+        for opt in options:
+            if c == opt or c.startswith(opt) or opt in c:
+                return field_name
+    return None
+
+
+def extract_tables(html: str, base_url: str = "") -> LayerResult:
+    """Map a table's header row onto fields, then read the body rows."""
+    if not html:
+        return LayerResult("table", [], 0.0, "no html")
+
+    soup = BeautifulSoup(html, "html.parser")
+    best = LayerResult("table", [], 0.0, "no table with a usable header")
+
     for table in soup.find_all("table"):
         header_cells = []
         head = table.find("thead")
         if head:
-            header_cells = head.find_all(["th", "td"])
+            tr = head.find("tr")
+            if tr:
+                header_cells = [clean(c.get_text()) for c in tr.find_all(["th", "td"])]
         if not header_cells:
             first = table.find("tr")
             if first:
-                header_cells = first.find_all("th")
-        headers = [clean_text(c.get_text(" ")) for c in header_cells]
-        field_by_index = {i: _header_field(h) for i, h in enumerate(headers)}
+                header_cells = [clean(c.get_text()) for c in first.find_all(["th", "td"])]
 
-        for tr in table.find_all("tr"):
-            cells = tr.find_all("td")
-            if not cells:
+        mapping = {}
+        for i, cell in enumerate(header_cells):
+            fieldname = _match_header(cell)
+            if fieldname and fieldname not in mapping.values():
+                mapping[i] = fieldname
+        if "title" not in mapping.values():
+            continue
+
+        body = table.find("tbody") or table
+        trs = body.find_all("tr")
+        rows: list[Row] = []
+        for tr in trs:
+            cells = tr.find_all(["td", "th"])
+            if not cells or len(cells) < 2:
                 continue
-            anchor = tr.find("a", href=True)
-            title = clean_text(anchor.get_text(" ")) if anchor else ""
-            if len(title) < MIN_TITLE_LENGTH:
-                longest = max((clean_text(c.get_text(" ")) for c in cells), key=len, default="")
-                title = longest
-            if len(title) < MIN_TITLE_LENGTH:
+            texts = [clean(c.get_text(" ")) for c in cells]
+            if texts == header_cells:
                 continue
-            fields = {}
-            for idx, cell in enumerate(cells):
-                field = field_by_index.get(idx)
-                if field and field in ("closing_date", "posted_date",
-                                       "estimated_value", "notice_type"):
-                    value = clean_text(cell.get_text(" "))
-                    if value:
-                        fields[field] = value
-            rows.append({
-                "title": title,
-                "url": urljoin(base_url, anchor["href"]) if anchor else base_url,
-                "text": clean_text(tr.get_text(" | ")),
-                "fields": fields,
-                "source": "table",
-            })
-    return rows
+            row = Row(raw_text=" | ".join(texts))
+            for i, fieldname in mapping.items():
+                if i >= len(cells):
+                    continue
+                val = texts[i]
+                if fieldname == "title":
+                    row.title = val
+                    link = cells[i].find("a", href=True)
+                    if link:
+                        row.url = urljoin(base_url, link["href"])
+                elif fieldname == "closing":
+                    row.closing_text = val
+                elif fieldname == "posted":
+                    row.date_text = val
+                elif fieldname == "value":
+                    row.value_text = val
+                elif fieldname == "reference":
+                    row.reference = val
+                elif fieldname == "type":
+                    row.extra["notice_type"] = val
+            if not row.url:
+                link = tr.find("a", href=True)
+                if link:
+                    row.url = urljoin(base_url, link["href"])
+            if clean(row.title):
+                rows.append(row)
+
+        quality = score_rows(rows)
+        if quality > best.quality:
+            best = LayerResult("table", rows, quality,
+                               f"header: {', '.join(header_cells[:6])}")
+    return best
 
 
-# --------------------------------------------------------------------------
-# Layer 5: structural inference (class-name independent)
-# --------------------------------------------------------------------------
-def _best_repeated_group(html: str) -> tuple[list, tuple | None]:
+# ---------------------------------------------------------------------------
+# Layer 5 -- structural inference (no class names at all)
+# ---------------------------------------------------------------------------
+
+_SKIP_CONTAINERS = {"nav", "header", "footer", "head", "script", "style",
+                    "select", "aside", "form"}
+
+
+def _signature(node) -> str:
+    """Shape of a node, ignoring every class and id.
+
+    Two sibling notice cards have the same tag and the same child tags even
+    after a restyle, which is what makes this layer survive redesigns.
     """
-    Largest set of sibling elements that share a tag/class signature and each
-    contain one substantial link. Returns (members, signature).
+    kids = sorted({c.name for c in node.find_all(True, recursive=False) if c.name})
+    has_link = "yes" if node.find("a", href=True) else "no"
+    return f"{node.name}|{','.join(kids)}|{has_link}"
+
+
+def extract_structural(html: str, base_url: str = "") -> LayerResult:
+    """Find the largest repeated sibling block and read it as a listing.
+
+    NOTE: there is deliberately NO cap that rejects a container for having too
+    many children. A previous build capped it and returned zero rows on a
+    500-notice listing -- which is precisely the page this layer exists to
+    rescue. Large containers are the good case, not the bad one.
     """
-    soup = soup_of(html)
-    best: list = []
-    best_sig: tuple | None = None
+    if not html:
+        return LayerResult("structural", [], 0.0, "no html")
 
-    for index, parent in enumerate(soup.find_all(True)):
-        if index > MAX_ELEMENTS_SCANNED:
-            break
-        children = [c for c in parent.find_all(recursive=False) if getattr(c, "name", None)]
-        # No upper bound on children: a 500-row listing is precisely the case
-        # this layer exists for. Total grouping work is already bounded by
-        # MAX_ELEMENTS_SCANNED, since each element is a child exactly once.
-        if len(children) < MIN_GROUP_SIZE:
-            continue
+    soup = BeautifulSoup(html, "html.parser")
+    for junk in soup.find_all(list(_SKIP_CONTAINERS)):
+        junk.decompose()
 
-        groups: dict = {}
-        for child in children:
-            classes = tuple(sorted(child.get("class") or []))[:2]
-            groups.setdefault((child.name, classes), []).append(child)
+    best = LayerResult("structural", [], 0.0, "no repeated sibling block found")
 
-        for signature, members in groups.items():
-            if len(members) < MIN_GROUP_SIZE:
-                continue
-            usable = []
-            for member in members:
-                anchor = member.find("a", href=True)
-                if anchor and len(clean_text(anchor.get_text(" "))) >= MIN_TITLE_LENGTH:
-                    usable.append(member)
-            if len(usable) >= MIN_GROUP_SIZE and len(usable) > len(best):
-                best, best_sig = usable, signature
-
-    return best, best_sig
-
-
-def rows_from_structure(html: str, base_url: str) -> list[dict]:
-    """
-    Find the repeated sibling block that makes up a listing, without relying on
-    any class name. This is what keeps working after a site redesign: a listing
-    is almost always N sibling elements of the same tag, each containing one
-    link with substantial text.
-    """
-    best, _ = _best_repeated_group(html)
-    rows = []
-    for element in best:
-        anchor = element.find("a", href=True)
-        rows.append({
-            "title": clean_text(anchor.get_text(" ")),
-            "url": urljoin(base_url, anchor["href"]),
-            "text": clean_text(element.get_text(" | ")),
-            "fields": {},
-            "source": "structure",
-        })
-    if rows:
-        log.debug("structural inference recovered %d rows", len(rows))
-    return rows
-
-
-def suggest_selectors(html: str) -> list[str]:
-    """
-    CSS selectors matching the listing this page actually uses.
-
-    Used by `run.py --capture` so selector hints can be confirmed against a real
-    page instead of guessed. Derived from the structurally-inferred listing
-    block, so it works regardless of what the classes are called.
-    """
-    _, signature = _best_repeated_group(html)
-    if not signature:
-        return []
-    tag, classes = signature
-    out = []
-    if classes:
-        out.append(tag + "".join(f".{c}" for c in classes))
-        out.append(f"{tag}[class*='{classes[0]}']")
-    else:
-        out.append(tag)
-    return out
-
-
-# --------------------------------------------------------------------------
-# Layer 6: anchor pattern
-# --------------------------------------------------------------------------
-def rows_from_anchors(html: str, base_url: str, href_pattern: str) -> list[dict]:
-    soup = soup_of(html)
-    pattern = re.compile(href_pattern, re.IGNORECASE)
-    rows, seen = [], set()
-    for anchor in soup.find_all("a", href=True):
-        href = anchor["href"]
-        if not pattern.search(href):
-            continue
-        title = clean_text(anchor.get_text(" "))
-        if len(title) < MIN_TITLE_LENGTH:
-            continue
-        url = urljoin(base_url, href)
-        if url in seen:
-            continue
-        seen.add(url)
-        rows.append({
-            "title": title,
-            "url": url,
-            "text": row_context(anchor),
-            "fields": {},
-            "source": "anchor",
-        })
-    return rows
-
-
-# --------------------------------------------------------------------------
-# The cascade
-# --------------------------------------------------------------------------
-QUALITY_THRESHOLD = 0.5
-
-
-def listing_quality(rows: list[dict]) -> float:
-    """
-    How much does this row-set look like a real notice listing (0..1)?
-
-    The selector hints in each portal module are unverified guesses, and a
-    deliberately broad one -- bare `article`, `table tbody tr` -- will happily
-    match navigation blocks, teasers or a "related documents" table. Selectors
-    run before the class-independent layers, so without this gate one bad guess
-    silently beats the layer that would have worked. Notice listings have
-    distinguishing traits: many rows, distinct links, substantial titles, and
-    dates somewhere in the row text.
-    """
-    if not rows:
-        return 0.0
-    count = len(rows)
-    urls = [r.get("url") or "" for r in rows]
-    titles = [r.get("title") or "" for r in rows]
-
-    with_url = sum(1 for u in urls if u) / count
-    unique_urls = len(set(u for u in urls if u)) / max(1, sum(1 for u in urls if u))
-    unique_titles = len(set(titles)) / count
-    with_date = sum(
-        1 for r in rows
-        if (r.get("fields") or {}).get("closing_date")
-        or (r.get("fields") or {}).get("posted_date")
-        or any_date(r.get("text") or "")
-    ) / count
-    median_title = sorted(len(t) for t in titles)[count // 2]
-
-    # Dates dominate deliberately: carrying a published or closing date is the
-    # single trait that separates a notice listing from navigation, teasers or
-    # a related-documents table, all of which otherwise look similar.
-    score = (
-        0.40 * with_date
-        + 0.20 * unique_urls              # nav menus repeat the same links
-        + 0.15 * unique_titles
-        + 0.10 * with_url
-        + 0.10 * min(1.0, count / 3.0)    # a listing has several entries
-        + 0.05 * min(1.0, median_title / 30.0)
+    # Largest containers first. This is an ordering, NOT a filter -- every
+    # container is still examined unless an unbeatable result is found. The
+    # distinction matters: a previous build filtered here and returned zero
+    # rows on a 500-notice page, which is the page this layer exists to save.
+    containers = sorted(
+        soup.find_all(True),
+        key=lambda c: len(c.find_all(True, recursive=False)),
+        reverse=True,
     )
-    return round(score, 3)
 
-
-def extract_rows(
-    html: str,
-    base_url: str,
-    *,
-    selectors: list[str] | None = None,
-    href_pattern: str | None = None,
-) -> list[dict]:
-    """
-    Run the extraction layers in order and return the first whose rows look like
-    a genuine listing. Layers that produce rows but fail the quality gate are
-    kept as fallbacks; if no layer clears the bar, the best one is returned so a
-    marginal page still yields something.
-    """
-    best_rows: list[dict] = []
-    best_score = -1.0
-
-    for label, extractor in (
-        ("json", lambda: extract_embedded_json(html, base_url)),
-        ("selectors", lambda: rows_from_selectors(html, base_url, selectors or [])),
-        ("tables", lambda: rows_from_tables(html, base_url)),
-        ("structure", lambda: rows_from_structure(html, base_url)),
-        ("anchors", lambda: rows_from_anchors(html, base_url, href_pattern) if href_pattern else []),
-    ):
-        try:
-            rows = extractor()
-        except Exception as exc:  # noqa: BLE001 - a broken layer must not stop the rest
-            log.debug("extraction layer %s failed: %s", label, exc)
+    for container in containers:
+        children = [c for c in container.find_all(True, recursive=False)
+                    if c.name not in _SKIP_CONTAINERS]
+        if len(children) < 3:
             continue
-        if not rows:
-            continue
-        score = listing_quality(rows)
-        log.debug("layer %s produced %d rows, quality %.2f", label, len(rows), score)
-        if score >= QUALITY_THRESHOLD:
-            return rows
-        if score > best_score:
-            best_rows, best_score = rows, score
 
-    if best_rows:
-        log.debug("no layer cleared the quality gate; using best (%.2f)", best_score)
-    return best_rows
+        # A near-perfect score on a substantial listing cannot be beaten, so
+        # there is nothing left to find. This is a short-circuit on success,
+        # never on size.
+        if best.quality >= 0.95 and len(best.rows) >= 10:
+            break
+
+        groups: dict[str, list] = {}
+        for child in children:
+            groups.setdefault(_signature(child), []).append(child)
+
+        for sig, members in groups.items():
+            if len(members) < 3:
+                continue
+            rows = _drop_navish([_node_to_row(m, base_url) for m in members])
+            if not rows:
+                continue
+            quality = score_rows(rows)
+            if quality > best.quality:
+                best = LayerResult(
+                    "structural", rows, quality,
+                    f"repeated <{container.name}> child block ({len(members)} rows, sig {sig})",
+                )
+    return best
 
 
-def analyse_page(
-    html: str,
-    base_url: str,
-    *,
-    selectors: list[str] | None = None,
-    href_pattern: str | None = None,
-) -> dict:
+# ---------------------------------------------------------------------------
+# Layer 6 -- anchor URL pattern (last resort)
+# ---------------------------------------------------------------------------
+
+_DIGIT_RUN = re.compile(r"\d+")
+
+
+def _nearest_row_text(anchor) -> str:
+    """Text of the smallest ancestor that still looks like a single row.
+
+    Walking straight to the first <div> ancestor is wrong twice over. On a
+    flat listing that ancestor is the container holding every notice, so each
+    row inherits the whole page's text -- which drags other rows' dates and
+    values into this row's fields. It is also quadratic: get_text() over the
+    full listing, once per link. Stopping at the nearest ancestor that holds
+    just this one link fixes both.
     """
-    Report how every layer performs on one real page.
-
-    This is what `run.py --capture` uses to turn "the selectors are guesses"
-    into a confirmed fact: run it against a live portal, see which layer wins
-    and what selectors the page actually uses, then paste them into the module.
-    """
-    layers: dict[str, dict] = {}
-    for label, extractor in (
-        ("feed_links", lambda: [{"title": u, "url": u} for u in discover_feeds(html, base_url)]),
-        ("json", lambda: extract_embedded_json(html, base_url)),
-        ("selectors", lambda: rows_from_selectors(html, base_url, selectors or [])),
-        ("tables", lambda: rows_from_tables(html, base_url)),
-        ("structure", lambda: rows_from_structure(html, base_url)),
-        ("anchors", lambda: rows_from_anchors(html, base_url, href_pattern) if href_pattern else []),
-    ):
-        try:
-            rows = extractor()
-        except Exception as exc:  # noqa: BLE001
-            layers[label] = {"rows": 0, "quality": 0.0, "error": str(exc)[:120]}
-            continue
-        layers[label] = {
-            "rows": len(rows),
-            "quality": listing_quality(rows) if label != "feed_links" else 0.0,
-            "sample": [r.get("title", "")[:80] for r in rows[:3]],
-        }
-
-    chosen = extract_rows(html, base_url, selectors=selectors, href_pattern=href_pattern)
-    return {
-        "diagnosis": diagnose(html),
-        "layers": layers,
-        "chosen_layer": chosen[0]["source"] if chosen else None,
-        "chosen_rows": len(chosen),
-        "suggested_selectors": suggest_selectors(html),
-        "next_page": find_next_page(html, base_url),
-    }
-
-
-# --------------------------------------------------------------------------
-# Pagination
-# --------------------------------------------------------------------------
-_NEXT_TEXTS = ("next", "next page", "weiter", "suivant", "التالي", "»", "›", ">")
-
-
-def find_next_page(html: str, base_url: str) -> str | None:
-    soup = soup_of(html)
-    link = soup.find("link", rel="next", href=True)
-    if link:
-        return urljoin(base_url, link["href"])
-    for anchor in soup.find_all("a", href=True):
-        rel = " ".join(anchor.get("rel") or []).lower()
-        label = clean_text(anchor.get_text(" ")).lower()
-        aria = (anchor.get("aria-label") or "").lower()
-        if rel == "next" or label in _NEXT_TEXTS or "next" in aria:
-            candidate = urljoin(base_url, anchor["href"])
-            if candidate != base_url:
-                return candidate
-    return None
-
-
-# --------------------------------------------------------------------------
-# Field helpers
-# --------------------------------------------------------------------------
-def row_context(element, levels: int = 3) -> str:
-    """Text of the nearest enclosing row/card, used to find dates and values."""
-    node = element
-    for _ in range(levels):
-        parent = getattr(node, "parent", None)
-        if parent is None:
+    node = anchor
+    for _ in range(4):
+        parent = node.parent
+        if parent is None or parent.name in (None, "body", "html", "[document]"):
+            break
+        if _has_multiple_anchors(parent):
             break
         node = parent
-        if getattr(node, "name", None) in ("tr", "li", "article", "section", "div"):
-            text = clean_text(node.get_text(" "))
-            if len(text) > 40:
-                return text
-    return clean_text(getattr(element, "get_text", lambda *_: "")(" "))
+    return clean(node.get_text(" "))[:1200]
 
 
-def labelled_date(text: str, labels: tuple[str, ...]) -> str | None:
-    """Find a date appearing shortly after one of `labels`."""
-    if not text:
-        return None
-    lowered = text.lower()
-    for label in labels:
-        idx = lowered.find(label)
-        if idx == -1:
+def _has_multiple_anchors(node) -> bool:
+    """Whether a node holds more than one link, exiting as soon as it knows.
+
+    find_all() would walk the entire subtree, which on a listing container is
+    the whole page -- once per link.
+    """
+    count = 0
+    for descendant in node.descendants:
+        if getattr(descendant, "name", None) == "a" and descendant.has_attr("href"):
+            count += 1
+            if count > 1:
+                return True
+    return False
+
+
+def _href_shape(href: str) -> str:
+    """Normalise a URL to its shape so sibling notice links group together."""
+    href = href.split("#")[0]
+    href = _DIGIT_RUN.sub("N", href)
+    return re.sub(r"=[^&]+", "=V", href)
+
+
+def extract_anchor_pattern(html: str, base_url: str = "",
+                           hint: str | None = None) -> LayerResult:
+    """Group links by URL shape and take the biggest plausible notice group."""
+    if not html:
+        return LayerResult("anchor-pattern", [], 0.0, "no html")
+
+    soup = BeautifulSoup(html, "html.parser")
+    for junk in soup.find_all(list(_SKIP_CONTAINERS)):
+        junk.decompose()
+
+    groups: dict[str, list] = {}
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if href.startswith(("mailto:", "tel:", "javascript:")):
             continue
-        match = DATE_TEXT_RE.search(text[idx: idx + 200])
-        if match:
-            return match.group(1)
-    return None
+        if hint and hint not in href:
+            continue
+        groups.setdefault(_href_shape(href), []).append(a)
+
+    best = LayerResult("anchor-pattern", [], 0.0, "no repeated link pattern")
+    for shape, anchors in groups.items():
+        if len(anchors) < 3:
+            continue
+        rows = []
+        for a in anchors:
+            title = clean(a.get_text(" ")) or clean(a.get("title") or "")
+            if not title or _title_is_navish(title):
+                continue
+            rows.append(Row(
+                title=title,
+                url=urljoin(base_url, a["href"]),
+                raw_text=_nearest_row_text(a),
+            ))
+        for r in rows:
+            _assign_labelled_fields(r, r.raw_text)
+        rows = _drop_navish(rows)
+        quality = score_rows(rows)
+        if quality > best.quality:
+            best = LayerResult("anchor-pattern", rows, quality, f"url shape: {shape}")
+    return best
 
 
-def any_date(text: str) -> str | None:
-    match = DATE_TEXT_RE.search(text or "")
-    return match.group(1) if match else None
+# ---------------------------------------------------------------------------
+# The cascade
+# ---------------------------------------------------------------------------
+
+LAYER_ORDER = ["feed", "embedded-json", "selectors", "table", "structural",
+               "anchor-pattern"]
 
 
-def resolve_dates(row: dict) -> tuple[str | None, str | None]:
-    """(posted, closing) from a row's structured fields, then its free text."""
-    fields = row.get("fields") or {}
-    text = row.get("text") or ""
-    posted = fields.get("posted_date") or labelled_date(text, POSTED_LABELS)
-    closing = fields.get("closing_date") or labelled_date(text, DEADLINE_LABELS)
-    if not closing and not posted:
-        # A single unlabelled date on a tender listing is far more often the
-        # deadline than the posting date.
-        closing = any_date(text)
-    return posted, closing
+def run_layers(content: str, base_url: str = "",
+               selectors: list[str] | None = None,
+               anchor_hint: str | None = None) -> list[LayerResult]:
+    """Run every layer and return all results, best-effort, in cascade order."""
+    results = [
+        extract_feed(content, base_url),
+        extract_embedded_json(content, base_url),
+        extract_by_selectors(content, selectors or [], base_url),
+        extract_tables(content, base_url),
+        extract_structural(content, base_url),
+        extract_anchor_pattern(content, base_url, anchor_hint),
+    ]
+    return results
 
 
-def enrich_from_detail(row: dict, budget: list[int]) -> None:
+def extract(content: str, base_url: str = "", selectors: list[str] | None = None,
+            anchor_hint: str | None = None,
+            threshold: float = QUALITY_THRESHOLD) -> LayerResult:
+    """Run the cascade and return the first layer whose rows clear the gate.
+
+    If none clears it, the best-scoring layer is returned with a note saying
+    so, rather than nothing. A weak result the caller can see and diagnose is
+    always better than a silent zero, which is indistinguishable from a quiet
+    week.
     """
-    Fetch a notice's own page to recover a missing deadline or value.
+    # Lazily, in cascade order: a page whose feed or JSON layer already wins
+    # should not pay for structural inference over the whole DOM. --capture
+    # still calls run_layers() to report every layer's result.
+    builders = [
+        lambda: extract_feed(content, base_url),
+        lambda: extract_embedded_json(content, base_url),
+        lambda: extract_by_selectors(content, selectors or [], base_url),
+        lambda: extract_tables(content, base_url),
+        lambda: extract_structural(content, base_url),
+        lambda: extract_anchor_pattern(content, base_url, anchor_hint),
+    ]
 
-    Listing pages frequently omit both. `budget` is a single-element list acting
-    as a shared counter so a portal cannot spend more than its allowance of
-    extra requests.
-    """
-    if budget[0] <= 0 or not row.get("url"):
-        return
-    if (row.get("fields") or {}).get("closing_date"):
-        return
-    try:
-        html = fetch_html(row["url"])
-    except Exception:  # noqa: BLE001 - enrichment is strictly best-effort
-        return
-    budget[0] -= 1
-    text = clean_text(soup_of(html).get_text(" "))
-    fields = row.setdefault("fields", {})
-    for field, labels in (("closing_date", DEADLINE_LABELS), ("posted_date", POSTED_LABELS)):
-        if not fields.get(field):
-            found = labelled_date(text, labels)
-            if found:
-                fields[field] = found
-    row["text"] = f"{row.get('text', '')} | {text[:1500]}"
+    results: list[LayerResult] = []
+    for build in builders:
+        result = build()
+        results.append(result)
+        if result.rows and result.quality >= threshold:
+            return result
 
+    best = max(results, key=lambda r: (r.quality, len(r.rows)))
+    if best.rows:
+        best.note = (f"{best.note} | BELOW QUALITY GATE "
+                     f"({best.quality:.2f} < {threshold:.2f}) - treat as unverified")
+        return best
 
-
-def same_host(url: str, base_url: str) -> bool:
-    try:
-        return urlparse(url).netloc.lower() == urlparse(base_url).netloc.lower()
-    except ValueError:
-        return False
-
-
-__all__ = [
-    "DEADLINE_LABELS", "POSTED_LABELS", "any_date", "diagnose", "discover_feeds",
-    "enrich_from_detail", "extract_embedded_json", "extract_rows", "fetch_html",
-    "find_next_page", "labelled_date", "parse_date", "parse_feed", "render_js",
-    "resolve_dates", "row_context", "rows_from_anchors",
-    "rows_from_selectors", "rows_from_structure", "rows_from_tables", "same_host",
-]
+    empty = LayerResult("none", [], 0.0, diagnose(content, []))
+    return empty

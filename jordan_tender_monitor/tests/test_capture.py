@@ -1,193 +1,339 @@
-#!/usr/bin/env python3
 """
-Offline validation of `run.py --capture`.
+Capture tests.
 
-    python tests/test_capture.py
+--capture is how an unverified selector hint gets confirmed against a live page
+in one command, so two properties matter:
 
---capture is the tool that resolves the one genuinely unverified part of this
-system: whether each portal's selector hints match its real markup. It can only
-be exercised for real from a network that can reach the portals, so this suite
-checks the machinery instead -- that for every HTML portal it fetches each
-declared source, saves it, reports per-layer results, names the winning layer,
-and suggests selectors derived from the page itself.
+  1. It works for EVERY HTML portal, including the ones with custom fetch logic.
+     A portal with a bespoke fetcher is exactly the one most easily left out of
+     a diagnostic by accident, and it is the one that most needs the diagnostic.
 
-Each portal is served a fixture in a CMS shape it plausibly uses, so a failure
-here means --capture is broken, not that a portal changed.
+  2. It fails HONESTLY when a source is unreachable -- reporting the failure
+     rather than an empty success, which would read as "this portal has no
+     Jordan notices".
+
+No network is used: the fetcher is replaced with one that serves fixtures or
+raises.
 """
 
 from __future__ import annotations
 
-import contextlib
 import io
-import shutil
-import sys
-import warnings
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(BASE_DIR))
-warnings.filterwarnings("ignore")
+from jordan_tender_monitor import config, portals
+from jordan_tender_monitor.portals import base, harvester
+from jordan_tender_monitor.portals.base import PortalError
+from jordan_tender_monitor.portals.harvester import HtmlSpec
+
+from .harness import check, check_eq
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 
-import portals  # noqa: E402
-from portals import htmlkit  # noqa: E402
 
-import run  # noqa: E402
-
-# Portals that scrape HTML. worldbank/ted/samgov are REST APIs and have no
-# SOURCES, so --capture correctly refuses them (covered below).
-HTML_PORTALS = ["ebrd", "eib", "ungm", "giz", "kfw", "isdb", "fcdo", "sfd", "adfd", "jica"]
-
-# A plausible CMS shape per portal. The point is coverage of the machinery
-# across every portal module, not a claim about that site's real markup.
-FIXTURE_FOR = {
-    "ebrd": "bootstrap_cards.html",
-    "eib": "drupal_views.html",
-    "ungm": "table_listing.html",
-    "giz": "german_table.html",
-    "kfw": "drupal_views.html",
-    "isdb": "drupal_views.html",
-    "fcdo": "table_listing.html",
-    "sfd": "arabic_rtl.html",
-    "adfd": "bootstrap_cards.html",
-    "jica": "paginated_p1.html",
-}
-
-_passed = 0
-_failed: list[str] = []
+def _serve(name: str):
+    html = io.open(FIXTURES / name, encoding="utf-8").read()
+    return lambda url: html
 
 
-def check(name: str, condition: bool, detail: str = "") -> None:
-    global _passed
-    if condition:
-        _passed += 1
-        print(f"  PASS  {name}")
-    else:
-        _failed.append(name)
-        print(f"  FAIL  {name}{('  -- ' + detail) if detail else ''}")
+def _unreachable(reason: str = "transport error - ConnectionError (host blocked)"):
+    def fetcher(url):
+        raise PortalError(reason, url)
+    return fetcher
 
 
-@contextlib.contextmanager
-def serving(fixture: str | None):
-    """Serve one fixture for every fetch, or raise if fixture is None."""
-    original = htmlkit.fetch_html
-    body = (FIXTURES / fixture).read_text(encoding="utf-8") if fixture else None
+# ---------------------------------------------------------------------------
 
-    def fake(url: str, *, params=None, js: bool = False) -> str:
-        if body is None:
-            raise RuntimeError("Tunnel connection failed: 403 Forbidden")
-        return body
 
-    htmlkit.fetch_html = fake
+def test_every_html_portal_is_capturable():
+    html_keys = set(portals.html_portals())
+    expected = {"ungm", "ebrd", "eib", "giz", "kfw", "isdb", "sfd", "adfd", "jica"}
+    check_eq(html_keys, expected, "capture: all nine HTML portals expose capture()")
+
+    for key, module in portals.html_portals().items():
+        check(callable(getattr(module, "capture", None)),
+              f"capture: {key} has a callable capture()")
+        check(hasattr(module, "SPEC"), f"capture: {key} declares a SPEC")
+        check(bool(module.SPEC.urls), f"capture: {key} declares at least one URL")
+
+
+def test_ungm_with_custom_fetcher_is_included():
+    """UNGM posts to a search endpoint rather than fetching a page.
+
+    A capture command built only around plain GETs would silently omit it --
+    and UNGM is the richest Jordan source, so omitting it would matter most.
+    """
+    from jordan_tender_monitor.portals import ungm
+
+    check("ungm" in portals.html_portals(),
+          "capture: UNGM is capturable despite its custom fetcher")
+    check(ungm.SPEC.fetcher is not None, "capture: UNGM does have a custom fetcher")
+
+    spec = HtmlSpec(key="ungm", urls=[ungm.SEARCH], selectors=ungm.SPEC.selectors,
+                    anchor_hint=ungm.SPEC.anchor_hint,
+                    fetcher=_serve("nextjs_json.html"))
+    results = harvester.capture(spec)
+    check_eq(len(results), 1, "capture: the custom-fetcher portal returns a result")
+    url, html, layers = results[0]
+    check(bool(html), "capture: content came back through the custom fetcher")
+    check(any(layer.rows for layer in layers), "capture: layers found rows")
+
+
+def test_capture_reports_every_layer():
+    spec = HtmlSpec(key="test", urls=["https://e.org/list"],
+                    selectors=[".views-row"], fetcher=_serve("drupal_views.html"))
+    results = harvester.capture(spec)
+    url, html, layers = results[0]
+
+    names = [layer.layer for layer in layers]
+    for expected in ("feed", "embedded-json", "selectors", "table",
+                     "structural", "anchor-pattern"):
+        check(expected in names, f"capture: the {expected} layer is reported")
+
+    winners = [layer for layer in layers
+               if layer.rows and layer.quality >= 0.36]
+    check(winners, "capture: at least one layer clears the gate")
+    check(any(layer.quality > 0 for layer in layers),
+          "capture: per-layer quality scores are reported")
+    check(any(len(layer.rows) > 0 for layer in layers),
+          "capture: per-layer row counts are reported")
+
+
+def test_capture_fails_honestly_when_unreachable():
+    spec = HtmlSpec(key="test", urls=["https://blocked.example/list"],
+                    fetcher=_unreachable())
+    results = harvester.capture(spec)
+    check_eq(len(results), 1, "capture: an unreachable source still returns a result")
+    url, html, layers = results[0]
+    check_eq(html, "", "capture: no content is invented")
+    check_eq(layers[0].layer, "error", "capture: the result is marked as an error")
+    check("transport error" in layers[0].note,
+          "capture: the diagnosed reason is carried through")
+    check(not layers[0].rows, "capture: no rows are reported for a failed fetch")
+
+
+def test_capture_distinguishes_bot_wall_from_layout_change():
+    wall = harvester.capture(HtmlSpec(key="t", urls=["https://e.org/x"],
+                                      fetcher=_serve("cloudflare_wall.html")))
+    _, html, layers = wall[0]
+    from jordan_tender_monitor.portals.htmlkit import diagnose
+    check("bot wall" in diagnose(html, []),
+          "capture: a bot wall is diagnosed as a bot wall")
+
+    shell = harvester.capture(HtmlSpec(key="t", urls=["https://e.org/x"],
+                                       fetcher=_serve("js_shell.html")))
+    _, html2, _ = shell[0]
+    check("JavaScript shell" in diagnose(html2, []),
+          "capture: a JS shell is diagnosed distinctly")
+
+
+def test_harvest_tolerates_one_failing_source():
+    """Several portals publish across two sites; one failing must not kill both."""
+    calls = {"n": 0}
+    good = io.open(FIXTURES / "drupal_views.html", encoding="utf-8").read()
+
+    def flaky(url):
+        calls["n"] += 1
+        if "broken" in url:
+            raise PortalError("HTTP 404 - the URL has moved", url)
+        return good
+
+    spec = HtmlSpec(key="ebrd", urls=["https://broken.example/a",
+                                      "https://good.example/b"],
+                    selectors=[".views-row"], fetcher=flaky,
+                    filter_to_jordan=True)
+    original = config.FOLLOW_PAGINATION
     try:
-        yield
+        config.FOLLOW_PAGINATION = False
+        records = harvester.harvest(spec)
     finally:
-        htmlkit.fetch_html = original
+        config.FOLLOW_PAGINATION = original
+
+    check(records, "harvest: the working source still produces records")
+    check(calls["n"] >= 2, "harvest: both sources were attempted")
 
 
-def capture(portal_key: str) -> tuple[int, str]:
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
-        code = run.capture_portal(portal_key)
-    return code, buffer.getvalue()
+def test_harvest_raises_when_every_source_fails():
+    spec = HtmlSpec(key="ebrd", urls=["https://a.example", "https://b.example"],
+                    fetcher=_unreachable("HTTP 403 - blocked"))
+    try:
+        harvester.harvest(spec)
+        check(False, "harvest: a fully failed portal must raise")
+    except PortalError as exc:
+        check(True, "harvest: a fully failed portal raises PortalError")
+        check("403" in exc.reason, "harvest: the diagnosed reason is preserved")
+        check(exc.url, "harvest: the URL to check by hand is carried")
 
 
-def test_every_html_portal() -> None:
-    print("\n--capture works for every HTML portal")
-    out_dir = BASE_DIR / "tests" / "fixtures" / "live"
-    shutil.rmtree(out_dir, ignore_errors=True)
+def test_one_failing_portal_never_aborts_the_run():
+    """The core resilience requirement, tested at the orchestrator level.
 
-    for key in HTML_PORTALS:
-        module = portals.load(key)
-        expected_sources = len(getattr(module, "SOURCES", []))
-        with serving(FIXTURE_FOR[key]):
-            code, output = capture(key)
+    harvest() tolerating a bad source URL is not the same guarantee: this is
+    about one portal module blowing up without taking the other twelve with it,
+    including when it raises something nobody anticipated.
+    """
+    from jordan_tender_monitor import portals as registry
+    from jordan_tender_monitor.agents import scraper
 
-        saved = sorted(out_dir.glob(f"{key}_*.html"))
-        ok = (
-            code == 0
-            and len(saved) == expected_sources
-            and "chosen:" in output
-            and "NOTHING PARSED" not in output
-            and "selectors this page actually uses" in output
-        )
-        check(
-            f"{key}: {expected_sources} source(s) captured, layer chosen, selectors suggested",
-            ok,
-            f"exit={code} saved={len(saved)}/{expected_sources}",
-        )
-    shutil.rmtree(out_dir, ignore_errors=True)
+    class _Good:
+        @staticmethod
+        def fetch_tenders():
+            return [base.build_record(portal="worldbank",
+                                      title="Advisory Services, Jordan",
+                                      url="https://e.org/ok")]
 
+    class _Diagnosed:
+        @staticmethod
+        def fetch_tenders():
+            raise PortalError("bot wall (Cloudflare/Incapsula)", "https://e.org/wall")
 
-def test_reports_every_layer() -> None:
-    print("\nPer-layer diagnostics are reported, not just the winner")
-    with serving("drupal_views.html"):
-        _, output = capture("isdb")
-    for layer in ("feed_links", "json", "selectors", "tables", "structure", "anchors"):
-        check(f"reports layer '{layer}'", layer in output)
-    shutil.rmtree(BASE_DIR / "tests" / "fixtures" / "live", ignore_errors=True)
+    class _Unconfigured:
+        @staticmethod
+        def fetch_tenders():
+            raise PortalError("not configured - no SAM_API_KEY in .env",
+                              "https://api.sam.gov/x")
 
+    class _Exploding:
+        @staticmethod
+        def fetch_tenders():
+            raise ZeroDivisionError("something nobody anticipated")
 
-def test_suggests_the_real_selector() -> None:
-    print("\nSuggested selectors come from the page, not from the module")
-    with serving("drupal_views.html"):
-        _, output = capture("sfd")   # sfd's own SELECTORS do not include views-row
-    check("suggests the class the served page actually uses",
-          "views-row" in output, output[-400:])
-    shutil.rmtree(BASE_DIR / "tests" / "fixtures" / "live", ignore_errors=True)
+    original_modules = dict(registry.MODULES)
+    original_enabled = dict(config.ENABLED_PORTALS)
+    try:
+        registry.MODULES.clear()
+        registry.MODULES.update({"worldbank": _Good, "ebrd": _Diagnosed,
+                                 "samgov": _Unconfigured, "eib": _Exploding})
+        config.ENABLED_PORTALS.clear()
+        config.ENABLED_PORTALS.update({k: True for k in registry.MODULES})
 
+        result = scraper.scrape()
+    finally:
+        registry.MODULES.clear()
+        registry.MODULES.update(original_modules)
+        config.ENABLED_PORTALS.clear()
+        config.ENABLED_PORTALS.update(original_enabled)
 
-def test_unreachable_network() -> None:
-    print("\nEvery source unreachable (the situation in a locked-down environment)")
-    with serving(None):
-        code, output = capture("isdb")
-    check("exits non-zero", code == 1, f"exit={code}")
-    check("reports the fetch failure", "fetch failed" in output, output[-300:])
-    check("does not claim a layer won", "NOTHING PARSED" not in output or True)
-    check("counts captured sources honestly", "Captured 0/" in output,
-          [ln for ln in output.splitlines() if "Captured" in ln])
+    check_eq(len(result.health), 4, "scraper: every portal is reported on")
+    check_eq(len(result.records), 1,
+             "scraper: the healthy portal's records survive its neighbours failing")
 
-
-def test_bot_wall_is_diagnosed() -> None:
-    print("\nA page that loads but is a bot wall is diagnosed, not called a layout change")
-    with serving("cloudflare_wall.html"):
-        _, output = capture("ebrd")
-    check("diagnosis line present", "diagnosis:" in output)
-    check("names bot protection", "bot protection" in output, output[-300:])
-    shutil.rmtree(BASE_DIR / "tests" / "fixtures" / "live", ignore_errors=True)
-
-
-def test_api_portals_refused() -> None:
-    print("\nREST-API portals are refused rather than silently doing nothing")
-    for key in ("worldbank", "ted", "samgov"):
-        code, output = capture(key)
-        check(f"{key}: refused with an explanation",
-              code == 1 and "no SOURCES" in output, f"exit={code}")
+    by_key = {h.key: h for h in result.health}
+    check_eq(by_key["worldbank"].status, "ok", "scraper: the good portal is ok")
+    check_eq(by_key["ebrd"].status, "unavailable",
+             "scraper: a diagnosed failure is unavailable")
+    check_eq(by_key["samgov"].status, "unconfigured",
+             "scraper: a missing API key is unconfigured, NOT unavailable")
+    check_eq(by_key["eib"].status, "unavailable",
+             "scraper: an unexpected exception is caught, not propagated")
+    check("ZeroDivisionError" in by_key["eib"].reason,
+          "scraper: and the exception type is reported so it can be debugged")
+    check(by_key["ebrd"].urls, "scraper: the URL to check by hand is carried")
+    check(not by_key["samgov"].broken,
+          "scraper: unconfigured does not count towards 'broken'")
+    check(not result.all_broken,
+          "scraper: a run with one healthy portal is not a total failure")
 
 
-def main() -> int:
-    print("=" * 74)
-    print("--capture validation -- offline, no network")
-    print("=" * 74)
+def test_all_broken_is_detected_for_the_subject_line():
+    """Total failure must be distinguishable, since the subject depends on it."""
+    from jordan_tender_monitor.agents.scraper import ScrapeResult
+    from jordan_tender_monitor import fixtures as fx
 
-    test_every_html_portal()
-    test_reports_every_layer()
-    test_suggests_the_real_selector()
-    test_unreachable_network()
-    test_bot_wall_is_diagnosed()
-    test_api_portals_refused()
-
-    print("\n" + "=" * 74)
-    total = _passed + len(_failed)
-    if _failed:
-        print(f"{_passed}/{total} passed, {len(_failed)} FAILED:")
-        for name in _failed:
-            print(f"  - {name}")
-        return 1
-    print(f"All {total} checks passed.")
-    return 0
+    partial = ScrapeResult(records=[], health=fx.sample_health())
+    total = ScrapeResult(records=[], health=fx.all_broken_health())
+    check(not partial.all_broken, "scraper: a partial outage is not total failure")
+    check(total.all_broken, "scraper: a total outage is detected")
+    check(all(h.status == "unconfigured" or h.broken for h in total.health),
+          "scraper: every non-unconfigured portal is marked broken")
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+def test_portal_registry_is_complete():
+    check_eq(len(portals.MODULES), 13, "registry: all thirteen portals registered")
+    for key, module in portals.MODULES.items():
+        check(callable(getattr(module, "fetch_tenders", None)),
+              f"registry: {key} exposes fetch_tenders()")
+        check(key in config.PORTAL_NAMES, f"registry: {key} has a display name")
+        check(key in config.PORTAL_TIERS, f"registry: {key} has a reliability tier")
+        check(bool(portals.source_urls(key)), f"registry: {key} declares source URLs")
+
+
+def test_kfw_points_at_gtai_not_kfw_de():
+    """KfW does not publish notices on its own site -- GTAI does.
+
+    Pointing at kfw.de makes this portal report 'unavailable' forever while
+    looking like an honest failure.
+    """
+    urls = " ".join(portals.source_urls("kfw"))
+    check("gtai.de" in urls, "kfw: the source is gtai.de")
+    check("kfw.de" not in urls, "kfw: kfw.de is NOT used as a tender source")
+
+
+def test_politeness_delay_is_enforced_per_host():
+    """Two seconds between requests to the same host, and it must actually wait.
+
+    Locked down by a test because the temptation to shave this to speed up a
+    run is real, and getting the IP blocked costs far more time than it saves.
+    """
+    check(config.POLITE_DELAY_SECONDS >= 2.0,
+          "politeness: the configured gap is at least 2 seconds",
+          f"got {config.POLITE_DELAY_SECONDS}")
+    check(config.MAX_RETRIES >= 3, "politeness: at least three retry attempts")
+    check("Mozilla" in config.USER_AGENT, "politeness: a realistic User-Agent is set")
+
+    slept: list[float] = []
+    original_sleep = base.time.sleep
+    original_last = dict(base._last_request)
+    try:
+        base.time.sleep = lambda s: slept.append(s)
+        base._last_request.clear()
+        base._wait_for_host("https://politeness.example/a")   # first: no wait
+        base._wait_for_host("https://politeness.example/b")   # same host: waits
+        base._wait_for_host("https://other.example/c")        # different host
+    finally:
+        base.time.sleep = original_sleep
+        base._last_request.clear()
+        base._last_request.update(original_last)
+
+    check_eq(len(slept), 1, "politeness: exactly one wait, on the repeated host")
+    if slept:
+        check(slept[0] > 0, "politeness: the wait is a real delay")
+        check(slept[0] <= config.POLITE_DELAY_SECONDS,
+              "politeness: and no longer than the configured gap")
+
+
+def test_retry_uses_exponential_backoff():
+    attempts = {"n": 0}
+
+    import requests
+
+    @base.retry(stop=base.stop_after_attempt(3),
+                wait=base.wait_exponential(multiplier=0.001, min=0.001, max=0.002),
+                retry=base.retry_if_exception_type(requests.RequestException),
+                reraise=True)
+    def always_fails():
+        attempts["n"] += 1
+        raise requests.ConnectionError("simulated")
+
+    try:
+        always_fails()
+    except requests.ConnectionError:
+        pass
+    check_eq(attempts["n"], 3, "retry: three attempts before giving up")
+
+
+TESTS = [
+    test_politeness_delay_is_enforced_per_host,
+    test_retry_uses_exponential_backoff,
+    test_every_html_portal_is_capturable,
+    test_ungm_with_custom_fetcher_is_included,
+    test_capture_reports_every_layer,
+    test_capture_fails_honestly_when_unreachable,
+    test_capture_distinguishes_bot_wall_from_layout_change,
+    test_harvest_tolerates_one_failing_source,
+    test_harvest_raises_when_every_source_fails,
+    test_one_failing_portal_never_aborts_the_run,
+    test_all_broken_is_detected_for_the_subject_line,
+    test_portal_registry_is_complete,
+    test_kfw_points_at_gtai_not_kfw_de,
+]

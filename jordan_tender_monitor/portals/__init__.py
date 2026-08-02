@@ -1,27 +1,68 @@
-"""Portal scrapers. Every module exposes `fetch_tenders() -> list[dict]`."""
+"""
+Portal registry.
+
+Every module here exposes exactly one required function:
+
+    fetch_tenders() -> list[dict]
+
+HTML portals additionally expose capture() and a SPEC, so `--capture PORTAL`
+works for all of them -- including the ones with custom fetch logic, which are
+exactly the ones most easily left out of a diagnostic by accident.
+"""
 
 from __future__ import annotations
 
-import importlib
+from types import ModuleType
 
-# Ordered so the fast, reliable API portals start first in the thread pool.
-PORTAL_MODULES = [
-    "worldbank",
-    "ted",
-    "samgov",
-    "ungm",
-    "fcdo",
-    "ebrd",
-    "eib",
-    "giz",
-    "kfw",
-    "isdb",
-    "sfd",
-    "adfd",
-    "jica",
-]
+from .. import config
+from . import (adfd, ebrd, eib, fcdo, giz, isdb, jica, kfw, samgov, sfd, ted,
+               ungm, worldbank)
+
+MODULES: dict[str, ModuleType] = {
+    "worldbank": worldbank,
+    "ted": ted,
+    "samgov": samgov,
+    "fcdo": fcdo,
+    "ungm": ungm,
+    "ebrd": ebrd,
+    "eib": eib,
+    "giz": giz,
+    "kfw": kfw,
+    "isdb": isdb,
+    "sfd": sfd,
+    "adfd": adfd,
+    "jica": jica,
+}
 
 
-def load(portal_key: str):
-    """Import a portal module by key."""
-    return importlib.import_module(f"portals.{portal_key}")
+def enabled() -> dict[str, ModuleType]:
+    """The portals switched on in config, in registry order."""
+    return {k: m for k, m in MODULES.items() if config.ENABLED_PORTALS.get(k, False)}
+
+
+def html_portals() -> dict[str, ModuleType]:
+    """Portals whose pages can be captured for selector verification."""
+    return {k: m for k, m in MODULES.items() if hasattr(m, "capture")}
+
+
+def source_urls(key: str) -> list[str]:
+    """The URLs a portal polls, for the failure table in the report."""
+    module = MODULES.get(key)
+    if module is None:
+        return []
+    spec = getattr(module, "SPEC", None)
+    if spec is not None:
+        return list(spec.urls)
+    for attr in ("API", "LISTING", "SEARCH"):
+        value = getattr(module, attr, None)
+        if value:
+            return [value]
+    return []
+
+
+def name(key: str) -> str:
+    return config.PORTAL_NAMES.get(key, key)
+
+
+def tier(key: str) -> int:
+    return config.PORTAL_TIERS.get(key, 2)

@@ -1,11 +1,22 @@
 """
-Agent 3 -- report builder.
+Reporter agent: the email body, the subject line, and five output files.
 
-Produces the HTML email body (report format C: full details per tender) plus the
-Excel / JSON / CSV / HTML output files.
+Two things here are load-bearing.
 
-Every email opens with the same summary block: scan time, portals checked with
-tick or cross, raw tender count, post-filter count, and the top 3 by score.
+THE SUBJECT LINE CARRIES PORTAL HEALTH (Q15). If the subject says
+"0 opportunities" whether every portal failed or every portal worked and
+nothing matched, a dead monitor goes unnoticed for weeks and you find out when
+someone asks why you missed a bid. So:
+
+    Jordan Tenders - 7 new opportunities
+    Jordan Tenders - no new opportunities (13/13 portals OK)
+    Jordan Tenders - 4 new, 3 portals unavailable
+    ACTION NEEDED: Jordan Tenders - all 13 portals unreachable
+
+THE EMAIL NEVER DROPS A TENDER. Outlook clips messages over roughly 100 KB and
+hides the tail without saying so, so full detail is rendered for the top
+MAX_INLINE_TENDERS by score and the remainder MOVES to a compact table with a
+pointer to the attachments. Moving is not dropping.
 """
 
 from __future__ import annotations
@@ -14,329 +25,279 @@ import csv
 import html
 import json
 import logging
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
-import config
+from .. import config
+from ..utils import money
+from ..utils.dates import days_until, fmt
+from ..utils.text import truncate
 
 log = logging.getLogger(__name__)
 
-EXCEL_COLUMNS = [
-    "Rank", "Title", "Portal", "Sector", "Type", "Posted", "Deadline",
-    "Value (USD)", "Score", "Eligibility", "Contact", "Link",
+COLUMNS = [
+    ("score", "Score"),
+    ("title", "Title"),
+    ("portal_name", "Portal"),
+    ("notice_type", "Notice type"),
+    ("sector", "Sector"),
+    ("posted_date", "Published"),
+    ("closing_date", "Deadline"),
+    ("days_left", "Days left"),
+    ("value_display", "Estimated value"),
+    ("language", "Language"),
+    ("flags_display", "Flags"),
+    ("eligibility", "Eligibility"),
+    ("contact", "Contact"),
+    ("url", "Link"),
 ]
 
 
-# --------------------------------------------------------------------------
-# Small helpers
-# --------------------------------------------------------------------------
-def _esc(value) -> str:
-    return html.escape(str(value)) if value not in (None, "") else ""
+# ---------------------------------------------------------------------------
+# Presentation helpers
+# ---------------------------------------------------------------------------
 
 
-def _fmt_value(value) -> str:
-    if value in (None, ""):
-        return "Not published"
-    try:
-        return f"${float(value):,.0f}"
-    except (TypeError, ValueError):
-        return str(value)
+def decorate(tenders: list[dict], today: date | None = None) -> list[dict]:
+    """Add display-only fields. Never mutates the underlying data meaning."""
+    today = today or date.today()
+    for t in tenders:
+        t["portal_name"] = config.PORTAL_NAMES.get(t.get("portal"), t.get("portal"))
+        t["value_display"] = money.format_usd(t.get("estimated_value_usd"))
+        left = days_until(t.get("closing_date"), today)
+        t["days_left"] = "" if left is None else left
+        t["flags_display"] = "; ".join(t.get("flags") or [])
+        t["posted_display"] = fmt(t.get("posted_date"))
+        t["closing_display"] = fmt(t.get("closing_date"))
+    return tenders
 
 
-def _fmt_date(value, fallback: str = "Not published") -> str:
-    if not value:
-        return fallback
-    try:
-        return datetime.fromisoformat(str(value)).strftime("%d %b %Y")
-    except ValueError:
-        return str(value)
+def build_subject(reported: int, health: list, first_run: bool = False) -> str:
+    """Subject line that states the run's health, not just its count."""
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    ok = total - len(broken)
+    prefix = config.EMAIL_SUBJECT_PREFIX
+
+    if total and len(broken) == total:
+        return f"{config.ACTION_NEEDED_PREFIX}: {prefix} - all {total} portals unreachable"
+
+    first = " (first run - full pipeline)" if first_run and reported else ""
+
+    if broken:
+        noun = "opportunity" if reported == 1 else "opportunities"
+        return (f"{prefix} - {reported} new {noun}, "
+                f"{len(broken)} of {total} portals unavailable{first}")
+
+    if reported == 0:
+        return f"{prefix} - no new opportunities ({ok}/{total} portals OK)"
+
+    noun = "opportunity" if reported == 1 else "opportunities"
+    return f"{prefix} - {reported} new {noun}{first}"
 
 
-def _deadline_text(tender: dict) -> str:
-    text = _fmt_date(tender.get("closing_date"), "Not published - verify on portal")
-    days = tender.get("days_to_deadline")
-    if isinstance(days, int) and days >= 0:
-        text += f" ({days} day{'s' if days != 1 else ''} left)"
-    return text
+# ---------------------------------------------------------------------------
+# HTML email body
+# ---------------------------------------------------------------------------
+
+_CSS = """
+body{font-family:Segoe UI,Helvetica,Arial,sans-serif;font-size:14px;color:#222;line-height:1.45}
+h1{font-size:19px;margin:0 0 4px}h2{font-size:16px;margin:22px 0 8px;
+   border-bottom:2px solid #1F4E79;padding-bottom:3px;color:#1F4E79}
+table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+th{background:#1F4E79;color:#fff;text-align:left;padding:6px;font-weight:600}
+td{border-bottom:1px solid #ddd;padding:6px;vertical-align:top}
+.t{border:1px solid #ddd;border-left:5px solid #1F4E79;padding:10px 12px;margin:10px 0;
+   border-radius:3px;background:#fafafa}
+.t h3{margin:0 0 6px;font-size:15px}
+.hi{border-left-color:#2E7D32}.mid{border-left-color:#F9A825}.lo{border-left-color:#C62828}
+.meta{font-size:12px;color:#555;margin:2px 0}
+.flag{display:inline-block;background:#FFF3CD;border:1px solid #FFE08A;color:#7A5B00;
+      padding:1px 6px;border-radius:9px;font-size:11px;margin:2px 3px 2px 0}
+.err{background:#FDECEA;border:1px solid #F5C2C0;padding:10px;border-radius:3px}
+.rtl{direction:rtl;text-align:right}
+.small{font-size:12px;color:#666}
+"""
 
 
-def _score_rgb(score: float) -> str:
-    """Bare aRGB hex (no '#') -- the form openpyxl requires."""
-    if score >= 70:
-        return config.COLOR_HIGH
-    if score >= 40:
-        return config.COLOR_MEDIUM
-    return config.COLOR_LOW
+def _band(score: float) -> str:
+    return "hi" if score >= 70 else ("mid" if score >= 40 else "lo")
 
 
-def _score_colour(score: float) -> str:
-    """CSS colour for the HTML email."""
-    return f"#{_score_rgb(score)}"
+def _e(value) -> str:
+    return html.escape(str(value if value is not None else ""))
 
 
-def _row_of(tender: dict) -> list:
-    return [
-        tender.get("rank"),
-        tender.get("title"),
-        tender.get("portal"),
-        tender.get("sector") or "Unclassified",
-        tender.get("notice_type") or "",
-        _fmt_date(tender.get("posted_date"), ""),
-        _fmt_date(tender.get("closing_date"), ""),
-        tender.get("estimated_value_usd"),
-        tender.get("score"),
-        tender.get("eligibility_flag") or tender.get("eligibility") or "",
-        tender.get("contact") or "",
-        tender.get("url") or "",
-    ]
+def _tender_block(t: dict) -> str:
+    rtl = ' class="rtl"' if t.get("language") == "ar" else ""
+    flags = "".join(f'<span class="flag">{_e(f)}</span>' for f in (t.get("flags") or []))
+    also = ""
+    if t.get("also_on"):
+        also = f'<div class="meta">Also published on: {_e(", ".join(t["also_on"]))}</div>'
+    link = (f'<div class="meta"><a href="{_e(t.get("url"))}">Open the notice</a></div>'
+            if t.get("url") else '<div class="meta">No direct link published</div>')
+    desc = truncate(t.get("description") or "", config.DESCRIPTION_CHAR_LIMIT)
+    contact = (f'<div class="meta"><b>Contact:</b> {_e(t["contact"])}</div>'
+               if t.get("contact") else "")
+    days = t.get("days_left")
+    days_txt = f" ({days} days left)" if days != "" and days is not None else ""
+
+    return f"""
+<div class="t {_band(t.get('score', 0))}"{rtl}>
+  <h3>{_e(t.get('title'))}</h3>
+  <div class="meta"><b>Score {t.get('score')}</b> &middot; {_e(t.get('portal_name'))}
+      &middot; {_e(t.get('sector'))} &middot; {_e(t.get('notice_type') or 'Type unspecified')}</div>
+  <div class="meta"><b>Published:</b> {_e(t.get('posted_display'))}
+      &nbsp;|&nbsp; <b>Deadline:</b> {_e(t.get('closing_display'))}{_e(days_txt)}
+      &nbsp;|&nbsp; <b>Value:</b> {_e(t.get('value_display'))}</div>
+  {contact}{also}
+  <div class="meta">{_e(desc)}</div>
+  {flags}
+  {link}
+</div>"""
 
 
-# --------------------------------------------------------------------------
-# Email body
-# --------------------------------------------------------------------------
-def _summary_html(statuses: list[dict], stats: dict, scan_time: datetime) -> str:
+def _health_table(health: list) -> str:
     rows = []
-    for status in statuses:
-        if status["ok"]:
-            mark = '<span style="color:#107C10;font-weight:bold">&#10004;</span>'
-            detail = f"{status['count']} notice(s) &middot; {status['seconds']}s"
+    for h in health:
+        if h.status == "ok":
+            status = '<span style="color:#2E7D32">OK</span>'
+            detail = f"{h.count} Jordan notice(s)"
+            if h.layer:
+                detail += f" &middot; via {_e(h.layer)} layer (quality {h.quality:.2f})"
+        elif h.status == "unconfigured":
+            status = '<span style="color:#8A6D00">NOT CONFIGURED</span>'
+            detail = _e(h.reason)
         else:
-            mark = '<span style="color:#C00000;font-weight:bold">&#10008;</span>'
-            detail = (
-                f"<span style='color:#C00000'>unavailable - check manually</span><br>"
-                f"<span style='color:#666;font-size:11px'>{_esc(status['error'])}</span>"
-            )
+            status = '<span style="color:#C62828"><b>UNAVAILABLE</b></span>'
+            urls = "<br>".join(f'<a href="{_e(u)}">{_e(u)}</a>' for u in h.urls[:2])
+            detail = f"{_e(h.reason)}<br><span class='small'>Check by hand: {urls}</span>"
+        tier = config.TIER_LABELS.get(h.tier, "")
+        rows.append(f"<tr><td>{_e(h.name)}<br><span class='small'>{_e(tier)}</span></td>"
+                    f"<td>{status}</td><td>{detail}</td></tr>")
+    return ("<table><tr><th>Portal</th><th>Status</th><th>Detail</th></tr>"
+            + "".join(rows) + "</table>")
+
+
+def _overflow_table(tenders: list[dict]) -> str:
+    rows = []
+    for t in tenders:
+        title = (f'<a href="{_e(t.get("url"))}">{_e(t.get("title"))}</a>'
+                 if t.get("url") else _e(t.get("title")))
         rows.append(
-            f"<tr><td style='padding:3px 10px 3px 0'>{mark}</td>"
-            f"<td style='padding:3px 12px 3px 0'><b>{_esc(status['name'])}</b></td>"
-            f"<td style='padding:3px 0;font-size:12px'>{detail}</td></tr>"
-        )
-
-    ok_count = sum(1 for s in statuses if s["ok"])
-    return f"""
-    <div style="background:#F3F6F9;border-left:4px solid #00338D;padding:14px 18px;margin-bottom:22px">
-      <h2 style="margin:0 0 10px;font-size:16px;color:#00338D">Scan summary</h2>
-      <table style="border-collapse:collapse;font-size:13px">
-        <tr><td style="padding:2px 14px 2px 0"><b>Scan completed</b></td>
-            <td>{scan_time.strftime('%d %b %Y, %H:%M')} (container local time)</td></tr>
-        <tr><td style="padding:2px 14px 2px 0"><b>Portals checked</b></td>
-            <td>{ok_count} of {len(statuses)} reachable</td></tr>
-        <tr><td style="padding:2px 14px 2px 0"><b>Raw tenders scraped</b></td>
-            <td>{stats.get('raw', 0)}</td></tr>
-        <tr><td style="padding:2px 14px 2px 0"><b>After filtering</b></td>
-            <td>{stats.get('final', 0)} matched
-                ({stats.get('duplicates_merged', 0)} duplicate(s) merged)</td></tr>
-        <tr><td style="padding:2px 14px 2px 0"><b>Flagged</b></td>
-            <td>{stats.get('national_only', 0)} national-only &middot;
-                {stats.get('arabic', 0)} Arabic-language</td></tr>
-      </table>
-      <h3 style="margin:14px 0 6px;font-size:14px;color:#00338D">Portal status</h3>
-      <table style="border-collapse:collapse">{''.join(rows)}</table>
-    </div>
-    """
+            f"<tr><td>{_e(t.get('score'))}</td><td>{title}</td>"
+            f"<td>{_e(t.get('portal_name'))}</td><td>{_e(t.get('closing_display'))}</td>"
+            f"<td>{_e(t.get('value_display'))}</td></tr>")
+    return ("<table><tr><th>Score</th><th>Title</th><th>Portal</th>"
+            "<th>Deadline</th><th>Value</th></tr>" + "".join(rows) + "</table>")
 
 
-def _top3_html(tenders: list[dict]) -> str:
-    if not tenders:
-        return ""
-    items = []
-    for tender in tenders[:3]:
-        items.append(
-            f"<li style='margin-bottom:6px'>"
-            f"<b>{_esc(tender['title'])}</b><br>"
-            f"<span style='font-size:12px;color:#444'>"
-            f"{_esc(tender['portal'])} &middot; score {tender['score']} &middot; "
-            f"closes {_esc(_deadline_text(tender))}</span></li>"
-        )
-    return (
-        "<div style='margin-bottom:22px'>"
-        "<h2 style='font-size:16px;color:#00338D;margin:0 0 8px'>Top 3 by score</h2>"
-        f"<ol style='margin:0;padding-left:20px'>{''.join(items)}</ol></div>"
-    )
+def build_email_html(result: dict, health: list, first_run: bool = False) -> str:
+    tenders = result["tenders"]
+    today = date.today()
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if h.status != "unconfigured"])
 
+    banner = ""
+    if broken and len(broken) == total:
+        banner = (f'<div class="err"><b>ACTION NEEDED.</b> All {total} portals were '
+                  f'unreachable this run. This report is empty because nothing could '
+                  f'be read, not because nothing was published. See the portal status '
+                  f'table below.</div>')
+    elif broken:
+        names = ", ".join(h.name for h in broken)
+        banner = (f'<div class="err"><b>{len(broken)} of {total} portals unavailable:</b> '
+                  f'{_e(names)}. The opportunities below are therefore a partial '
+                  f'picture. Details in the portal status table.</div>')
 
-def _flags_html(tender: dict) -> str:
-    chips = []
-    if tender.get("eligibility_flag"):
-        chips.append(("#C00000", "#FDE7E9", tender["eligibility_flag"]))
-    if tender.get("language_flag"):
-        chips.append(("#8A6D00", "#FFF4CE", tender["language_flag"]))
-    if tender.get("deadline_flag"):
-        chips.append(("#5C5C5C", "#EFEFEF", tender["deadline_flag"]))
-    if tender.get("duplicate_note"):
-        chips.append(("#00338D", "#E8EEF7", tender["duplicate_note"]))
-    if not chips:
-        return ""
-    return "".join(
-        f"<span style='display:inline-block;background:{bg};color:{fg};"
-        f"font-size:11px;padding:2px 8px;border-radius:10px;margin:0 6px 4px 0'>"
-        f"{_esc(text)}</span>"
-        for fg, bg, text in chips
-    )
+    first_note = ""
+    if first_run and tenders:
+        first_note = ('<p class="small">This is the first run, so the seen-tenders '
+                      'database was empty and the whole open pipeline is reported. '
+                      'From the next run onward only new notices appear.</p>')
 
-
-def _detail_block(tender: dict) -> str:
-    """Format C -- every field for one tender."""
-    description = tender.get("description") or ""
-    if len(description) > config.DESCRIPTION_CHAR_LIMIT:
-        description = description[: config.DESCRIPTION_CHAR_LIMIT].rstrip() + " [...]"
-
-    fields = [
-        ("Portal", tender.get("portal")),
-        ("Notice type", tender.get("notice_type") or "Not stated"),
-        ("Sector (inferred)", tender.get("sector") or "Unclassified"),
-        ("Posted", _fmt_date(tender.get("posted_date"), "Not published")),
-        ("Deadline", _deadline_text(tender)),
-        ("Estimated value", _fmt_value(tender.get("estimated_value_usd"))),
-        ("Eligibility", tender.get("eligibility") or "Not stated in notice"),
-        ("Contact", tender.get("contact") or "See notice"),
-        ("Language", "Arabic" if tender.get("language") == "ar" else "English"),
-        ("Relevance score", f"{tender.get('score')} / 100"),
-    ]
-    rows = "".join(
-        f"<tr><td style='padding:3px 14px 3px 0;color:#555;white-space:nowrap;"
-        f"vertical-align:top'>{label}</td>"
-        f"<td style='padding:3px 0'>{_esc(value)}</td></tr>"
-        for label, value in fields
-    )
-    link = tender.get("url") or ""
-    link_html = (
-        f"<p style='margin:10px 0 0'><a href='{_esc(link)}' "
-        f"style='color:#00338D;font-weight:bold'>Open the notice &rarr;</a></p>"
-        if link else ""
-    )
-    return f"""
-    <div style="border:1px solid #DDD;border-left:5px solid {_score_colour(tender.get('score', 0))};
-                padding:14px 18px;margin-bottom:16px">
-      <h3 style="margin:0 0 4px;font-size:15px;color:#111">
-        {tender.get('rank')}. {_esc(tender.get('title'))}
-      </h3>
-      <div style="margin-bottom:8px">{_flags_html(tender)}</div>
-      <table style="border-collapse:collapse;font-size:13px">{rows}</table>
-      <p style="font-size:13px;color:#333;margin:10px 0 0">
-        <b>Description:</b> {_esc(description) or 'Not provided in the notice.'}
-      </p>
-      {link_html}
-    </div>
-    """
-
-
-def _compact_table(tenders: list[dict]) -> str:
-    header = (
-        "<tr style='background:#00338D;color:#fff;text-align:left'>"
-        "<th style='padding:6px'>#</th><th style='padding:6px'>Title</th>"
-        "<th style='padding:6px'>Portal</th><th style='padding:6px'>Deadline</th>"
-        "<th style='padding:6px'>Score</th></tr>"
-    )
-    rows = "".join(
-        f"<tr style='background:{_score_colour(t.get('score', 0))}'>"
-        f"<td style='padding:5px'>{t.get('rank')}</td>"
-        f"<td style='padding:5px'><a href='{_esc(t.get('url'))}'>{_esc(t.get('title'))}</a></td>"
-        f"<td style='padding:5px'>{_esc(t.get('portal'))}</td>"
-        f"<td style='padding:5px'>{_esc(_fmt_date(t.get('closing_date'), 'n/a'))}</td>"
-        f"<td style='padding:5px'>{t.get('score')}</td></tr>"
-        for t in tenders
-    )
-    return (
-        "<table style='border-collapse:collapse;width:100%;font-size:12px;"
-        f"border:1px solid #CCC'>{header}{rows}</table>"
-    )
-
-
-def build_email_html(
-    tenders: list[dict], statuses: list[dict], stats: dict, scan_time: datetime
-) -> str:
-    """Full HTML email body."""
-    head = f"""
-    <div style="font-family:Segoe UI,Arial,sans-serif;color:#222;max-width:900px">
-      <h1 style="color:#00338D;font-size:20px;margin:0 0 4px">Jordan Tender Intelligence</h1>
-      <p style="color:#666;font-size:13px;margin:0 0 18px">
-        Automated donor and IFI procurement scan &middot; {scan_time.strftime('%d %B %Y')}
-      </p>
-      {_summary_html(statuses, stats, scan_time)}
-    """
-
-    if not tenders:
-        failed = [s["name"] for s in statuses if not s["ok"]]
-        note = (
-            f"<p style='font-size:13px;color:#C00000'>Note: {len(failed)} portal(s) were "
-            f"unavailable this run ({_esc(', '.join(failed))}), so coverage was incomplete. "
-            "Please check those manually.</p>"
-            if failed else ""
-        )
-        return head + f"""
-      <div style="background:#FFF4CE;border-left:4px solid #8A6D00;padding:14px 18px">
-        <h2 style="margin:0 0 6px;font-size:16px">No matching tenders this run</h2>
-        <p style="font-size:13px;margin:0">The scan completed successfully but no
-        tenders passed the current filters. Portal-by-portal results are listed above.</p>
-      </div>
-      {note}
-    </div>"""
-
-    inline = tenders[: config.MAX_INLINE_TENDERS]
+    inline = tenders[:config.MAX_INLINE_TENDERS]
     overflow = tenders[config.MAX_INLINE_TENDERS:]
 
-    body = _top3_html(tenders)
-    body += (
-        f"<h2 style='font-size:16px;color:#00338D;margin:0 0 10px'>"
-        f"All {len(tenders)} matching tenders &mdash; full detail</h2>"
-    )
-    body += "".join(_detail_block(t) for t in inline)
-
-    if overflow:
-        body += (
-            f"<h2 style='font-size:16px;color:#00338D;margin:24px 0 8px'>"
-            f"Remaining {len(overflow)} tenders (summary)</h2>"
-            "<p style='font-size:12px;color:#666;margin:0 0 8px'>Full detail for these is "
-            "in the attached workbook &mdash; the email is truncated here so Outlook does "
-            "not clip it.</p>"
-            + _compact_table(overflow)
-        )
-
-    footer = """
-      <p style="font-size:11px;color:#888;margin-top:26px;border-top:1px solid #DDD;padding-top:10px">
-        Generated automatically by the Jordan Tender Monitor. Scores are a relevance
-        heuristic, not a bid/no-bid decision. Always verify deadlines, eligibility and
-        scope against the original notice before acting.
-      </p>
-    </div>"""
-    return head + body + footer
-
-
-def build_subject(
-    tenders: list[dict], scan_time: datetime, statuses: list[dict] | None = None
-) -> str:
-    """
-    Subject line that distinguishes a quiet market from a broken monitor.
-
-    Both produce zero tenders, and with new-only mode on a quiet day is normal,
-    so "0 opportunities found" every morning is exactly what a silently dead
-    scraper looks like. The subject therefore carries the portal health, not
-    just the count -- a degraded run is visible in the inbox without opening it.
-    """
-    date = scan_time.strftime("%d %b %Y")
-    statuses = statuses or []
-    total = len(statuses)
-    failed = sum(1 for s in statuses if not s.get("ok"))
-
-    if total and failed == total:
-        return (f"{config.EMAIL_SUBJECT_PREFIX} - {date} | "
-                f"ACTION NEEDED: all {total} portals unreachable")
+    parts = [
+        f"<html><head><meta charset='utf-8'><style>{_CSS}</style></head><body>",
+        "<h1>Jordan Tender Intelligence</h1>",
+        f"<div class='small'>{today.strftime('%A %d %B %Y')} &middot; "
+        f"{len(tenders)} opportunit{'y' if len(tenders)==1 else 'ies'} reported "
+        f"&middot; {result['scanned']} notices scanned across {total} portals</div>",
+        banner, first_note,
+    ]
 
     if tenders:
-        headline = f"{len(tenders)} new opportunit{'y' if len(tenders) == 1 else 'ies'}"
+        parts.append(f"<h2>Opportunities ({len(inline)} shown in full)</h2>")
+        parts.extend(_tender_block(t) for t in inline)
+        if overflow:
+            parts.append(
+                f"<h2>Further opportunities ({len(overflow)})</h2>"
+                f"<p class='small'>Listed compactly to keep this email under Outlook's "
+                f"clipping limit. Nothing has been dropped &mdash; full detail for every "
+                f"one of these is in the attached Word and Excel files.</p>")
+            parts.append(_overflow_table(overflow))
     else:
-        headline = "no new opportunities"
+        if not broken:
+            parts.append("<h2>No new opportunities</h2><p>Every portal was read "
+                         "successfully and nothing new matched. This is a genuine "
+                         "quiet run, not a failure &mdash; see the status table.</p>")
 
-    if failed:
-        headline += f" ({failed} of {total} portals unavailable)"
+    dropped = result.get("dropped") or {}
+    if dropped:
+        items = ", ".join(f"{v} {k}" for k, v in sorted(dropped.items()))
+        parts.append(f"<p class='small'><b>Filtered out this run:</b> {_e(items)}. "
+                     f"Merged as duplicates across portals: "
+                     f"{result.get('merged_duplicates', 0)}.</p>")
 
-    return f"{config.EMAIL_SUBJECT_PREFIX} - {date} | {headline}"
+    parts.append("<h2>Portal status</h2>")
+    parts.append(_health_table(health))
+
+    weights = ", ".join(f"{k} {v:.1f}" for k, v in result.get("weights", {}).items())
+    parts.append(f"<p class='small'>Scoring weights in force (renormalised to 100 "
+                 f"after dropping components with a disabled filter): {_e(weights)}.</p>")
+    parts.append("</body></html>")
+    return "\n".join(p for p in parts if p)
 
 
-# --------------------------------------------------------------------------
+def build_text_body(result: dict, health: list) -> str:
+    """Plain-text alternative, for clients that will not render HTML."""
+    lines = [f"Jordan Tender Intelligence - {date.today().isoformat()}", ""]
+    for t in result["tenders"]:
+        lines += [
+            f"[{t.get('score')}] {t.get('title')}",
+            f"    {t.get('portal_name')} | {t.get('sector')} | "
+            f"deadline {t.get('closing_display')} | {t.get('value_display')}",
+        ]
+        if t.get("flags"):
+            lines.append(f"    flags: {'; '.join(t['flags'])}")
+        if t.get("url"):
+            lines.append(f"    {t['url']}")
+        lines.append("")
+    lines.append("Portal status:")
+    for h in health:
+        lines.append(f"  {h.name}: {h.status.upper()}"
+                     + (f" ({h.count})" if h.ok else f" - {h.reason}"))
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Output files
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+
+
+def _stamp() -> str:
+    return datetime.now().strftime("%Y%m%d_%H%M")
+
+
+def _cell(t: dict, key: str):
+    value = t.get(key)
+    if isinstance(value, date):
+        return value.isoformat()
+    return "" if value is None else value
+
+
 def write_excel(tenders: list[dict], path: Path) -> Path:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
@@ -344,259 +305,175 @@ def write_excel(tenders: list[dict], path: Path) -> Path:
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Jordan Tenders"
+    ws.title = "Jordan tenders"
 
-    header_fill = PatternFill("solid", fgColor="00338D")
-    header_font = Font(color="FFFFFF", bold=True)
-    ws.append(EXCEL_COLUMNS)
+    headers = [label for _, label in COLUMNS]
+    ws.append(headers)
+
+    # openpyxl requires BARE hex. "#1F4E79" raises; "1F4E79" is correct.
+    header_fill = PatternFill(start_color=config.COLOR_HEADER,
+                              end_color=config.COLOR_HEADER, fill_type="solid")
     for cell in ws[1]:
         cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(vertical="center")
+        cell.font = Font(color="FFFFFF", bold=True)
+        cell.alignment = Alignment(vertical="center", wrap_text=True)
 
-    for tender in tenders:
-        ws.append(_row_of(tender))
-        row = ws.max_row
-        fill = PatternFill("solid", fgColor=_score_rgb(tender.get("score", 0)))
-        for col in range(1, len(EXCEL_COLUMNS) + 1):
-            ws.cell(row=row, column=col).fill = fill
-            ws.cell(row=row, column=col).alignment = Alignment(vertical="top", wrap_text=True)
-        link_cell = ws.cell(row=row, column=EXCEL_COLUMNS.index("Link") + 1)
-        if tender.get("url"):
-            link_cell.hyperlink = tender["url"]
-            link_cell.value = "Open notice"
-            link_cell.font = Font(color="0563C1", underline="single")
-        value_cell = ws.cell(row=row, column=EXCEL_COLUMNS.index("Value (USD)") + 1)
-        if isinstance(value_cell.value, (int, float)):
-            value_cell.number_format = '#,##0'
+    for t in tenders:
+        ws.append([_cell(t, key) for key, _ in COLUMNS])
+        fill_hex = (config.COLOR_HIGH if (t.get("score") or 0) >= 70
+                    else config.COLOR_MEDIUM if (t.get("score") or 0) >= 40
+                    else config.COLOR_LOW)
+        fill = PatternFill(start_color=fill_hex, end_color=fill_hex, fill_type="solid")
+        for cell in ws[ws.max_row]:
+            cell.fill = fill
+            cell.alignment = Alignment(vertical="top", wrap_text=True)
 
-    widths = [6, 60, 20, 24, 22, 12, 12, 14, 8, 34, 30, 14]
-    for idx, width in enumerate(widths, start=1):
-        ws.column_dimensions[get_column_letter(idx)].width = width
-
+    widths = [8, 60, 24, 16, 22, 12, 12, 10, 18, 10, 34, 34, 28, 46]
+    for i, width in enumerate(widths[:len(COLUMNS)], start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
     ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(EXCEL_COLUMNS))}{max(ws.max_row, 1)}"
+
+    # Setting auto_filter over a header-only range is a classic crash, and it
+    # happens on precisely the quiet day when nothing matched.
+    if tenders:
+        ws.auto_filter.ref = f"A1:{get_column_letter(len(COLUMNS))}{ws.max_row}"
 
     wb.save(path)
-    log.info("Excel written: %s", path)
     return path
 
 
-def write_json(tenders: list[dict], statuses: list[dict], stats: dict, path: Path) -> Path:
-    payload = {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "stats": stats,
-        "portals": statuses,
-        "tenders": tenders,
-    }
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
-    log.info("JSON written: %s", path)
-    return path
-
-
-def write_csv(tenders: list[dict], path: Path) -> Path:
-    with path.open("w", newline="", encoding="utf-8-sig") as handle:
-        writer = csv.writer(handle)
-        writer.writerow(EXCEL_COLUMNS)
-        for tender in tenders:
-            writer.writerow(_row_of(tender))
-    log.info("CSV written: %s", path)
-    return path
-
-
-def write_html(body_html: str, path: Path, subject: str) -> Path:
-    page = (
-        "<!doctype html><html><head><meta charset='utf-8'>"
-        f"<title>{html.escape(subject)}</title></head>"
-        f"<body style='margin:24px;background:#fff'>{body_html}</body></html>"
-    )
-    path.write_text(page, encoding="utf-8")
-    log.info("HTML written: %s", path)
-    return path
-
-
-def _shade(cell, rgb: str) -> None:
-    """Fill a table cell. python-docx has no API for this, so set the XML."""
-    from docx.oxml.ns import qn
-    from docx.oxml import OxmlElement
-
-    shading = OxmlElement("w:shd")
-    shading.set(qn("w:val"), "clear")
-    shading.set(qn("w:fill"), rgb)
-    cell._tc.get_or_add_tcPr().append(shading)
-
-
-def _kv_table(document, rows: list[tuple[str, str]]):
-    table = document.add_table(rows=0, cols=2)
-    table.style = "Table Grid"
-    for label, value in rows:
-        cells = table.add_row().cells
-        cells[0].text = label
-        cells[0].paragraphs[0].runs[0].bold = True
-        cells[1].text = value or ""
-    return table
-
-
-def write_docx(
-    tenders: list[dict], statuses: list[dict], stats: dict, scan_time: datetime, path: Path
-) -> Path:
-    """
-    Word version of the report: the same content as the email, in a document
-    that can be circulated, annotated or dropped into a bid-review pack.
-    """
+def write_docx(tenders: list[dict], health: list, result: dict, path: Path) -> Path:
+    """Word bid-review pack -- the artefact that circulates and takes comments."""
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.shared import Pt, RGBColor
 
-    document = Document()
-
-    title = document.add_heading("Jordan Tender Intelligence", level=0)
-    subtitle = document.add_paragraph(
-        f"Automated donor and IFI procurement scan · {scan_time.strftime('%d %B %Y, %H:%M')}"
+    doc = Document()
+    doc.add_heading("Jordan Tender Intelligence", level=0)
+    subtitle = doc.add_paragraph(date.today().strftime("%A %d %B %Y"))
+    subtitle.runs[0].font.size = Pt(11)
+    doc.add_paragraph(
+        f"{len(tenders)} opportunities reported from {result.get('scanned', 0)} "
+        f"notices scanned. Ranked by fit score."
     )
-    subtitle.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    subtitle.runs[0].font.size = Pt(10)
-    subtitle.runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
-    del title  # heading object not needed beyond insertion
 
-    # ---- Scan summary -----------------------------------------------------
-    document.add_heading("Scan summary", level=1)
-    ok_count = sum(1 for s in statuses if s.get("ok"))
-    _kv_table(document, [
-        ("Scan completed", scan_time.strftime("%d %b %Y, %H:%M")),
-        ("Portals checked", f"{ok_count} of {len(statuses)} reachable"),
-        ("Raw tenders scraped", str(stats.get("raw", 0))),
-        ("After filtering", f"{stats.get('final', 0)} matched "
-                            f"({stats.get('duplicates_merged', 0)} duplicate(s) merged)"),
-        ("Flagged", f"{stats.get('national_only', 0)} national-only · "
-                    f"{stats.get('arabic', 0)} Arabic-language"),
-    ])
-
-    # ---- Portal status ----------------------------------------------------
-    document.add_heading("Portal status", level=1)
-    portal_table = document.add_table(rows=1, cols=3)
-    portal_table.style = "Table Grid"
-    for cell, heading in zip(portal_table.rows[0].cells, ("", "Portal", "Result")):
-        cell.text = heading
-        if cell.paragraphs[0].runs:
-            cell.paragraphs[0].runs[0].bold = True
-    for status in statuses:
-        cells = portal_table.add_row().cells
-        cells[0].text = "OK" if status.get("ok") else "FAIL"
-        cells[1].text = str(status.get("name", ""))
-        cells[2].text = (
-            f"{status.get('count', 0)} notice(s)" if status.get("ok")
-            else f"unavailable - {str(status.get('error') or '')[:180]}"
-        )
-        _shade(cells[0], "C6EFCE" if status.get("ok") else "FFC7CE")
-
-    if not tenders:
-        document.add_heading("No matching tenders this run", level=1)
-        document.add_paragraph(
-            "The scan completed successfully but no tenders passed the current "
-            "filters. Portal-by-portal results are listed above."
-        )
-        document.save(path)
-        log.info("Word document written: %s", path)
-        return path
-
-    # ---- Top 3 ------------------------------------------------------------
-    document.add_heading("Top 3 by score", level=1)
-    for tender in tenders[:3]:
-        para = document.add_paragraph(style="List Number")
-        run = para.add_run(tender.get("title", ""))
+    broken = [h for h in health if getattr(h, "broken", False)]
+    if broken:
+        warn = doc.add_paragraph()
+        run = warn.add_run(
+            f"{len(broken)} portal(s) were unavailable this run, so this is a "
+            f"partial picture: " + ", ".join(h.name for h in broken))
         run.bold = True
-        para.add_run(
-            f"\n{tender.get('portal', '')} · score {tender.get('score')} · "
-            f"closes {_deadline_text(tender)}"
-        ).font.size = Pt(9)
+        run.font.color.rgb = RGBColor(0xC6, 0x28, 0x28)
 
-    # ---- Every tender in full --------------------------------------------
-    document.add_heading(f"All {len(tenders)} matching tenders", level=1)
-    for tender in tenders:
-        heading = document.add_heading(
-            f"{tender.get('rank')}. {tender.get('title', '')}", level=2
-        )
-        band = _score_rgb(tender.get("score", 0))
-        if heading.runs:
-            heading.runs[0].font.color.rgb = RGBColor.from_string(
-                {"C6EFCE": "1E7B34", "FFEB9C": "8A6D00"}.get(band, "C00000")
-            )
+    for t in tenders:
+        doc.add_heading(t.get("title") or "(untitled)", level=2)
+        meta = doc.add_paragraph()
+        meta.add_run(f"Score {t.get('score')}").bold = True
+        meta.add_run(f"  |  {t.get('portal_name')}  |  {t.get('sector')}"
+                     f"  |  {t.get('notice_type') or 'Type unspecified'}")
+        doc.add_paragraph(
+            f"Published: {t.get('posted_display')}    "
+            f"Deadline: {t.get('closing_display')}    "
+            f"Estimated value: {t.get('value_display')}")
+        if t.get("flags"):
+            flagline = doc.add_paragraph()
+            flagline.add_run("Flags: " + "; ".join(t["flags"])).italic = True
+        if t.get("contact"):
+            doc.add_paragraph(f"Contact: {t['contact']}")
+        if t.get("also_on"):
+            doc.add_paragraph(f"Also published on: {', '.join(t['also_on'])}")
+        if t.get("description"):
+            body = doc.add_paragraph(truncate(t["description"], 2000))
+            if t.get("language") == "ar":
+                body.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        if t.get("url"):
+            doc.add_paragraph(t["url"])
 
-        for flag in ("eligibility_flag", "language_flag", "deadline_flag", "duplicate_note"):
-            if tender.get(flag):
-                para = document.add_paragraph()
-                run = para.add_run(str(tender[flag]))
-                run.italic = True
-                run.font.size = Pt(9)
+    doc.add_page_break()
+    doc.add_heading("Portal status", level=1)
+    table = doc.add_table(rows=1, cols=3)
+    table.style = "Light Grid Accent 1"
+    hdr = table.rows[0].cells
+    hdr[0].text, hdr[1].text, hdr[2].text = "Portal", "Status", "Detail"
+    for h in health:
+        cells = table.add_row().cells
+        cells[0].text = h.name
+        cells[1].text = h.status.upper()
+        cells[2].text = (f"{h.count} notice(s)" if h.ok
+                         else f"{h.reason}  ({'; '.join(h.urls[:1])})")
 
-        _kv_table(document, [
-            ("Portal", tender.get("portal", "")),
-            ("Notice type", tender.get("notice_type") or "Not stated"),
-            ("Sector (inferred)", tender.get("sector") or "Unclassified"),
-            ("Posted", _fmt_date(tender.get("posted_date"), "Not published")),
-            ("Deadline", _deadline_text(tender)),
-            ("Estimated value", _fmt_value(tender.get("estimated_value_usd"))),
-            ("Eligibility", tender.get("eligibility") or "Not stated in notice"),
-            ("Contact", tender.get("contact") or "See notice"),
-            ("Language", "Arabic" if tender.get("language") == "ar" else "English"),
-            ("Relevance score", f"{tender.get('score')} / 100"),
-            ("Link", tender.get("url") or ""),
-        ])
-
-        description = tender.get("description") or ""
-        if len(description) > config.DESCRIPTION_CHAR_LIMIT:
-            description = description[: config.DESCRIPTION_CHAR_LIMIT].rstrip() + " [...]"
-        para = document.add_paragraph()
-        para.add_run("Description: ").bold = True
-        para.add_run(description or "Not provided in the notice.")
-
-    document.add_paragraph()
-    footer = document.add_paragraph(
-        "Generated automatically by the Jordan Tender Monitor. Scores are a "
-        "relevance heuristic, not a bid/no-bid decision. Always verify deadlines, "
-        "eligibility and scope against the original notice before acting."
-    )
-    footer.runs[0].font.size = Pt(8)
-    footer.runs[0].font.color.rgb = RGBColor(0x88, 0x88, 0x88)
-
-    document.save(path)
-    log.info("Word document written: %s", path)
+    doc.save(path)
     return path
 
 
-def build_outputs(
-    tenders: list[dict], statuses: list[dict], stats: dict, scan_time: datetime
-) -> dict:
-    """Render the email body and write every configured output file."""
-    body = build_email_html(tenders, statuses, stats, scan_time)
-    subject = build_subject(tenders, scan_time, statuses)
-    stamp = scan_time.strftime("%Y%m%d_%H%M")
-    files: dict[str, Path] = {}
+def write_json(tenders: list[dict], health: list, path: Path) -> Path:
+    def encode(obj):
+        if isinstance(obj, date):
+            return obj.isoformat()
+        raise TypeError(type(obj))
 
-    config.OUTPUT_DIR.mkdir(exist_ok=True)
-    if "excel" in config.OUTPUT_FORMATS:
-        files["excel"] = write_excel(tenders, config.OUTPUT_DIR / f"jordan_tenders_{stamp}.xlsx")
-    if "json" in config.OUTPUT_FORMATS:
-        files["json"] = write_json(
-            tenders, statuses, stats, config.OUTPUT_DIR / f"jordan_tenders_{stamp}.json"
-        )
-    if "csv" in config.OUTPUT_FORMATS:
-        files["csv"] = write_csv(tenders, config.OUTPUT_DIR / f"jordan_tenders_{stamp}.csv")
-    if "html" in config.OUTPUT_FORMATS:
-        files["html"] = write_html(body, config.OUTPUT_DIR / f"jordan_tenders_{stamp}.html", subject)
-    if "docx" in config.OUTPUT_FORMATS:
-        files["docx"] = write_docx(
-            tenders, statuses, stats, scan_time,
-            config.OUTPUT_DIR / f"jordan_tenders_{stamp}.docx",
-        )
-
-    return {"subject": subject, "body_html": body, "files": files}
+    payload = {
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "tender_count": len(tenders),
+        "tenders": [
+            {k: v for k, v in t.items() if not k.startswith("_")}
+            for t in tenders
+        ],
+        "portals": [
+            {"key": h.key, "name": h.name, "tier": h.tier, "status": h.status,
+             "count": h.count, "reason": h.reason, "urls": h.urls}
+            for h in health
+        ],
+    }
+    # ensure_ascii=False so Arabic survives as Arabic rather than \uXXXX.
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False, default=encode),
+                    encoding="utf-8")
+    return path
 
 
-def attachments_for(files: dict) -> list[Path]:
-    """Output files to attach to the email, in the order configured."""
-    return [
-        files[kind] for kind in config.EMAIL_ATTACH_FORMATS
-        if kind in files and files[kind]
-    ]
+def write_csv(tenders: list[dict], path: Path) -> Path:
+    # utf-8-sig: without the BOM, Excel opens Arabic as mojibake.
+    with path.open("w", newline="", encoding="utf-8-sig") as fh:
+        writer = csv.writer(fh)
+        writer.writerow([label for _, label in COLUMNS])
+        for t in tenders:
+            writer.writerow([_cell(t, key) for key, _ in COLUMNS])
+    return path
+
+
+def write_html(body_html: str, path: Path) -> Path:
+    path.write_text(body_html, encoding="utf-8")
+    return path
+
+
+def write_outputs(result: dict, health: list, body_html: str,
+                  output_dir: Path | None = None) -> dict[str, Path]:
+    """Write every configured output format. Returns format -> path."""
+    output_dir = Path(output_dir or config.OUTPUT_DIR)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    tenders = result["tenders"]
+    stamp = _stamp()
+    written: dict[str, Path] = {}
+
+    for fmt_name in config.OUTPUT_FORMATS:
+        try:
+            if fmt_name == "excel":
+                written["excel"] = write_excel(tenders, output_dir / f"jordan_tenders_{stamp}.xlsx")
+            elif fmt_name == "docx":
+                written["docx"] = write_docx(tenders, health, result,
+                                             output_dir / f"jordan_tenders_{stamp}.docx")
+            elif fmt_name == "json":
+                written["json"] = write_json(tenders, health, output_dir / f"jordan_tenders_{stamp}.json")
+            elif fmt_name == "csv":
+                written["csv"] = write_csv(tenders, output_dir / f"jordan_tenders_{stamp}.csv")
+            elif fmt_name == "html":
+                written["html"] = write_html(body_html, output_dir / f"jordan_tenders_{stamp}.html")
+        except Exception as exc:  # noqa: BLE001 - one format must not lose the rest
+            log.error("could not write %s output: %s", fmt_name, exc)
+
+    return written
+
+
+def attachments_for_email(written: dict[str, Path]) -> list[Path]:
+    return [written[f] for f in config.EMAIL_ATTACH_FORMATS if f in written]

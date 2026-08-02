@@ -1,323 +1,381 @@
 """
-Agent 2 -- filter, score and deduplicate.
+Filter, score and deduplicate.
 
-Filter order (per spec):
-  1. language
-  2. closing date (expired)
-  3. minimum value
-  4. notice type
-  5. lookback window
-  6. new-only (seen_tenders.db)
+Filtering policy comes straight from the interview and is deliberately
+permissive -- almost nothing is removed, because every removal here is
+invisible in the finished report:
 
-Then every survivor is scored 0-100 and near-duplicate titles across portals are
-merged, keeping the highest-scoring copy and annotating it with the others.
+  * all sectors, all notice types, no lookback window  (Q1, Q4, Q5)
+  * the $100k floor applies ONLY to published values   (Q3)
+  * closed tenders out, undated ones kept and flagged  (Q6)
+  * national-only tenders kept, flagged, penalised     (Q9)
+
+Scoring is where the report earns its keep, and it has one subtlety worth
+stating. A scoring component whose filter is disabled awards every tender the
+same points, so it carries no information at all while still occupying weight
+that could have gone to a component that discriminates. Such components are
+dropped and the remainder renormalised to 100.
 """
 
 from __future__ import annotations
 
-import logging
-from datetime import date, datetime
+from datetime import date
 
 from rapidfuzz import fuzz
 
-import config
+from .. import config
+from ..utils import dates as dateutils
+from ..utils import money
+from ..utils.text import clean, keyword_hits
 
-from . import tracker
+# ---------------------------------------------------------------------------
+# Scoring weights, resolved once against the active configuration
+# ---------------------------------------------------------------------------
 
-log = logging.getLogger(__name__)
+
+def active_weights() -> dict[str, float]:
+    """Weights renormalised to 100 across components that still discriminate.
+
+    The sector component is dropped when TARGET_SECTORS is empty, because with
+    "all sectors" every tender scores identically on it.
+
+    The keyword component is NOT dropped when MATCH_KEYWORDS is empty. Keyword
+    *filtering* is off, but RANKING_LEXICON still varies per tender, so the
+    component carries real information -- and without it ranking would collapse
+    onto value and deadline alone, putting a large road contract above a
+    well-matched governance advisory.
+    """
+    weights = dict(config.SCORE_WEIGHTS)
+
+    if not config.TARGET_SECTORS:
+        weights.pop("sector", None)
+    if not config.RANKING_LEXICON and not config.MATCH_KEYWORDS:
+        weights.pop("keyword", None)
+    if config.MIN_VALUE_USD is None and not config.KEEP_UNKNOWN_VALUE:
+        weights.pop("value", None)
+
+    total = sum(weights.values())
+    if total <= 0:
+        return {"keyword": 100.0}
+    return {k: (v / total) * 100.0 for k, v in weights.items()}
 
 
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Filtering
-# --------------------------------------------------------------------------
-def _as_date(value) -> date | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(str(value)).date()
-    except ValueError:
-        return None
+# ---------------------------------------------------------------------------
 
 
-def _passes_language(tender: dict) -> tuple[bool, str | None]:
-    mode = config.LANGUAGE_MODE
-    language = tender.get("language", "en")
-    if mode == "english_only" and language != "en":
-        return False, "non-English notice"
-    if language == "ar":
-        tender["language_flag"] = config.ARABIC_FLAG_NOTE
-    return True, None
-
-
-def _passes_deadline(tender: dict, today: date) -> tuple[bool, str | None]:
-    if not config.EXCLUDE_CLOSED:
-        return True, None
-    closing = _as_date(tender.get("closing_date"))
-    if closing is None:
-        if config.KEEP_UNKNOWN_DEADLINE:
-            tender["deadline_flag"] = "Deadline not published - verify on the portal"
-            return True, None
-        return False, "no deadline published"
-    if closing < today:
-        return False, "deadline passed"
-    return True, None
-
-
-def _passes_value(tender: dict) -> tuple[bool, str | None]:
-    threshold = config.MIN_VALUE_USD
-    if not threshold:
-        return True, None
-    value = tender.get("estimated_value_usd")
+def _passes_value(record: dict) -> tuple[bool, str | None]:
+    value = record.get("estimated_value_usd")
     if value is None:
-        if config.KEEP_UNKNOWN_VALUE:
-            tender["value_flag"] = "Value not published"
-            return True, None
-        return False, "value not published"
-    if value < threshold:
-        return False, f"value below USD {threshold:,.0f}"
-    return True, None
+        # Q3: unknown is not the same as small. Most donor notices publish no
+        # value at all, so dropping these would remove most of the pipeline.
+        return (config.KEEP_UNKNOWN_VALUE, "Value not published")
+    if config.MIN_VALUE_USD is not None and value < config.MIN_VALUE_USD:
+        return (False, None)
+    return (True, None)
 
 
-def _passes_type(tender: dict) -> tuple[bool, str | None]:
-    if not config.NOTICE_TYPES:
-        return True, None
-    notice_type = (tender.get("notice_type") or "").lower()
-    if any(wanted.lower() in notice_type for wanted in config.NOTICE_TYPES):
-        return True, None
-    return False, "notice type excluded"
+def _passes_deadline(record: dict, today: date) -> tuple[bool, str | None]:
+    closing = record.get("closing_date")
+    if closing is None:
+        return (config.KEEP_UNKNOWN_DEADLINE, config.UNKNOWN_DEADLINE_NOTE)
+    if config.EXCLUDE_CLOSED and not dateutils.is_open(closing, today):
+        return (False, None)
+    return (True, None)
 
 
-def _passes_lookback(tender: dict, today: date) -> tuple[bool, str | None]:
-    if not config.LOOKBACK_DAYS:
-        return True, None
-    posted = _as_date(tender.get("posted_date"))
+def _passes_lookback(record: dict, today: date) -> bool:
+    if config.LOOKBACK_DAYS is None:
+        return True
+    posted = record.get("posted_date")
     if posted is None:
-        return True, None  # never drop a tender purely for missing a posted date
-    if (today - posted).days > config.LOOKBACK_DAYS:
-        return False, f"posted more than {config.LOOKBACK_DAYS} days ago"
-    return True, None
+        return True  # never drop on a field the portal did not publish
+    return (today - posted).days <= config.LOOKBACK_DAYS
 
 
-def apply_filters(tenders: list[dict], new_only: bool | None = None) -> tuple[list[dict], dict]:
-    """Run every filter in order. Returns (kept, rejection counts)."""
-    today = date.today()
-    use_new_only = config.NEW_ONLY_MODE if new_only is None else new_only
-    previously_seen = tracker.seen_ids() if use_new_only else set()
+def _passes_sector(record: dict) -> bool:
+    if not config.TARGET_SECTORS:
+        return True
+    return record.get("sector") in config.TARGET_SECTORS
 
+
+def _passes_keywords(record: dict) -> bool:
+    if not config.MATCH_KEYWORDS:
+        return True
+    blob = f"{record.get('title') or ''} {record.get('description') or ''}"
+    return bool(keyword_hits(blob, config.MATCH_KEYWORDS))
+
+
+def _passes_notice_type(record: dict) -> bool:
+    if not config.NOTICE_TYPES:
+        return True
+    given = (record.get("notice_type") or "").lower()
+    return any(t.lower() in given for t in config.NOTICE_TYPES)
+
+
+def _passes_language(record: dict) -> bool:
+    if config.LANGUAGE_MODE == "english_only":
+        return record.get("language") != "ar"
+    return True
+
+
+def _passes_eligibility(record: dict) -> bool:
+    if config.ELIGIBILITY_MODE != "exclude":
+        return True
+    return not record.get("eligibility")
+
+
+def apply_filters(records: list[dict], today: date | None = None
+                  ) -> tuple[list[dict], dict[str, int]]:
+    """Filter records, returning survivors and a count of what was removed.
+
+    The dropped-reason counts exist so the report can say what was filtered
+    rather than leaving it invisible.
+    """
+    today = today or date.today()
     kept: list[dict] = []
-    rejected: dict[str, int] = {}
+    dropped: dict[str, int] = {}
 
-    def reject(reason: str) -> None:
-        rejected[reason] = rejected.get(reason, 0) + 1
+    def drop(reason: str) -> None:
+        dropped[reason] = dropped.get(reason, 0) + 1
 
-    for tender in tenders:
-        if not tender.get("title"):
-            reject("no title")
+    for record in records:
+        flags = list(record.get("flags") or [])
+
+        ok, flag = _passes_deadline(record, today)
+        if not ok:
+            drop("closed")
+            continue
+        if flag:
+            flags.append(flag)
+
+        ok, flag = _passes_value(record)
+        if not ok:
+            drop("below minimum value")
+            continue
+        if flag:
+            flags.append(flag)
+
+        if not _passes_lookback(record, today):
+            drop("outside lookback window")
+            continue
+        if not _passes_sector(record):
+            drop("sector not targeted")
+            continue
+        if not _passes_keywords(record):
+            drop("no keyword match")
+            continue
+        if not _passes_notice_type(record):
+            drop("notice type not targeted")
+            continue
+        if not _passes_language(record):
+            drop("language excluded")
+            continue
+        if not _passes_eligibility(record):
+            drop("eligibility restricted")
             continue
 
-        for check in (
-            lambda t: _passes_language(t),
-            lambda t: _passes_deadline(t, today),
-            lambda t: _passes_value(t),
-            lambda t: _passes_type(t),
-            lambda t: _passes_lookback(t, today),
-        ):
-            ok, reason = check(tender)
-            if not ok:
-                reject(reason or "filtered")
-                break
-        else:
-            if use_new_only and tender["id"] in previously_seen:
-                reject("already reported in a previous run")
-                continue
-            kept.append(tender)
+        if record.get("language") == "ar":
+            flags.append(config.ARABIC_FLAG_NOTE)
+        if record.get("eligibility"):
+            flags.append(record["eligibility"])
 
-    log.info("Filtering: %d in -> %d kept (%s)", len(tenders), len(kept), rejected or "no rejections")
-    return kept, rejected
+        record["flags"] = flags
+        kept.append(record)
+
+    return kept, dropped
 
 
-# --------------------------------------------------------------------------
-# Eligibility
-# --------------------------------------------------------------------------
-def annotate_eligibility(tender: dict) -> bool:
-    """Mark national-only tenders. Returns True if the tender is restricted."""
-    blob = " ".join(
-        str(tender.get(field) or "")
-        for field in ("eligibility", "description", "title", "notice_type")
-    ).lower()
-    restricted = any(marker in blob for marker in config.NATIONAL_ONLY_MARKERS)
-    if restricted:
-        tender["eligibility_flag"] = "NATIONAL ONLY - international firms likely ineligible"
-    tender["national_only"] = restricted
-    return restricted
-
-
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 # Scoring
-# --------------------------------------------------------------------------
-def _active_weights() -> dict[str, float]:
-    """Drop components whose filter is disabled, then renormalise to 100."""
-    weights = dict(config.SCORE_WEIGHTS)
+# ---------------------------------------------------------------------------
+
+_KEYWORD_SATURATION = 5   # hits beyond this add nothing
+
+
+def _keyword_component(record: dict) -> float:
+    blob = f"{record.get('title') or ''} {record.get('description') or ''}"
+    lexicon = config.MATCH_KEYWORDS or config.RANKING_LEXICON
+    if not lexicon:
+        return 0.0
+
+    hits = keyword_hits(blob, lexicon)
+    # A title hit says more than a body hit -- donor titles are terse, so a
+    # match there is deliberate.
+    title_hits = keyword_hits(record.get("title") or "", lexicon)
+
+    # Guard the division: an empty lexicon or zero hits must not raise.
+    density = min(len(hits) / _KEYWORD_SATURATION, 1.0) if _KEYWORD_SATURATION else 0.0
+    score = 0.7 * density + 0.3 * min(len(title_hits) / 2.0, 1.0)
+
+    penalty = keyword_hits(blob, config.DEPRIORITISE_LEXICON)
+    if penalty:
+        score *= 0.55
+
+    record["_keyword_hits"] = sorted(set(hits))[:12]
+    return max(0.0, min(score, 1.0))
+
+
+def _sector_component(record: dict) -> float:
     if not config.TARGET_SECTORS:
-        # "All sectors" -- every tender would score identically, so the
-        # component carries no information. Drop it.
-        weights.pop("sector", None)
-    total = sum(weights.values()) or 1.0
-    return {name: value * 100.0 / total for name, value in weights.items()}
-
-
-def _keyword_terms() -> list[str]:
-    return config.MATCH_KEYWORDS or config.RANKING_LEXICON
-
-
-def _keyword_hits(tender: dict, terms: list[str]) -> int:
-    blob = f"{tender.get('title', '')} {tender.get('description', '')}".lower()
-    return sum(1 for term in terms if term.lower() in blob)
-
-
-def _sector_points(tender: dict) -> float:
-    """1.0 exact sector match, 0.5 partial, 0.0 none."""
-    sector = (tender.get("sector") or "").lower()
-    if not sector:
         return 0.0
-    targets = [s.lower() for s in config.TARGET_SECTORS]
-    if sector in targets:
-        return 1.0
-    if any(word in sector for target in targets for word in target.split()):
-        return 0.5
-    return 0.0
+    return 1.0 if record.get("sector") in config.TARGET_SECTORS else 0.0
 
 
-def _value_points(tender: dict) -> float:
-    """1.0 above threshold, 0.53 (8/15) unknown, 0.0 below."""
-    value = tender.get("estimated_value_usd")
+def _value_component(record: dict) -> float:
+    value = record.get("estimated_value_usd")
     if value is None:
-        return 8.0 / 15.0
-    if not config.MIN_VALUE_USD or value >= config.MIN_VALUE_USD:
-        return 1.0
-    return 0.0
+        # Mid-band: unknown value must neither dominate the ranking nor sink,
+        # since most of the pipeline has no published value.
+        return config.UNKNOWN_VALUE_SCORE_FRACTION
+    floor = config.MIN_VALUE_USD or 100_000.0
+    if value <= floor:
+        return 0.35
+    ceiling = floor * 50
+    span = max(ceiling - floor, 1.0)
+    return min(0.35 + 0.65 * ((value - floor) / span), 1.0)
 
 
-def _urgency_points(tender: dict, today: date) -> float:
-    """15 within 14 days, 10 within 30, 5 within 60, 2 beyond, 0 unknown."""
-    closing = _as_date(tender.get("closing_date"))
-    if closing is None:
-        return 0.0
-    days = (closing - today).days
-    tender["days_to_deadline"] = days
+def _urgency_component(record: dict, today: date) -> float:
+    """Scored as time available to respond, not as nearness of the deadline.
+
+    A tender closing tomorrow is not an opportunity, it is a missed one. What
+    matters for a bid pipeline is whether there is enough runway to write a
+    credible proposal.
+    """
+    days = dateutils.days_until(record.get("closing_date"), today)
+    if days is None:
+        return 0.5     # unknown deadline: neutral, and flagged elsewhere
     if days < 0:
         return 0.0
-    if days <= 14:
-        return 1.0
+    if days <= 5:
+        return 0.15
+    if days <= 12:
+        return 0.5
     if days <= 30:
-        return 10.0 / 15.0
-    if days <= 60:
-        return 5.0 / 15.0
-    return 2.0 / 15.0
+        return 1.0
+    if days <= 75:
+        return 0.85
+    return 0.6
 
 
-def score_tenders(tenders: list[dict]) -> list[dict]:
-    """Score each tender 0-100 and attach a per-component breakdown."""
-    if not tenders:
-        return []
+def score(record: dict, today: date | None = None,
+          weights: dict[str, float] | None = None) -> float:
+    """Score a tender 0-100 under the active, renormalised weights."""
+    today = today or date.today()
+    weights = weights if weights is not None else active_weights()
 
-    today = date.today()
-    weights = _active_weights()
-    terms = _keyword_terms()
+    components = {
+        "keyword": _keyword_component(record),
+        "sector": _sector_component(record),
+        "value": _value_component(record),
+        "urgency": _urgency_component(record, today),
+    }
 
-    hits = {t["id"]: _keyword_hits(t, terms) for t in tenders}
-    max_hits = max(hits.values()) or 1
+    total = sum(weights[name] * components[name]
+                for name in weights if name in components)
 
-    for tender in tenders:
-        annotate_eligibility(tender)
+    if record.get("eligibility") and config.ELIGIBILITY_MODE == "flag":
+        total -= config.NATIONAL_ONLY_PENALTY
 
-        components: dict[str, float] = {}
-        if "keyword" in weights:
-            components["keyword"] = round(
-                weights["keyword"] * hits[tender["id"]] / max_hits, 1
-            )
-        if "sector" in weights:
-            components["sector"] = round(weights["sector"] * _sector_points(tender), 1)
-        if "value" in weights:
-            components["value"] = round(weights["value"] * _value_points(tender), 1)
-        if "urgency" in weights:
-            components["urgency"] = round(weights["urgency"] * _urgency_points(tender, today), 1)
-
-        score = sum(components.values())
-        if tender.get("national_only") and config.ELIGIBILITY_MODE == "flag":
-            components["eligibility_penalty"] = -float(config.NATIONAL_ONLY_PENALTY)
-            score -= config.NATIONAL_ONLY_PENALTY
-
-        tender["keyword_hits"] = hits[tender["id"]]
-        tender["score_components"] = components
-        tender["score"] = round(max(0.0, min(100.0, score)), 1)
-
-    tenders.sort(key=lambda t: t["score"], reverse=True)
-    for rank, tender in enumerate(tenders, start=1):
-        tender["rank"] = rank
-    return tenders
+    record["_components"] = {k: round(v, 3) for k, v in components.items()
+                            if k in weights}
+    return round(max(0.0, min(total, 100.0)), 1)
 
 
-# --------------------------------------------------------------------------
+def score_all(records: list[dict], today: date | None = None) -> list[dict]:
+    today = today or date.today()
+    weights = active_weights()
+    for record in records:
+        record["score"] = score(record, today, weights)
+    return records
+
+
+# ---------------------------------------------------------------------------
 # Deduplication
-# --------------------------------------------------------------------------
-def deduplicate(tenders: list[dict]) -> tuple[list[dict], int]:
-    """Merge near-identical titles across portals, keeping the best-scoring copy."""
-    if len(tenders) < 2:
-        return tenders, 0
+# ---------------------------------------------------------------------------
 
-    ordered = sorted(tenders, key=lambda t: t.get("score", 0), reverse=True)
+
+def deduplicate(records: list[dict]) -> tuple[list[dict], int]:
+    """Collapse the same notice appearing on more than one portal.
+
+    A World Bank-financed assignment routinely shows up on the World Bank site
+    and on UNGM. The surviving copy keeps the better data and records where
+    else it was seen, so nothing is hidden by the merge.
+
+    Fuzzy title matching applies ONLY across portals. Within a single portal,
+    two notices must share a URL to be treated as the same thing. Donor portals
+    publish numbered lots and near-identical sister assignments -- "Governance
+    Advisory Assignment 5" and "Assignment 6" score 97 on token similarity and
+    would collapse into one, silently deleting a real tender. Cross-portal
+    duplication is what this function exists to fix; same-portal similarity is
+    usually a genuinely different contract.
+    """
+    if not records:
+        return [], 0
+
+    ordered = sorted(records, key=lambda r: (-(r.get("score") or 0),
+                                             r.get("title") or ""))
     kept: list[dict] = []
     merged = 0
 
-    for tender in ordered:
-        match = None
-        for candidate in kept:
-            similarity = fuzz.token_sort_ratio(
-                tender.get("title", ""), candidate.get("title", "")
-            )
-            if similarity >= config.DEDUPE_SIMILARITY_THRESHOLD:
-                match = candidate
+    for record in ordered:
+        title = clean(record.get("title")).lower()
+        duplicate = None
+        for existing in kept:
+            if record.get("url") and record["url"] == existing.get("url"):
+                duplicate = existing
                 break
-        if match is None:
-            kept.append(tender)
+            if record.get("portal") == existing.get("portal"):
+                continue  # same portal: only an identical URL counts
+            other = clean(existing.get("title")).lower()
+            if not title or not other:
+                continue
+            if fuzz.token_sort_ratio(title, other) >= config.DEDUPE_SIMILARITY_THRESHOLD:
+                duplicate = existing
+                break
+
+        if duplicate is None:
+            record["also_on"] = []
+            kept.append(record)
             continue
 
         merged += 1
-        also = match.setdefault("also_found_on", [])
-        if tender["portal"] != match["portal"] and tender["portal"] not in also:
-            also.append(tender["portal"])
-        # Prefer any field the winning copy is missing
-        for field in ("closing_date", "estimated_value_usd", "contact", "eligibility", "url"):
-            if not match.get(field) and tender.get(field):
-                match[field] = tender[field]
+        also = duplicate.setdefault("also_on", [])
+        label = config.PORTAL_NAMES.get(record["portal"], record["portal"])
+        if label not in also:
+            also.append(label)
+        # Keep whichever copy actually has the field.
+        for field_name in ("closing_date", "posted_date", "estimated_value_usd",
+                           "description", "contact", "notice_type", "eligibility"):
+            if duplicate.get(field_name) in (None, "") and record.get(field_name):
+                duplicate[field_name] = record[field_name]
 
-    for tender in kept:
-        if tender.get("also_found_on"):
-            tender["duplicate_note"] = "Also found on: " + ", ".join(tender["also_found_on"])
-
-    kept.sort(key=lambda t: t.get("score", 0), reverse=True)
-    for rank, tender in enumerate(kept, start=1):
-        tender["rank"] = rank
-
-    log.info("Deduplication: %d merged, %d unique remain", merged, len(kept))
     return kept, merged
 
 
-def process(tenders: list[dict], new_only: bool | None = None) -> tuple[list[dict], dict]:
-    """Full Agent 2 pipeline: filter -> score -> deduplicate."""
-    raw_count = len(tenders)
-    kept, rejected = apply_filters(tenders, new_only=new_only)
-    kept = score_tenders(kept)
-    kept, merged = deduplicate(kept)
+# ---------------------------------------------------------------------------
+# Pipeline entry point
+# ---------------------------------------------------------------------------
 
-    stats = {
-        "raw": raw_count,
-        "after_filters": len(kept) + merged,
-        "duplicates_merged": merged,
-        "final": len(kept),
-        "rejected": rejected,
-        "national_only": sum(1 for t in kept if t.get("national_only")),
-        "arabic": sum(1 for t in kept if t.get("language") == "ar"),
+
+def process(records: list[dict], today: date | None = None) -> dict:
+    """Filter, score, deduplicate. Returns results plus what was dropped."""
+    today = today or date.today()
+    kept, dropped = apply_filters(records, today)
+    kept = score_all(kept, today)
+    kept, merged = deduplicate(kept)
+    kept.sort(key=lambda r: (-(r.get("score") or 0),
+                             r.get("closing_date") or date.max))
+    return {
+        "tenders": kept,
+        "dropped": dropped,
+        "merged_duplicates": merged,
+        "weights": active_weights(),
+        "scanned": len(records),
     }
-    return kept, stats
+
+
+def summarise_value(record: dict) -> str:
+    return money.format_usd(record.get("estimated_value_usd"))

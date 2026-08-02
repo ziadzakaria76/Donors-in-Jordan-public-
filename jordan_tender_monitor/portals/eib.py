@@ -1,48 +1,44 @@
 """
-European Investment Bank procurement notices (HTML).
+EIB -- European Investment Bank. Tier 2.
 
-Covers EIB corporate procurement plus notices tied to the projects it finances.
-Only Jordan-related items are kept.
+The EIB publishes its own corporate procurement and, separately, notices for
+projects it finances. Jordan appears mainly under the latter.
+
+VERIFICATION STATUS: never run against the live site; selectors unverified.
 """
 
 from __future__ import annotations
 
-from .harvester import Source, harvest
+from . import harvester
+from .harvester import HtmlSpec
 
-PORTAL_KEY = "eib"
-LABEL = "EIB"
-MANUAL_URL = "https://www.eib.org/en/projects/procurement/index.htm"
+KEY = "eib"
 
-# URLs verified August 2026. EIB procurement lives under /en/about/procurement/
-# (not /en/projects/procurement/, which this module previously used). The
-# "all" index is the actual listing of open calls.
-SOURCES = [
-    Source("https://www.eib.org/en/about/procurement/all/index.htm"),
-    Source("https://www.eib.org/en/about/procurement/index"),
-    Source("https://www.eib.org/en/about/procurement/project-procurement"),
-    Source("https://www.eib.org/en/about/procurement/technical-assistance.htm"),
-    Source("https://www.eib.org/en/projects/all/index.htm", params={"q": "Jordan"}),
-]
-
-SELECTORS = [
-    "div.eib-listing__item", "li.listing__item", "article.teaser",
-    "div.search-result", "table tbody tr", "div.views-row",
-    "div[class*='listing']", "article[class*='teaser']",
-]
-
-# Real call permalinks:
-#   /en/about/procurement/calls/all/cft-1744
-#   /en/about/procurement/calls-technical-assistance/all/aa-011624003
-HREF_PATTERN = r"/(projects|about)/(procurement|pipelines|all)/|/procurement/calls"
+SPEC = HtmlSpec(
+    key=KEY,
+    urls=[
+        "https://www.eib.org/en/about/procurement/all/index.htm",
+    ],
+    # SELECTOR HINTS ONLY -- written without access to the live pages, which
+    # were blocked from the build environment. If a hint is wrong the quality
+    # gate rejects it and a class-independent layer takes over. Confirm with:
+    #     python run.py --capture eib
+    selectors=[
+        "div.eib-list__item",
+        "article.teaser",
+        "li.list-item",
+        "table tbody tr",
+    ],
+    anchor_hint="/about/procurement/",
+    currency="EUR",
+    filter_to_jordan=True,
+    notes="corporate and project procurement in one listing",
+)
 
 
 def fetch_tenders() -> list[dict]:
-    return harvest(
-        portal_key=PORTAL_KEY,
-        label=LABEL,
-        sources=SOURCES,
-        selectors=SELECTORS,
-        href_pattern=HREF_PATTERN,
-        notice_type="EIB procurement notice",
-        manual_url=MANUAL_URL,
-    )
+    return harvester.harvest(SPEC)
+
+
+def capture():
+    return harvester.capture(SPEC)

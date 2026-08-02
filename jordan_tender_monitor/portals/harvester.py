@@ -1,173 +1,176 @@
 """
-Shared harvest pipeline for the HTML-scraping portals.
+Generic driver for HTML portals.
 
-Each portal declares *what* to scrape (sources, selector hints, notice type) and
-this module handles *how*: feed discovery, the extraction cascade, pagination,
-Jordan filtering, detail-page enrichment and error diagnosis. Hardening applied
-here benefits all ten scrapers at once, which is the point -- these portals fail
-in the same handful of ways.
+A portal module declares a HtmlSpec -- its source URLs, its selector hints and
+its currency -- and this module does the fetching, the cascade, pagination and
+detail enrichment. Portals that need custom logic (UNGM's POST search endpoint,
+the REST APIs) supply their own fetch function instead, but still route the
+resulting HTML through here so that --capture works for every HTML portal
+rather than only the simple ones.
+
+THE SELECTORS ARE HINTS, NOT CONTRACTS. They were written without access to the
+live pages -- see the README. If a hint is wrong the quality gate rejects it and
+a class-independent layer takes over, which is the whole reason the cascade
+exists.
 """
 
 from __future__ import annotations
 
-import logging
+from dataclasses import dataclass, field
+from urllib.parse import urljoin
 
-import config
+from bs4 import BeautifulSoup
 
-from . import htmlkit
-from .base import PortalError, clean_text, detect_language, make_record, mentions_jordan
-
-log = logging.getLogger(__name__)
-
-
-class Source:
-    """One page to scrape."""
-
-    def __init__(self, url: str, *, js: bool = False, params: dict | None = None):
-        self.url = url
-        self.js = js
-        self.params = params
+from .. import config
+from ..utils.text import clean
+from . import base
+from .htmlkit import LayerResult, extract, run_layers
 
 
-def _collect_from_source(
-    source: Source,
-    *,
-    selectors: list[str],
-    href_pattern: str | None,
-    use_feeds: bool,
-    errors: list[str],
-) -> tuple[list[dict], str]:
-    """Rows from one source, following pagination. Returns (rows, last_html)."""
-    rows: list[dict] = []
-    last_html = ""
-    url = source.url
-    params = source.params
+@dataclass
+class HtmlSpec:
+    """Everything the generic driver needs to read one portal."""
 
-    for page_number in range(config.MAX_PAGINATION_PAGES if config.FOLLOW_PAGINATION else 1):
+    key: str
+    urls: list[str]
+    selectors: list[str] = field(default_factory=list)
+    anchor_hint: str | None = None
+    currency: str | None = None
+    # Portals that publish worldwide need filtering down to Jordan; a
+    # Jordan-specific page does not.
+    filter_to_jordan: bool = True
+    # Optional custom fetcher: (url) -> html. Used by portals behind a POST
+    # search endpoint so that --capture can still reach them.
+    fetcher: object | None = None
+    notes: str = ""
+
+
+def _fetch(spec: HtmlSpec, url: str) -> str:
+    if spec.fetcher is not None:
+        return spec.fetcher(url)
+    return base.fetch(url)
+
+
+def _next_page(html: str, current_url: str) -> str | None:
+    """Find a 'next page' link without relying on class names."""
+    soup = BeautifulSoup(html, "html.parser")
+    for a in soup.find_all("a", href=True):
+        label = clean(a.get_text()).lower()
+        rel = " ".join(a.get("rel") or []).lower()
+        aria = clean(a.get("aria-label") or "").lower()
+        if (rel == "next" or label in {"next", "next page", ">", "›", "»"}
+                or aria in {"next", "next page"}):
+            href = a["href"]
+            if href and not href.startswith("#"):
+                return urljoin(current_url, href)
+    return None
+
+
+def harvest(spec: HtmlSpec) -> list[dict]:
+    """Read every source URL for a portal and return standard records.
+
+    A single URL failing is tolerated as long as another one works -- several
+    of these portals publish across two sites (GIZ, EBRD). Only a portal where
+    every source failed raises, and it raises with the last diagnosed reason.
+    """
+    records: list[dict] = []
+    failures: list[str] = []
+    seen_ids: set[str] = set()
+
+    for url in spec.urls:
         try:
-            html = htmlkit.fetch_html(url, params=params, js=source.js)
-        except Exception as exc:  # noqa: BLE001 - try the next source
-            errors.append(f"{url}: {exc}")
+            page_url = url
+            for page_number in range(config.MAX_PAGINATION_PAGES if config.FOLLOW_PAGINATION else 1):
+                html = _fetch(spec, page_url)
+                result = extract(html, page_url, spec.selectors, spec.anchor_hint)
+                if not result.rows:
+                    if page_number == 0:
+                        failures.append(f"{page_url}: {result.note}")
+                    break
+
+                for row in result.rows:
+                    record = base.row_to_record(spec.key, row, spec.currency)
+                    if record["id"] in seen_ids:
+                        continue
+                    seen_ids.add(record["id"])
+                    record["_layer"] = result.layer
+                    record["_quality"] = result.quality
+                    records.append(record)
+
+                if not config.FOLLOW_PAGINATION:
+                    break
+                page_url = _next_page(html, page_url)
+                if not page_url:
+                    break
+        except base.PortalError as exc:
+            failures.append(f"{url}: {exc.reason}")
+            continue
+
+    if not records:
+        reason = " | ".join(failures) if failures else "no notices found on any source URL"
+        raise base.PortalError(reason, spec.urls[0] if spec.urls else "")
+
+    if spec.filter_to_jordan:
+        records = base.jordan_only(records)
+
+    if config.ENRICH_FROM_DETAIL:
+        _enrich_missing_deadlines(spec, records)
+
+    return records
+
+
+def _enrich_missing_deadlines(spec: HtmlSpec, records: list[dict]) -> None:
+    """Try to recover missing deadlines from detail pages, within a budget.
+
+    Bounded by DETAIL_FETCH_BUDGET so a portal with a hundred undated notices
+    cannot turn one run into a hundred extra requests. Notices left undated are
+    kept and flagged, never dropped (Q6).
+    """
+    budget = config.DETAIL_FETCH_BUDGET
+    for record in records:
+        if budget <= 0:
             break
-        last_html = html
-        params = None  # query params belong to the first request only
+        if record.get("closing_date") or not record.get("url"):
+            continue
+        try:
+            html = _fetch(spec, record["url"])
+        except base.PortalError:
+            budget -= 1
+            continue
+        budget -= 1
 
-        # A published feed beats scraping, and survives redesigns.
-        if use_feeds and page_number == 0:
-            for feed_url in htmlkit.discover_feeds(html, url)[:2]:
-                try:
-                    feed_rows = htmlkit.parse_feed(htmlkit.fetch_html(feed_url), feed_url)
-                except Exception as exc:  # noqa: BLE001
-                    log.debug("feed %s failed: %s", feed_url, exc)
-                    continue
-                if feed_rows:
-                    log.info("%s: %d rows from feed %s", source.url, len(feed_rows), feed_url)
-                    rows.extend(feed_rows)
-
-        page_rows = htmlkit.extract_rows(
-            html, url, selectors=selectors, href_pattern=href_pattern
-        )
-        rows.extend(page_rows)
-
-        if not page_rows or not config.FOLLOW_PAGINATION:
-            break
-        next_url = htmlkit.find_next_page(html, url)
-        if not next_url or not htmlkit.same_host(next_url, url) or next_url == url:
-            break
-        url = next_url
-
-    return rows, last_html
+        detail = extract(html, record["url"], spec.selectors, spec.anchor_hint)
+        text = clean(BeautifulSoup(html, "html.parser").get_text(" "))
+        from .htmlkit import Row, _assign_labelled_fields  # local: internal helper
+        probe = Row(title=record["title"], raw_text=text)
+        _assign_labelled_fields(probe, text)
+        from ..utils.dates import parse_date
+        closing = parse_date(probe.closing_text)
+        if closing:
+            record["closing_date"] = closing
+        if record.get("estimated_value_usd") is None and probe.value_text:
+            from ..utils import money
+            record["estimated_value_usd"] = money.parse_value_usd(
+                probe.value_text, spec.currency)
+        if detail.rows and not record.get("description"):
+            record["description"] = detail.rows[0].description
 
 
-def harvest(
-    *,
-    portal_key: str,
-    label: str,
-    sources: list[Source],
-    selectors: list[str],
-    href_pattern: str | None = None,
-    notice_type: str = "",
-    manual_url: str = "",
-    use_feeds: bool = True,
-    require_jordan: bool = True,
-    default_eligibility: str | None = None,
-    enrich: bool | None = None,
-) -> list[dict]:
-    """Scrape every source and return standardised tender records."""
-    all_rows: list[dict] = []
-    errors: list[str] = []
-    parsed_any = False
-    last_html = ""
+def capture(spec: HtmlSpec) -> list[tuple[str, str, list[LayerResult]]]:
+    """Fetch a portal's live pages and report every layer's result.
 
-    for source in sources:
-        rows, html = _collect_from_source(
-            source,
-            selectors=selectors,
-            href_pattern=href_pattern,
-            use_feeds=use_feeds,
-            errors=errors,
-        )
-        if html:
-            last_html = html
-        if rows:
-            parsed_any = True
-            all_rows.extend(rows)
-
-    if not parsed_any:
-        reason = htmlkit.diagnose(last_html) if last_html else None
-        detail = reason or (
-            "no extraction layer (feed, JSON, selectors, tables, structure, anchors) "
-            "could parse a notice row"
-        )
-        raise PortalError(
-            f"{label}: {detail}. "
-            + (f"Transport errors: {'; '.join(errors[:3])}. " if errors else "")
-            + f"Check manually: {manual_url or (sources[0].url if sources else '')}"
-        )
-
-    # Deduplicate within the portal, preferring rows that carry structured fields
-    by_url: dict[str, dict] = {}
-    for row in all_rows:
-        key = row.get("url") or row.get("title", "")
-        existing = by_url.get(key)
-        if existing is None or len(row.get("fields") or {}) > len(existing.get("fields") or {}):
-            if existing:
-                row.setdefault("text", "")
-                row["text"] = f"{row['text']} | {existing.get('text', '')}"
-            by_url[key] = row
-    rows = list(by_url.values())
-
-    if require_jordan:
-        rows = [r for r in rows if mentions_jordan(r.get("title", ""), r.get("text", ""))]
-
-    do_enrich = config.ENRICH_FROM_DETAIL if enrich is None else enrich
-    if do_enrich:
-        budget = [config.DETAIL_FETCH_BUDGET]
-        for row in rows:
-            if budget[0] <= 0:
-                break
-            htmlkit.enrich_from_detail(row, budget)
-
-    tenders: list[dict] = []
-    for row in rows:
-        posted, closing = htmlkit.resolve_dates(row)
-        fields = row.get("fields") or {}
-        text = row.get("text") or row.get("title", "")
-        tenders.append(
-            make_record(
-                portal_key=portal_key,
-                title=row["title"],
-                url=row.get("url", ""),
-                posted_date=posted,
-                closing_date=closing,
-                estimated_value=fields.get("estimated_value") or text,
-                description=clean_text(text)[:1500],
-                notice_type=fields.get("notice_type") or notice_type,
-                eligibility=default_eligibility,
-                language=detect_language(row["title"], text),
-            )
-        )
-
-    log.info("%s: %d Jordan notices retrieved (%d rows before country filter)",
-             label, len(tenders), len(all_rows))
-    return tenders
+    This is how an unverified selector hint gets confirmed in one command.
+    Returns (url, html, layer_results) per source URL. Works for every HTML
+    portal, including those with a custom fetcher -- portals with bespoke fetch
+    logic are exactly the ones most likely to be accidentally excluded from a
+    diagnostic like this.
+    """
+    out = []
+    for url in spec.urls:
+        try:
+            html = _fetch(spec, url)
+        except base.PortalError as exc:
+            out.append((url, "", [LayerResult("error", [], 0.0, exc.reason)]))
+            continue
+        out.append((url, html, run_layers(html, url, spec.selectors, spec.anchor_hint)))
+    return out

@@ -1,201 +1,98 @@
 """
-UNGM -- the United Nations Global Marketplace.
+UNGM -- the United Nations Global Marketplace. Tier 2, and the single richest
+Jordan source: UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA all publish here.
 
-Single richest source for Jordan: UNDP, UNICEF, WFP, UNOPS, UNHCR, UNRWA,
-UN Women, FAO and the rest of the UN system.
+The public listing is JavaScript-driven, so fetching /Public/Notice returns a
+shell. The UI itself calls a POST search endpoint that returns rendered rows,
+which is what this module targets. If that endpoint changes, the HTML fallback
+below still runs through the cascade rather than the portal going dark.
 
-The public notice board is JavaScript-driven, but its own UI calls a POST search
-endpoint returning HTML rows. Order of attack:
-
-  1. the POST search endpoint (fastest, and what the UI itself uses)
-  2. Playwright rendering of the public board
-  3. static HTML through the standard extraction cascade
-
-Any of the three feeds the same row parser, so a change to one does not lose the
-portal.
+VERIFICATION STATUS: never run against the live site. The POST endpoint and its
+payload shape are the least certain part of this codebase -- confirm with
+`python run.py --capture ungm` before trusting this portal.
 """
 
 from __future__ import annotations
 
-import logging
-from urllib.parse import urljoin
+from . import base, harvester
+from .harvester import HtmlSpec
 
-import config
+KEY = "ungm"
+LISTING = "https://www.ungm.org/Public/Notice"
+SEARCH = "https://www.ungm.org/Public/Notice/Search"
 
-from . import htmlkit
-from .base import (
-    PortalError,
-    clean_text,
-    detect_language,
-    http_post,
-    make_record,
-    mentions_jordan,
-)
-from .harvester import Source
+# UNGM's own country id for Jordan. If results come back worldwide, this is the
+# value to check first.
+JORDAN_COUNTRY_ID = 113
 
-log = logging.getLogger(__name__)
-
-PORTAL_KEY = "ungm"
-LABEL = "UNGM"
-
-BASE = "https://www.ungm.org"
-SEARCH_ENDPOINT = f"{BASE}/Public/Notice/Search"
-PUBLIC_PAGE = f"{BASE}/Public/Notice"
-PAGE_SIZE = 100
-MAX_PAGES = 5
-
-SELECTORS = [
-    "div.tableRow.dataRow", "div.tableRow", "tr.tableRow",
-    "div.resultRow", "table tbody tr", "div[class*='tableRow']",
-]
-HREF_PATTERN = r"/Public/Notice/\d+"
-
-# This module drives its own fetching (the POST search endpoint first), but
-# `run.py --capture ungm` still needs to know which page to pull down to check
-# the selectors above against real markup.
-SOURCES = [Source(PUBLIC_PAGE, js=True)]
-
-UN_AGENCIES = (
-    "UNDP", "UNICEF", "WFP", "UNOPS", "UNHCR", "UNRWA", "UN Women", "FAO",
-    "WHO", "IOM", "UNESCO", "UNFPA", "UNIDO", "UNEP", "ILO", "UNODC", "UNV",
-)
+_PAYLOAD = {
+    "PageIndex": 0,
+    "PageSize": 100,
+    "Title": "",
+    "Description": "",
+    "Reference": "",
+    "PublishedFrom": "",
+    "PublishedTo": "",
+    "DeadlineFrom": "",
+    "DeadlineTo": "",
+    "Countries": [JORDAN_COUNTRY_ID],
+    "Agencies": [],
+    "UNSPSCs": [],
+    "NoticeTypes": [],
+    "SortField": "DatePublished",
+    "SortAscending": False,
+    "isPicker": False,
+}
 
 
-def _search_payload(page: int) -> dict:
-    """Payload mirroring the UNGM notice-board UI's own search request."""
-    return {
-        "PageIndex": page,
-        "PageSize": PAGE_SIZE,
-        "Title": "",
-        "Description": "",
-        "Reference": "",
-        "PublishedFrom": "",
-        "PublishedTo": "",
-        "DeadlineFrom": "",
-        "DeadlineTo": "",
-        "Countries": [],
-        "Agencies": [],
-        "NoticeTypes": [],
-        "UNSPSCs": [],
-        "SortField": "DatePublished",
-        "SortAscending": False,
-        "isPicker": False,
-        "NoticeDisplayType": None,
-        "Keyword": "Jordan",
-    }
+def _fetch_search_html(url: str) -> str:
+    """POST to the search endpoint and return its HTML fragment.
 
-
-def _rows_from_html(html: str) -> list[dict]:
-    return htmlkit.extract_rows(
-        html, BASE, selectors=SELECTORS, href_pattern=HREF_PATTERN
-    )
-
-
-def _from_search_endpoint(errors: list[str]) -> list[dict]:
-    rows: list[dict] = []
-    for page in range(MAX_PAGES):
+    Falls back to a plain GET of the listing page so that --capture still has
+    something to show, and so the cascade can diagnose a JavaScript shell
+    rather than the portal reporting a bare transport error.
+    """
+    if url == SEARCH:
         try:
-            resp = http_post(
-                SEARCH_ENDPOINT,
-                json=_search_payload(page),
-                headers={
-                    "Content-Type": "application/json",
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Referer": PUBLIC_PAGE,
-                },
+            response = base._request(
+                "POST", SEARCH, json=_PAYLOAD,
+                headers={"X-Requested-With": "XMLHttpRequest",
+                         "Referer": LISTING,
+                         "Accept": "text/html, */*; q=0.01"},
             )
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"search endpoint: {exc}")
-            break
-        if resp.status_code != 200:
-            errors.append(f"search endpoint HTTP {resp.status_code}")
-            break
-
-        body = resp.text
-        try:  # some deployments wrap the fragment in JSON
-            payload = resp.json()
-            if isinstance(payload, dict):
-                body = payload.get("html") or payload.get("Html") or body
-        except ValueError:
-            pass
-
-        page_rows = _rows_from_html(body)
-        if not page_rows:
-            break
-        rows.extend(page_rows)
-        if len(page_rows) < PAGE_SIZE:
-            break
-    return rows
+            response.encoding = response.encoding or "utf-8"
+            return response.text
+        except Exception as exc:  # noqa: BLE001 - reported, never swallowed
+            raise base.PortalError(
+                f"POST search endpoint failed ({type(exc).__name__}: {exc}). "
+                f"The listing is JavaScript-driven, so a plain GET returns an "
+                f"empty shell; confirm the endpoint with --capture.", SEARCH) from exc
+    return base.fetch(url)
 
 
-def _agency_from(text: str) -> str | None:
-    lowered = text.lower()
-    for agency in UN_AGENCIES:
-        if agency.lower() in lowered:
-            return agency
-    return None
+SPEC = HtmlSpec(
+    key=KEY,
+    urls=[SEARCH, LISTING],
+    # Hints only -- unverified against the live DOM.
+    selectors=[
+        "div.tableRow.dataRow",
+        "div.tableRow",
+        "tr.noticeRow",
+        "table tbody tr",
+    ],
+    anchor_hint="/Public/Notice/",
+    currency="USD",
+    # The search is already filtered to Jordan, but the HTML fallback is not,
+    # and a silently ignored country filter would flood the report.
+    filter_to_jordan=True,
+    fetcher=_fetch_search_html,
+    notes="POST search endpoint; JS-driven listing page",
+)
 
 
 def fetch_tenders() -> list[dict]:
-    errors: list[str] = []
-    last_html = ""
+    return harvester.harvest(SPEC)
 
-    collected = _from_search_endpoint(errors)
 
-    if not collected:
-        html = htmlkit.render_js(PUBLIC_PAGE, wait_selector="div.tableRow")
-        if not html:
-            try:
-                html = htmlkit.fetch_html(PUBLIC_PAGE)
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"public page: {exc}")
-                html = ""
-        last_html = html or ""
-        if html:
-            collected = _rows_from_html(html)
-
-    if not collected:
-        reason = htmlkit.diagnose(last_html) if last_html else None
-        raise PortalError(
-            f"{LABEL}: {reason or 'notice board could not be parsed by any extraction layer'}. "
-            + (f"Transport errors: {'; '.join(errors[:3])}. " if errors else "")
-            + f"Check manually: {PUBLIC_PAGE}"
-        )
-
-    if config.ENRICH_FROM_DETAIL:
-        budget = [config.DETAIL_FETCH_BUDGET]
-        for row in collected:
-            if budget[0] <= 0:
-                break
-            if mentions_jordan(row.get("title", ""), row.get("text", "")):
-                htmlkit.enrich_from_detail(row, budget)
-
-    tenders: list[dict] = []
-    seen: set[str] = set()
-    for row in collected:
-        text = row.get("text") or row["title"]
-        if not mentions_jordan(row["title"], text):
-            continue
-        url = row.get("url") or PUBLIC_PAGE
-        if url in seen:
-            continue
-        seen.add(url)
-        posted, closing = htmlkit.resolve_dates(row)
-        agency = _agency_from(text)
-        tenders.append(
-            make_record(
-                portal_key=PORTAL_KEY,
-                title=row["title"],
-                url=urljoin(BASE, url),
-                posted_date=posted,
-                closing_date=closing,
-                estimated_value=(row.get("fields") or {}).get("estimated_value") or text,
-                description=clean_text(text)[:1500],
-                contact=agency,
-                notice_type=f"{agency} notice" if agency else "UN procurement notice",
-                language=detect_language(row["title"], text),
-            )
-        )
-
-    log.info("UNGM: %d Jordan notices retrieved", len(tenders))
-    return tenders
+def capture():
+    return harvester.capture(SPEC)

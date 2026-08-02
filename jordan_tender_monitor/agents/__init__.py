@@ -1,1 +1,1 @@
-"""Agents: scraper, filter/scorer, reporter, emailer, plus the seen-tender tracker."""
+"""The four agents: scraper, filter/scorer, reporter, emailer."""
