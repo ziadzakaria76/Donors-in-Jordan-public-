@@ -22,7 +22,7 @@ import io
 from pathlib import Path
 
 from jordan_tender_monitor import config, portals
-from jordan_tender_monitor.portals import harvester
+from jordan_tender_monitor.portals import base, harvester
 from jordan_tender_monitor.portals.base import PortalError
 from jordan_tender_monitor.portals.harvester import HtmlSpec
 
@@ -186,7 +186,62 @@ def test_kfw_points_at_gtai_not_kfw_de():
     check("kfw.de" not in urls, "kfw: kfw.de is NOT used as a tender source")
 
 
+def test_politeness_delay_is_enforced_per_host():
+    """Two seconds between requests to the same host, and it must actually wait.
+
+    Locked down by a test because the temptation to shave this to speed up a
+    run is real, and getting the IP blocked costs far more time than it saves.
+    """
+    check(config.POLITE_DELAY_SECONDS >= 2.0,
+          "politeness: the configured gap is at least 2 seconds",
+          f"got {config.POLITE_DELAY_SECONDS}")
+    check(config.MAX_RETRIES >= 3, "politeness: at least three retry attempts")
+    check("Mozilla" in config.USER_AGENT, "politeness: a realistic User-Agent is set")
+
+    slept: list[float] = []
+    original_sleep = base.time.sleep
+    original_last = dict(base._last_request)
+    try:
+        base.time.sleep = lambda s: slept.append(s)
+        base._last_request.clear()
+        base._wait_for_host("https://politeness.example/a")   # first: no wait
+        base._wait_for_host("https://politeness.example/b")   # same host: waits
+        base._wait_for_host("https://other.example/c")        # different host
+    finally:
+        base.time.sleep = original_sleep
+        base._last_request.clear()
+        base._last_request.update(original_last)
+
+    check_eq(len(slept), 1, "politeness: exactly one wait, on the repeated host")
+    if slept:
+        check(slept[0] > 0, "politeness: the wait is a real delay")
+        check(slept[0] <= config.POLITE_DELAY_SECONDS,
+              "politeness: and no longer than the configured gap")
+
+
+def test_retry_uses_exponential_backoff():
+    attempts = {"n": 0}
+
+    import requests
+
+    @base.retry(stop=base.stop_after_attempt(3),
+                wait=base.wait_exponential(multiplier=0.001, min=0.001, max=0.002),
+                retry=base.retry_if_exception_type(requests.RequestException),
+                reraise=True)
+    def always_fails():
+        attempts["n"] += 1
+        raise requests.ConnectionError("simulated")
+
+    try:
+        always_fails()
+    except requests.ConnectionError:
+        pass
+    check_eq(attempts["n"], 3, "retry: three attempts before giving up")
+
+
 TESTS = [
+    test_politeness_delay_is_enforced_per_host,
+    test_retry_uses_exponential_backoff,
     test_every_html_portal_is_capturable,
     test_ungm_with_custom_fetcher_is_included,
     test_capture_reports_every_layer,

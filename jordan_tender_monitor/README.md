@@ -15,7 +15,7 @@ it was not worked around.
 | | Status |
 |---|---|
 | **Verified against the live web** | **Nothing.** Zero portal domains were reachable. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, the portal registry — **318 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, the portal registry — **325 checks** |
 | **Verified in this environment (no portals)** | Dependency install, `pyflakes`, `--check-portals`, `--dry-run`, `--capture`, `--self-test` all run end to end and behave correctly under total portal failure |
 | **Not verified at all** | Every portal URL · every CSS selector · every API response shape · the UNGM POST payload · email delivery (no credentials were present) |
 
@@ -195,7 +195,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 318 checks, no network, no credentials
+python tests/run_all.py    # 325 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test
