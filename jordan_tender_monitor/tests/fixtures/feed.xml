@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+ <title>Tender notices</title><link>https://example.org/feed</link>
+ <item><title>Institutional Reform Support to the Ministry of Planning, Jordan</title>
+  <link>https://example.org/notice/7001</link>
+  <pubDate>Mon, 06 Jul 2026 09:00:00 GMT</pubDate>
+  <description>Technical assistance for institutional reform, closing 2026-10-15.</description></item>
+ <item><title>Climate Adaptation Master Plan, Jordan Valley</title>
+  <link>https://example.org/notice/7002</link>
+  <pubDate>Wed, 08 Jul 2026 09:00:00 GMT</pubDate>
+  <description>Consultancy to prepare an adaptation master plan, closing 2026-11-01.</description></item>
+ <item><title>Public Transport Sector Review, Amman</title>
+  <link>https://example.org/notice/7003</link>
+  <pubDate>Fri, 10 Jul 2026 09:00:00 GMT</pubDate>
+  <description>Review of urban transport operations, closing 2026-11-20.</description></item>
+</channel></rss>
