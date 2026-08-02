@@ -13,6 +13,7 @@ import logging
 from datetime import timedelta
 
 from . import htmlkit
+from .harvester import Source
 from .base import (
     PortalError,
     clean_text,
@@ -32,6 +33,16 @@ SEARCH_PAGE = "https://www.find-tender.service.gov.uk/Search/Results"
 NOTICE_BASE = "https://www.find-tender.service.gov.uk/Notice/"
 WINDOW_DAYS = 365
 MAX_PAGES = 12
+
+SELECTORS = [
+    "li.search-result", "div.search-result", "article",
+    "table tbody tr", "div[class*='search-result']",
+]
+HREF_PATTERN = r"/Notice/\d+"
+
+# The OCDS API is the primary path, but the search page is the HTML fallback,
+# so `run.py --capture fcdo` needs it to check the selectors above.
+SOURCES = [Source(SEARCH_PAGE, params={"keywords": "Jordan"})]
 
 
 def _text_of(release: dict) -> str:
@@ -100,11 +111,7 @@ def _from_ocds() -> tuple[list[dict], list[str]]:
 def _from_html() -> list[dict]:
     html = htmlkit.fetch_html(SEARCH_PAGE, params={"keywords": "Jordan"})
     rows = htmlkit.extract_rows(
-        html,
-        SEARCH_PAGE,
-        selectors=["li.search-result", "div.search-result", "article",
-                   "table tbody tr", "div[class*='search-result']"],
-        href_pattern=r"/Notice/\d+",
+        html, SEARCH_PAGE, selectors=SELECTORS, href_pattern=HREF_PATTERN
     )
     if not rows:
         reason = htmlkit.diagnose(html)

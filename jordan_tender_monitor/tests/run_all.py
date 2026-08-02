@@ -14,7 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-TESTS = ["test_extraction.py", "test_pipeline.py"]
+TESTS = ["test_extraction.py", "test_pipeline.py", "test_capture.py"]
 HERE = Path(__file__).resolve().parent
 
 

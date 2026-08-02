@@ -31,6 +31,7 @@ from .base import (
     make_record,
     mentions_jordan,
 )
+from .harvester import Source
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +49,11 @@ SELECTORS = [
     "div.resultRow", "table tbody tr", "div[class*='tableRow']",
 ]
 HREF_PATTERN = r"/Public/Notice/\d+"
+
+# This module drives its own fetching (the POST search endpoint first), but
+# `run.py --capture ungm` still needs to know which page to pull down to check
+# the selectors above against real markup.
+SOURCES = [Source(PUBLIC_PAGE, js=True)]
 
 UN_AGENCIES = (
     "UNDP", "UNICEF", "WFP", "UNOPS", "UNHCR", "UNRWA", "UN Women", "FAO",
