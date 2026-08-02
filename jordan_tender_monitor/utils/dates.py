@@ -60,7 +60,17 @@ _add({  # Arabic -- Gulf / Gregorian transliteration
 # and "كانون الأول" before "آب".
 _MONTH_NAMES_SORTED = sorted(_MONTHS, key=len, reverse=True)
 
-_ISO_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+# The trailing guard is (?!\d), NOT \b.
+#
+# \b would require a non-word character after the day, and in "2026-06-01T09:00"
+# the next character is "T" -- a word character -- so the boundary fails and the
+# whole ISO fast path is skipped. Parsing then falls through to dateutil with
+# dayfirst=True, which reads 2026-06-01 as 1 June... as 6 January. Every REST
+# API here returns ISO timestamps with a T, so this silently swapped day and
+# month on every API-sourced date where both were <= 12, corrupting the
+# closing-date filter in both directions: closed tenders looking open, and open
+# ones being dropped as closed.
+_ISO_RE = re.compile(r"\b(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)")
 _DOTTED_RE = re.compile(r"\b(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\b")
 _SLASH_RE = re.compile(r"\b(\d{1,2})/(\d{1,2})/(\d{4})\b")
 _DMY_NAMED_RE = re.compile(r"\b(\d{1,2})\s*\.?\s*([^\W\d_]{3,}(?:\s+[^\W\d_]{3,})?)\s+(\d{4})\b",

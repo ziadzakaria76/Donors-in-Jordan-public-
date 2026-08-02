@@ -165,6 +165,89 @@ def test_harvest_raises_when_every_source_fails():
         check(exc.url, "harvest: the URL to check by hand is carried")
 
 
+def test_one_failing_portal_never_aborts_the_run():
+    """The core resilience requirement, tested at the orchestrator level.
+
+    harvest() tolerating a bad source URL is not the same guarantee: this is
+    about one portal module blowing up without taking the other twelve with it,
+    including when it raises something nobody anticipated.
+    """
+    from jordan_tender_monitor import portals as registry
+    from jordan_tender_monitor.agents import scraper
+
+    class _Good:
+        @staticmethod
+        def fetch_tenders():
+            return [base.build_record(portal="worldbank",
+                                      title="Advisory Services, Jordan",
+                                      url="https://e.org/ok")]
+
+    class _Diagnosed:
+        @staticmethod
+        def fetch_tenders():
+            raise PortalError("bot wall (Cloudflare/Incapsula)", "https://e.org/wall")
+
+    class _Unconfigured:
+        @staticmethod
+        def fetch_tenders():
+            raise PortalError("not configured - no SAM_API_KEY in .env",
+                              "https://api.sam.gov/x")
+
+    class _Exploding:
+        @staticmethod
+        def fetch_tenders():
+            raise ZeroDivisionError("something nobody anticipated")
+
+    original_modules = dict(registry.MODULES)
+    original_enabled = dict(config.ENABLED_PORTALS)
+    try:
+        registry.MODULES.clear()
+        registry.MODULES.update({"worldbank": _Good, "ebrd": _Diagnosed,
+                                 "samgov": _Unconfigured, "eib": _Exploding})
+        config.ENABLED_PORTALS.clear()
+        config.ENABLED_PORTALS.update({k: True for k in registry.MODULES})
+
+        result = scraper.scrape()
+    finally:
+        registry.MODULES.clear()
+        registry.MODULES.update(original_modules)
+        config.ENABLED_PORTALS.clear()
+        config.ENABLED_PORTALS.update(original_enabled)
+
+    check_eq(len(result.health), 4, "scraper: every portal is reported on")
+    check_eq(len(result.records), 1,
+             "scraper: the healthy portal's records survive its neighbours failing")
+
+    by_key = {h.key: h for h in result.health}
+    check_eq(by_key["worldbank"].status, "ok", "scraper: the good portal is ok")
+    check_eq(by_key["ebrd"].status, "unavailable",
+             "scraper: a diagnosed failure is unavailable")
+    check_eq(by_key["samgov"].status, "unconfigured",
+             "scraper: a missing API key is unconfigured, NOT unavailable")
+    check_eq(by_key["eib"].status, "unavailable",
+             "scraper: an unexpected exception is caught, not propagated")
+    check("ZeroDivisionError" in by_key["eib"].reason,
+          "scraper: and the exception type is reported so it can be debugged")
+    check(by_key["ebrd"].urls, "scraper: the URL to check by hand is carried")
+    check(not by_key["samgov"].broken,
+          "scraper: unconfigured does not count towards 'broken'")
+    check(not result.all_broken,
+          "scraper: a run with one healthy portal is not a total failure")
+
+
+def test_all_broken_is_detected_for_the_subject_line():
+    """Total failure must be distinguishable, since the subject depends on it."""
+    from jordan_tender_monitor.agents.scraper import ScrapeResult
+    from jordan_tender_monitor import fixtures as fx
+
+    partial = ScrapeResult(records=[], health=fx.sample_health())
+    total = ScrapeResult(records=[], health=fx.all_broken_health())
+    check(not partial.all_broken, "scraper: a partial outage is not total failure")
+    check(total.all_broken, "scraper: a total outage is detected")
+    check(all(h.status == "unconfigured" or h.broken for h in total.health),
+          "scraper: every non-unconfigured portal is marked broken")
+
+
 def test_portal_registry_is_complete():
     check_eq(len(portals.MODULES), 13, "registry: all thirteen portals registered")
     for key, module in portals.MODULES.items():
@@ -249,6 +332,8 @@ TESTS = [
     test_capture_distinguishes_bot_wall_from_layout_change,
     test_harvest_tolerates_one_failing_source,
     test_harvest_raises_when_every_source_fails,
+    test_one_failing_portal_never_aborts_the_run,
+    test_all_broken_is_detected_for_the_subject_line,
     test_portal_registry_is_complete,
     test_kfw_points_at_gtai_not_kfw_de,
 ]

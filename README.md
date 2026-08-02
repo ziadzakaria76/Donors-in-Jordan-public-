@@ -14,7 +14,7 @@ worked around.
 
 - **Verified against the live web:** nothing
 - **Verified offline against fixtures:** extraction, parsing, filtering,
-  scoring, reporting, delivery fallback — 325 checks
+  scoring, reporting, delivery fallback — 459 checks
 - **Not verified:** every portal URL, every CSS selector, every API response
   shape, and email delivery
 
@@ -73,7 +73,7 @@ carrying a date weighted most heavily and gated outright.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 325 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 459 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

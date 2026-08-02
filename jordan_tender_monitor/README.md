@@ -15,9 +15,16 @@ it was not worked around.
 | | Status |
 |---|---|
 | **Verified against the live web** | **Nothing.** Zero portal domains were reachable. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, the portal registry — **325 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **459 checks** |
 | **Verified in this environment (no portals)** | Dependency install, `pyflakes`, `--check-portals`, `--dry-run`, `--capture`, `--self-test` all run end to end and behave correctly under total portal failure |
-| **Not verified at all** | Every portal URL · every CSS selector · every API response shape · the UNGM POST payload · email delivery (no credentials were present) |
+| **Not verified at all** | Every portal URL · every CSS selector · **whether the real APIs return the shapes assumed** · the UNGM POST payload · email delivery (no credentials were present) |
+
+On the REST modules specifically: their parsing is now exercised against payloads
+in the shapes the documentation describes, which proves the parsing is correct
+*given* those shapes. It does not prove the shapes are right. If an API returns
+something different, these tests still pass and the portal still fails — though
+it will fail with a diagnosed `PortalError` rather than silently returning
+nothing, which is the property the tests do guarantee.
 
 **The CSS selectors are guesses.** They are informed by the CMS each portal
 appears to run, but not one has been checked against the live DOM. The same
@@ -195,7 +202,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 325 checks, no network, no credentials
+python tests/run_all.py    # 459 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

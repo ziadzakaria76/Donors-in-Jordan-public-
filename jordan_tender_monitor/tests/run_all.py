@@ -10,6 +10,7 @@ test can touch the real seen-tenders database or the real output folder.
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import tempfile
@@ -27,9 +28,14 @@ os.environ.setdefault("JTM_OUTPUT_DIR", str(Path(_TMP) / "output"))
 os.environ.setdefault("JTM_SEEN_DB", str(Path(_TMP) / "data" / "seen_tenders.db"))
 os.environ.setdefault("JTM_LOG_FILE", str(Path(_TMP) / "test.log"))
 
+# Silence the application logger. Tests deliberately provoke failures that the
+# code logs with tracebacks, and that noise would bury a genuine test failure.
+logging.disable(logging.CRITICAL)
+
 from jordan_tender_monitor import config  # noqa: E402
 from jordan_tender_monitor.tests import (harness, test_capture,  # noqa: E402
-                                         test_extraction, test_pipeline)
+                                         test_extraction, test_pipeline,
+                                         test_portals_api)
 
 
 def main() -> int:
@@ -41,6 +47,7 @@ def main() -> int:
                       test_extraction.TESTS)
     harness.run_suite("Pipeline: filter, score, dedupe, report, deliver",
                       test_pipeline.TESTS)
+    harness.run_suite("REST API portal modules", test_portals_api.TESTS)
     harness.run_suite("Capture and the portal registry", test_capture.TESTS)
 
     return harness.report()

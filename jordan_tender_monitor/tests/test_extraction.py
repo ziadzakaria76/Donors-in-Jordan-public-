@@ -328,6 +328,28 @@ def test_multilingual_dates():
         check_eq(parse_date(text), want, f"date: {label}")
 
     check_eq(parse_date("no date at all"), None, "date: prose yields None")
+
+
+def test_iso_timestamps_do_not_swap_day_and_month():
+    """Every REST API here returns ISO with a T, and this used to be wrong.
+
+    A \\b after the day fails against the following "T", so the ISO fast path
+    was skipped and dateutil's dayfirst=True read 2026-06-01 as 6 January.
+    Every date where day and month were both <= 12 came out transposed, which
+    moved closing dates by months in either direction.
+    """
+    cases = [
+        ("2026-06-01T09:00:00Z", date(2026, 6, 1), "ISO with T and Z"),
+        ("2026-09-12T12:00:00Z", date(2026, 9, 12), "ISO where both parts are <= 12"),
+        ("2026-06-10+02:00", date(2026, 6, 10), "ISO with a UTC offset"),
+        ("2026-09-30T17:00:00-04:00", date(2026, 9, 30), "ISO with a negative offset"),
+        ("2026-06-01 09:00:00", date(2026, 6, 1), "ISO with a space separator"),
+        ("2026-06-01T00:00:00.000Z", date(2026, 6, 1), "ISO with milliseconds"),
+        ("2026-6-1T09:00:00Z", date(2026, 6, 1), "ISO without zero padding"),
+        ("2026-01-06T09:00:00Z", date(2026, 1, 6), "the transposed twin parses correctly too"),
+    ]
+    for text, want, label in cases:
+        check_eq(parse_date(text), want, f"iso: {label}")
     check_eq(parse_date(None), None, "date: None yields None")
     check_eq(parse_date(""), None, "date: empty string yields None")
 
@@ -397,6 +419,7 @@ TESTS = [
     test_largest_candidate_wins,
     test_arabic_value_parsing,
     test_multilingual_dates,
+    test_iso_timestamps_do_not_swap_day_and_month,
     test_deadline_boundary_today_is_open,
     test_country_matching_word_boundaries,
     test_country_matching_strips_emails_but_trusts_jo_domain,
