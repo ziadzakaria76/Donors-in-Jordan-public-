@@ -28,8 +28,13 @@ You need:
   www.jica.go.jp
   ```
 
-- **An Azure app registration** for sending mail (step 4), or Office 365 SMTP
-  credentials as a fallback.
+- **A folder for the output**, and somewhere your team can reach it — a shared
+  drive or a synced folder works well, since the reports are files rather than
+  emails.
+
+You do **not** need an Azure app registration, mail credentials, or any secret.
+Email is off by default; the system writes a Word pack and an Excel file to
+disk and stops there.
 
 ---
 
@@ -102,83 +107,58 @@ a failure here is an install problem, not a configuration one.
 
 ---
 
-## 4. Register the Azure app for email
+## 4. Choose where the reports land
 
-Ask whoever administers your tenant to do this, or do it in the Azure portal
-under **App registrations → New registration**.
-
-1. Name it something identifiable (e.g. `jordan-tender-monitor`).
-2. Under **Certificates & secrets**, create a client secret. **Copy the value
-   immediately** — it is shown once. Note its expiry date and put a calendar
-   reminder a month before; an expired secret is the single most common cause
-   of a monitor going quiet a year in.
-3. Under **API permissions**, add **Microsoft Graph → Application permissions →
-   `Mail.Send`**, then click **Grant admin consent**.
-
-### Then scope it. This is not optional.
-
-`Mail.Send` as an *application* permission is **tenant-wide**: that app
-registration can send mail as **any mailbox in your organisation**. A leaked
-client secret becomes an organisation-wide mail-sending capability.
-
-Restrict it to the one mailbox, in Exchange Online PowerShell:
+By default they go to `jordan_tender_monitor\output\` inside the install
+directory. To put them on a share instead, set `JTM_OUTPUT_DIR`:
 
 ```powershell
-Connect-ExchangeOnline
-New-ApplicationAccessPolicy `
-  -AppId <client-id> `
-  -PolicyScopeGroupId tender-monitor@yourdomain.com `
-  -AccessRight RestrictAccess `
-  -Description "Restrict Jordan tender monitor to its own mailbox"
-
-# Verify it applies:
-Test-ApplicationAccessPolicy -Identity tender-monitor@yourdomain.com -AppId <client-id>
+setx JTM_OUTPUT_DIR "\\fileserver\Bids\JordanTenders" /M
 ```
 
-Expect `AccessCheckResult : Granted` for that mailbox, and `Denied` for any
-other address you test.
+Make sure the service account that runs the scheduled task can **write** there —
+a permissions failure at 07:00 on a share is the most likely way this silently
+stops producing files.
 
----
+Each run leaves two files:
+
+```
+jordan_tenders_20260803_0700_7-opportunities.docx    <- circulate and annotate
+jordan_tenders_20260803_0700_7-opportunities.xlsx    <- filter, sort, assign
+```
+
+Files accumulate, one pair per weekday. Housekeeping is up to you; nothing
+deletes them.
+
+### Optional: email later
+
+If you ever want these emailed as well, set `EMAIL_METHOD = "graph"` in
+`config.py` and fill in the Azure credentials in `.env`. Before granting
+`Mail.Send` as an Azure **application** permission, read the warning in the
+project README — it is tenant-wide, and must be scoped to a single mailbox with
+`New-ApplicationAccessPolicy`. None of that is needed for file output.
 
 ## 5. Configure
+
+There is nothing you must configure to get file output — the defaults work.
+
+`.env` is only needed for the optional SAM.gov API key:
 
 ```powershell
 copy jordan_tender_monitor\.env.example jordan_tender_monitor\.env
 notepad jordan_tender_monitor\.env
 ```
 
-Fill in:
-
 ```ini
-EMAIL_RECIPIENTS=you@example.com,colleague@example.com
-EMAIL_CC=
-
-AZURE_TENANT_ID=...
-AZURE_CLIENT_ID=...
-AZURE_CLIENT_SECRET=...
-SENDER_EMAIL=tender-monitor@yourdomain.com
-
 SAM_API_KEY=
 ```
 
-**Lock the file down** — it holds a client secret:
+SAM.gov issues free keys with **1-4 weeks** approval. Leave it blank until yours
+arrives; the portal then reports as *not configured* rather than *unavailable*,
+so a pending key never looks like a broken scraper.
 
-```powershell
-icacls jordan_tender_monitor\.env /inheritance:r
-icacls jordan_tender_monitor\.env /grant:r "$env:USERNAME:(R)"
-icacls jordan_tender_monitor\.env /grant:r "SYSTEM:(R)"
-# add the service account that will run the task:
-icacls jordan_tender_monitor\.env /grant:r "DOMAIN\svc-tenders:(R)"
-```
-
-`.env` is gitignored and is never printed or logged. Do not commit it — this
-repository is public.
-
-**SAM.gov** needs a free API key from sam.gov with **1–4 weeks** approval. Leave
-`SAM_API_KEY` blank until it arrives; the portal reports as *not configured*
-rather than *unavailable*, so a pending key never looks like a broken scraper.
-
----
+Everything else lives in `config.py` — sectors, minimum value, which portals to
+poll, output formats. Each setting is commented with the reasoning behind it.
 
 ## 6. Verify the portals — do not skip this
 
@@ -272,7 +252,7 @@ Create `C:\Services\jordan-tenders\run-monitor.cmd`:
 @echo off
 cd /d C:\Services\jordan-tenders
 call .venv\Scripts\activate.bat
-python jordan_tender_monitor\run.py --send >> logs\task.log 2>&1
+python jordan_tender_monitor\run.py --run >> logs\task.log 2>&1
 exit /b %ERRORLEVEL%
 ```
 
@@ -340,35 +320,39 @@ Get-ScheduledTaskInfo -TaskName "Jordan Tender Monitor" | Format-List LastRunTim
 
 ## 9. Know that it is still alive
 
-The subject line tells you the run's health, so you never have to wonder
-whether silence means "quiet week" or "dead monitor":
+**The filename tells you the run's health**, so a glance at the output folder
+answers "did this work?" without opening anything:
 
 ```
-Jordan Tenders - 7 new opportunities
-Jordan Tenders - no new opportunities (13/13 portals OK)
-Jordan Tenders - 4 new opportunities, 3 of 13 portals unavailable
-ACTION NEEDED: Jordan Tenders - all 13 portals unreachable
+jordan_tenders_20260803_0700_7-opportunities.docx
+jordan_tenders_20260804_0700_no-new-opportunities-13-of-13-portals-OK.docx
+jordan_tenders_20260805_0700_4-opportunities-3-of-13-portals-unavailable.docx
+jordan_tenders_20260806_0700_ACTION-NEEDED-all-13-portals-unreachable.docx
 ```
 
-**No email at all is the one state the monitor cannot report on itself.** If a
-weekday passes with nothing in your inbox, the task did not run. Check:
+A quiet day and a dead monitor are different filenames, deliberately. Inside,
+the Word pack opens with the run status in words, and the Excel file has a
+**Run status** sheet naming each portal's diagnosed failure and the URL to check
+by hand.
+
+**No new file at all is the one state the monitor cannot report on itself.** If
+a weekday passes with nothing new in the folder, the task did not run:
 
 ```powershell
 Get-ScheduledTaskInfo -TaskName "Jordan Tender Monitor"
 Get-Content C:\Services\jordan-tenders\logs\task.log -Tail 50
 ```
 
-Consider a mail rule that flags anything with `ACTION NEEDED` in the subject.
-
----
+Worth doing: a weekly calendar reminder to glance at the folder. Since there is
+no email arriving, nothing else will prompt you to notice a silent scheduler.
 
 ## Routine maintenance
 
 | When | Do |
 |---|---|
-| Client secret expiry (usually 12 or 24 months) | Rotate it in Azure and update `.env`. Set the reminder now. |
 | A portal reports unavailable for several days | `--capture` that portal; the site has probably been redesigned or moved |
 | SAM.gov key arrives | Put it in `.env`; the portal switches from *not configured* to live on the next run |
+| Output folder grows | Archive or delete old reports; nothing prunes them automatically |
 | Updating the code | `git pull`, then `pip install -r jordan_tender_monitor\requirements.txt`, then re-run the test suite |
 
 ### Useful commands
@@ -384,6 +368,9 @@ python jordan_tender_monitor\run.py --self-test
 # Investigate a single portal
 python jordan_tender_monitor\run.py --dry-run --only ungm
 ```
+
+Note `--dry-run` still writes the files; what it does not do is record the
+tenders as seen, so the next real run reports them again.
 
 ---
 

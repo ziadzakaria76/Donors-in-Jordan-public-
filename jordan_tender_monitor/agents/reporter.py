@@ -291,6 +291,58 @@ def _stamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M")
 
 
+_SLUG_UNSAFE = str.maketrans({c: "-" for c in r'\/:*?"<>| '})
+
+
+def run_slug(reported: int, health: list) -> str:
+    """Filename fragment stating the run's health, not just its count.
+
+    This carries what the email subject line used to. With output going to disk
+    instead of an inbox, a run where every portal failed and a run where nothing
+    new was published both leave a file behind -- and identically-named files
+    make a dead monitor invisible. The folder listing must show the difference:
+
+        2026-08-03_7-opportunities.docx
+        2026-08-03_no-new-opportunities_13-of-13-portals-OK.docx
+        2026-08-03_ACTION-NEEDED_all-13-portals-unreachable.docx
+    """
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    ok = total - len(broken)
+
+    if total and len(broken) == total:
+        slug = f"{config.ACTION_NEEDED_PREFIX}-all-{total}-portals-unreachable"
+    elif broken:
+        noun = "opportunity" if reported == 1 else "opportunities"
+        slug = f"{reported}-{noun}-{len(broken)}-of-{total}-portals-unavailable"
+    elif reported == 0:
+        slug = f"no-new-opportunities-{ok}-of-{total}-portals-OK"
+    else:
+        noun = "opportunity" if reported == 1 else "opportunities"
+        slug = f"{reported}-{noun}"
+
+    return slug.translate(_SLUG_UNSAFE).replace("--", "-").strip("-")
+
+
+def status_line(reported: int, health: list) -> str:
+    """One-sentence run status, shown at the top of both documents."""
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+
+    if total and len(broken) == total:
+        return (f"{config.ACTION_NEEDED_PREFIX}: all {total} portals were unreachable. "
+                f"This report is empty because nothing could be read, NOT because "
+                f"nothing was published.")
+    if broken:
+        return (f"{reported} opportunities found. {len(broken)} of {total} portals "
+                f"were unavailable, so this is a partial picture: "
+                + ", ".join(h.name for h in broken))
+    if reported == 0:
+        return (f"No new opportunities. All {total} portals were read successfully "
+                f"and nothing new matched -- a genuine quiet run, not a failure.")
+    return f"{reported} new opportunities found. All {total} portals were read successfully."
+
+
 def _cell(t: dict, key: str):
     value = t.get(key)
     if isinstance(value, date):
@@ -298,7 +350,8 @@ def _cell(t: dict, key: str):
     return "" if value is None else value
 
 
-def write_excel(tenders: list[dict], path: Path) -> Path:
+def write_excel(tenders: list[dict], path: Path, health: list | None = None,
+                reported: int | None = None) -> Path:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -338,8 +391,57 @@ def write_excel(tenders: list[dict], path: Path) -> Path:
     if tenders:
         ws.auto_filter.ref = f"A1:{get_column_letter(len(COLUMNS))}{ws.max_row}"
 
+    # Portal health goes on its own sheet rather than above the headers, which
+    # would shift every column and break the auto_filter range. Without it, an
+    # empty workbook from a total outage is indistinguishable from an empty
+    # workbook from a quiet week.
+    if health is not None:
+        _append_status_sheet(wb, health, reported if reported is not None else len(tenders))
+
     wb.save(path)
     return path
+
+
+def _append_status_sheet(wb, health: list, reported: int) -> None:
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    ws = wb.create_sheet("Run status")
+    ws["A1"] = "Run status"
+    ws["A1"].font = Font(bold=True, size=13)
+    ws["A2"] = status_line(reported, health)
+    ws["A2"].alignment = Alignment(wrap_text=True, vertical="top")
+    ws["A3"] = f"Generated {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
+    header_row = 5
+    for col, label in enumerate(("Portal", "Tier", "Status", "Notices", "Detail",
+                                 "URL to check by hand"), start=1):
+        cell = ws.cell(row=header_row, column=col, value=label)
+        cell.font = Font(color="FFFFFF", bold=True)
+        cell.fill = PatternFill(start_color=config.COLOR_HEADER,
+                                end_color=config.COLOR_HEADER, fill_type="solid")
+
+    for offset, h in enumerate(health, start=1):
+        row = header_row + offset
+        ws.cell(row=row, column=1, value=h.name)
+        ws.cell(row=row, column=2, value=config.TIER_LABELS.get(h.tier, ""))
+        ws.cell(row=row, column=3, value=h.status.upper())
+        ws.cell(row=row, column=4, value=h.count if h.ok else "")
+        ws.cell(row=row, column=5, value=h.reason or (
+            f"read via {h.layer} layer" if h.layer else ""))
+        ws.cell(row=row, column=6, value=h.urls[0] if h.urls and not h.ok else "")
+
+        fill_hex = (config.COLOR_HIGH if h.ok
+                    else config.COLOR_MEDIUM if h.status == "unconfigured"
+                    else config.COLOR_LOW)
+        fill = PatternFill(start_color=fill_hex, end_color=fill_hex, fill_type="solid")
+        for col in range(1, 7):
+            ws.cell(row=row, column=col).fill = fill
+            ws.cell(row=row, column=col).alignment = Alignment(vertical="top",
+                                                               wrap_text=True)
+
+    for i, width in enumerate((46, 20, 16, 10, 60, 60), start=1):
+        ws.column_dimensions[get_column_letter(i)].width = width
 
 
 def write_docx(tenders: list[dict], health: list, result: dict, path: Path) -> Path:
@@ -357,14 +459,24 @@ def write_docx(tenders: list[dict], health: list, result: dict, path: Path) -> P
         f"notices scanned. Ranked by fit score."
     )
 
+    # Run status on the first page, in words. Someone opening this file weeks
+    # later should not have to infer from an empty list whether the pipeline was
+    # quiet or the scrapers were dead.
     broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    status = doc.add_paragraph()
+    run = status.add_run(status_line(len(tenders), health))
+    run.bold = True
     if broken:
-        warn = doc.add_paragraph()
-        run = warn.add_run(
-            f"{len(broken)} portal(s) were unavailable this run, so this is a "
-            f"partial picture: " + ", ".join(h.name for h in broken))
-        run.bold = True
         run.font.color.rgb = RGBColor(0xC6, 0x28, 0x28)
+    else:
+        run.font.color.rgb = RGBColor(0x2E, 0x7D, 0x32)
+
+    if not tenders and not broken:
+        doc.add_paragraph(
+            f"All {total} portals were read successfully and returned no new "
+            f"Jordan opportunities. This file is evidence the monitor ran, not "
+            f"evidence that it failed.")
 
     for t in tenders:
         doc.add_heading(t.get("title") or "(untitled)", level=2)
@@ -456,19 +568,27 @@ def write_outputs(result: dict, health: list, body_html: str,
     stamp = _stamp()
     written: dict[str, Path] = {}
 
+    # The filename states the run's health, so the folder listing alone
+    # distinguishes a quiet day from a dead monitor.
+    if config.HEALTH_IN_FILENAME:
+        base = f"jordan_tenders_{stamp}_{run_slug(len(tenders), health)}"
+    else:
+        base = f"jordan_tenders_{stamp}"
+
     for fmt_name in config.OUTPUT_FORMATS:
         try:
             if fmt_name == "excel":
-                written["excel"] = write_excel(tenders, output_dir / f"jordan_tenders_{stamp}.xlsx")
+                written["excel"] = write_excel(tenders, output_dir / f"{base}.xlsx",
+                                               health, len(tenders))
             elif fmt_name == "docx":
                 written["docx"] = write_docx(tenders, health, result,
-                                             output_dir / f"jordan_tenders_{stamp}.docx")
+                                             output_dir / f"{base}.docx")
             elif fmt_name == "json":
-                written["json"] = write_json(tenders, health, output_dir / f"jordan_tenders_{stamp}.json")
+                written["json"] = write_json(tenders, health, output_dir / f"{base}.json")
             elif fmt_name == "csv":
-                written["csv"] = write_csv(tenders, output_dir / f"jordan_tenders_{stamp}.csv")
+                written["csv"] = write_csv(tenders, output_dir / f"{base}.csv")
             elif fmt_name == "html":
-                written["html"] = write_html(body_html, output_dir / f"jordan_tenders_{stamp}.html")
+                written["html"] = write_html(body_html, output_dir / f"{base}.html")
         except Exception as exc:  # noqa: BLE001 - one format must not lose the rest
             log.error("could not write %s output: %s", fmt_name, exc)
 

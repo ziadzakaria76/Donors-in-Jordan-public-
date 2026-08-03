@@ -322,7 +322,14 @@ UNKNOWN_VALUE_SCORE_FRACTION = 0.55   # unknown value scores mid-band, not zero
 # TENANT-WIDE -- the app can send as any mailbox in the organisation. Scope it
 # to one mailbox with an ApplicationAccessPolicy. See the README.
 # --------------------------------------------------------------------------
-EMAIL_METHOD = "graph"
+# "none" -> write the files and send nothing. This is the default: the system
+# produces a Word pack and an Excel working file on disk, and that is all.
+#
+# The Graph and SMTP code is retained and still tested, so switching delivery
+# back on is a one-line change here rather than a revert. Set "graph" (or
+# "smtp"), fill in the credentials in .env, and read the ApplicationAccessPolicy
+# warning below before granting Mail.Send as an application permission.
+EMAIL_METHOD = "none"
 EMAIL_FALLBACK_CHAIN = ["graph", "smtp", "file"]
 
 
@@ -349,10 +356,28 @@ MAX_INLINE_TENDERS = 50
 DESCRIPTION_CHAR_LIMIT = 1500
 
 # --------------------------------------------------------------------------
-# Q13 -- OUTPUT FILES: all five; Word and Excel attached.
+# Q13 -- OUTPUT FILES: Word and Excel, written to OUTPUT_DIR.
+#
+# Word is the pack that circulates and takes review comments; Excel is the
+# working file you filter, sort and assign owners in. JSON, CSV and HTML are no
+# longer emitted -- add them back here if a downstream system ever needs them,
+# since reporter.write_json / write_csv / write_html are still present.
 # --------------------------------------------------------------------------
-OUTPUT_FORMATS = ["docx", "excel", "json", "csv", "html"]
+OUTPUT_FORMATS = ["docx", "excel"]
 EMAIL_ATTACH_FORMATS = ["docx", "excel"]
+
+# Run health is encoded in the OUTPUT FILENAME as well as inside the documents.
+#
+# This carries the property the email subject line used to carry. With files on
+# disk and no email, a run where every portal failed and a run where nothing
+# new was published both produce a file -- and if they are named alike, a dead
+# monitor is invisible until someone asks why a bid was missed. The folder
+# listing has to show the difference:
+#
+#   2026-08-03_7-opportunities.docx
+#   2026-08-03_no-new-opportunities_13-of-13-portals-OK.docx
+#   2026-08-03_ACTION-NEEDED_all-13-portals-unreachable.docx
+HEALTH_IN_FILENAME = True
 
 # Excel score-band fills. openpyxl requires BARE hex -- "#C6EFCE" raises.
 COLOR_HIGH = "C6EFCE"     # >= 70  green
