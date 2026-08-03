@@ -76,7 +76,14 @@ SPEC = HtmlSpec(
     field_selectors={
         "title": "span.ungm-title",
         "closing": "span:has(+ span.remainingDaysToDeadline)",
-        "posted": "span.remainingDays + span",
+        # "~" rather than "+": the adjacent-sibling form worked on the fixture
+        # and matched nothing on the live page, so the publication date came
+        # back empty while the deadline read correctly. The published span is
+        # the first span AFTER the counter, but not necessarily the very next
+        # node. The deadline uses ":has(+ ...)" and does work live, which is
+        # what matters most -- a missing publication date costs ranking
+        # precision; a missing deadline would drop the notice.
+        "posted": "span.remainingDays ~ span",
     },
     anchor_hint="/Public/Notice/",
     currency="USD",
