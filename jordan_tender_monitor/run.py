@@ -321,7 +321,17 @@ def _describe_block(html: str, selectors: list[str]) -> list[str]:
         child_classes = child.get("class") or []
         if child_classes:
             label += "." + ".".join(child_classes[:2])
-        line = f"      {label:34} {truncate(text, 60)!r}"
+        # Indent by depth below the row. find_all() is recursive and returns
+        # document order, so a flat list cannot show whether two elements are
+        # siblings or nested -- and that is exactly what decides whether a
+        # column can be addressed by a CSS selector at all.
+        depth = 0
+        parent = child.parent
+        while parent is not None and parent is not node:
+            depth += 1
+            parent = parent.parent
+        label = ("  " * depth) + label
+        line = f"      {label:38} {truncate(text, 60)!r}"
         if href:
             line += f"  href={truncate(href, 50)!r}"
         out.append(line)

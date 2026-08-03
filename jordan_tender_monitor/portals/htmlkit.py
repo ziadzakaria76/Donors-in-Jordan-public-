@@ -166,6 +166,11 @@ def _drop_navish(rows: list[Row]) -> list[Row]:
 
 _DATE_HINT_RE = re.compile(
     r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b"
+    # Same hyphenated month name the extraction pattern needed ("03-Aug-2026").
+    # This one decides whether a row COUNTS as dated for the quality gate, so
+    # leaving it out would keep UNGM below the threshold even once its dates
+    # were being read correctly.
+    r"|\b\d{1,2}[-/][^\W\d_]{3,}[-/]\d{2,4}\b"
     r"|\b\d{1,2}\s+\w{3,}\s+\d{4}\b|[٠-٩]{1,2}\s",
 )
 
@@ -445,6 +450,11 @@ _VALUE_LABELS = ("value", "budget", "amount", "estimated", "contract value",
 
 _DEAD_HREF_RE = re.compile(r"^\s*(?:javascript:|#|mailto:|tel:)", re.I)
 
+# Matches a class like "ungm-title", "card__title" or "noticeTitle", but NOT
+# "subtitle" -- a subtitle is a caption, and using it as the notice name would
+# be a quieter version of the same bug this is here to fix.
+_TITLE_CLASS_RE = re.compile(r"(?:^|[-_ ])title|Title", re.I)
+
 
 def _first_real_link(node, hint: str | None = None):
     """The anchor that is actually the notice.
@@ -481,8 +491,16 @@ def _node_to_row(node, base_url: str, anchor_hint: str | None = None) -> Row:
     url = urljoin(base_url, link["href"]) if link else None
 
     heading = node.find(["h1", "h2", "h3", "h4", "h5"])
+    titled = node.find(class_=_TITLE_CLASS_RE)
     if heading and clean(heading.get_text()):
         title = clean(heading.get_text())
+    elif titled and clean(titled.get_text()):
+        # An element whose CLASS says it is the title, when there is no
+        # heading. VERIFIED ON UNGM: the notice's own anchor carries no text at
+        # all -- it is labelled only by title="Open in a new window" -- and the
+        # notice name lives in <span class="ungm-title">. A row's title is not
+        # always its link text, and "*title*" is the convention CMSes reach for.
+        title = clean(titled.get_text())
     elif link and clean(link.get_text()):
         title = clean(link.get_text())
     else:
@@ -518,15 +536,35 @@ _DATE_SPAN_RE = re.compile(
 )
 
 
+# "Expires in 57 days", "Closes within 24 hours" -- a countdown, not a date.
+_RELATIVE_DURATION_RE = re.compile(
+    r"\b(?:in|within|after)\s+(?:\d+(?:\.\d+)?|a|an)\s*"
+    r"(?:day|hour|week|month|minute)s?\b", re.I)
+
+
 def _first_date_text(tail: str) -> str | None:
     """The first date-shaped substring, so a label does not drag the whole row.
 
     Without this, "Deadline: 30 September 2026 Estimated value: EUR 1,850,000"
     is stored whole and the fuzzy date parser is left to guess which of the
     numbers is the deadline.
+
+    A countdown between the label and the first date VOIDS the match, and this
+    is not a nicety. UNGM writes a relative countdown next to each notice:
+
+        30-Sep-2026 19:00 (GMT +3.00)  57.812  Expires in 57 days  20-Jul-2026
+
+    "expires" is a closing label, so the search began there and ran forward to
+    the next date-shaped text -- which is the PUBLICATION date. Every notice
+    came back with a deadline months earlier than its real one, and a deadline
+    in the past is silently dropped as closed. Open tenders would have
+    disappeared from the report with nothing to show anything was wrong.
     """
     m = _DATE_SPAN_RE.search(tail)
     if m and parse_date(m.group()):
+        countdown = _RELATIVE_DURATION_RE.search(tail[: m.start()])
+        if countdown:
+            return None
         return clean(m.group())
     return clean(tail) if parse_date(tail) else None
 

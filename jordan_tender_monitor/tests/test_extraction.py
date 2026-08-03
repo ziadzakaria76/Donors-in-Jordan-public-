@@ -438,12 +438,18 @@ def test_an_advertisement_does_not_become_the_notice_either():
     """
     html = load("save_button_rows.html")
 
-    # Without the hint, the advert wins -- pinning the regression itself, so a
-    # future change cannot quietly reintroduce it.
+    # Without the hint, every row LINKS to the advert -- pinning the regression
+    # itself so a future change cannot quietly reintroduce it.
+    #
+    # The titles are correct here even unhinted, because span.ungm-title now
+    # supplies them. That makes this failure worse, not better: a plausible
+    # title over a link to the advertising page is harder to spot by eye than
+    # fifteen rows all called "UNGM Pro".
     unhinted = H.extract_by_selectors(html, ["div.dataRow.notice-table"],
                                       "https://www.ungm.org/Public/Notice")
-    check(all(r.title == "UNGM Pro" for r in unhinted.rows),
-          "advert: without a hint the upsell link is what a row looks like")
+    check(all("TenderAlertService" in (r.url or "") for r in unhinted.rows),
+          "advert: without a hint every row links to the upsell page",
+          f"got {[r.url for r in unhinted.rows]}")
 
     hinted = H.extract_by_selectors(html, ["div.dataRow.notice-table"],
                                     "https://www.ungm.org/Public/Notice",
@@ -465,6 +471,47 @@ def test_an_advertisement_does_not_become_the_notice_either():
     row = H._node_to_row(soup.find("div"), "https://e.org/", "/Public/Notice/")
     check_eq(row.url, "https://e.org/other/9",
              "advert: an unmatched hint falls back to the first real link")
+
+
+def test_a_countdown_does_not_supply_the_deadline():
+    """VERIFIED ON UNGM, and the most dangerous defect found on that page.
+
+    Each row carries a relative countdown beside its dates:
+
+        30-Sep-2026 19:00 (GMT +3.00)  57.812  Expires in 57 days  20-Jul-2026
+
+    "expires" is a closing label, so the search started there and ran forward
+    to the next date-shaped text -- the PUBLICATION date. Every notice came
+    back with a deadline months earlier than its real one, and a deadline in
+    the past is dropped as closed. Open tenders would have vanished from the
+    report with nothing to indicate anything was wrong, and the rows scored
+    1.00 while doing it.
+    """
+    check(H._first_date_text(" in 57 days 20-Jul-2026 UNDP") is None,
+          "countdown: 'in 57 days' voids the date that follows it")
+    check(H._first_date_text(" within 24 hours 20-Jul-2026") is None,
+          "countdown: 'within 24 hours' does too")
+
+    # A real labelled date is unaffected -- this must not become a blanket
+    # refusal to read deadlines.
+    check_eq(H._first_date_text(": 30 September 2026"), "30 September 2026",
+             "countdown: an ordinary labelled deadline still reads")
+    check_eq(H._first_date_text(" 31.12.2026 (Ortszeit)"), "31.12.2026",
+             "countdown: and so does a German one")
+
+    result = H.extract(load("save_button_rows.html"),
+                       "https://www.ungm.org/Public/Notice",
+                       ["div.dataRow.notice-table"],
+                       anchor_hint="/Public/Notice/")
+    for row in result.rows:
+        closing = parse_date(row.closing_text)
+        check(closing is None or closing >= date(2026, 8, 3),
+              "countdown: no row reports a publication date as its deadline",
+              f"{row.title[:40]!r} -> {row.closing_text!r}")
+
+    check(result.quality >= H.QUALITY_THRESHOLD,
+          "countdown: the rows still clear the gate on their own dates",
+          f"quality {result.quality}")
 
 
 def test_dead_hrefs_are_never_a_rows_link():
@@ -595,6 +642,7 @@ TESTS = [
     test_own_text_is_identical_on_well_formed_cells,
     test_a_save_button_does_not_become_the_notice,
     test_an_advertisement_does_not_become_the_notice_either,
+    test_a_countdown_does_not_supply_the_deadline,
     test_dead_hrefs_are_never_a_rows_link,
     test_a_month_name_joined_by_hyphens_is_recognised,
 ]
