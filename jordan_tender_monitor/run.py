@@ -157,6 +157,9 @@ def cmd_capture(portal_key: str) -> int:
         print("\n    Selectors this page actually uses (derived structurally):")
         for hint in _derive_selectors(html):
             print(f"      {hint}")
+
+        for line in _describe_tables(html):
+            print(f"      {line}")
         print()
 
     if not any_saved:
@@ -190,6 +193,44 @@ def _derive_selectors(html: str, limit: int = 6) -> list[str]:
            for sel, n in counter.most_common(limit * 3) if n >= 3][:limit]
     return out or ["(no repeated class-bearing blocks -- this page needs the "
                    "class-independent layers)"]
+
+
+def _describe_tables(html: str, limit: int = 2) -> list[str]:
+    """Show how each table's header maps onto columns, and one row's cells.
+
+    A header can map correctly and the row still come out wrong -- nested
+    tables, colspans and responsive duplicate cells all shift the indices. The
+    per-layer summary cannot show that; only the cells side by side can.
+    """
+    from bs4 import BeautifulSoup
+
+    from jordan_tender_monitor.portals.htmlkit import _match_header
+    from jordan_tender_monitor.utils.text import clean, truncate
+
+    out: list[str] = []
+    soup = BeautifulSoup(html, "html.parser")
+    for index, table in enumerate(soup.find_all("table")[:limit], start=1):
+        rows = table.find_all("tr")
+        if len(rows) < 2:
+            continue
+        header = [clean(c.get_text()) for c in rows[0].find_all(["th", "td"])]
+        if not header:
+            continue
+        out.append(f"\n    Table {index}: {len(rows) - 1} data row(s), "
+                   f"{len(header)} header cell(s)")
+        for i, cell in enumerate(header):
+            mapped = _match_header(cell) or "-"
+            out.append(f"      [{i}] {mapped:9} header={truncate(cell, 40)!r}")
+
+        body = table.find("tbody") or table
+        data = [r for r in body.find_all("tr") if r is not rows[0]]
+        if data:
+            cells = [clean(c.get_text(" ")) for c in data[0].find_all(["td", "th"])]
+            out.append(f"      first data row has {len(cells)} cell(s)"
+                       + ("  <-- MISMATCH with the header" if len(cells) != len(header) else ""))
+            for i, cell in enumerate(cells):
+                out.append(f"      [{i}] {truncate(cell, 70)!r}")
+    return out
 
 
 def _run_pipeline(only: list[str] | None = None):
