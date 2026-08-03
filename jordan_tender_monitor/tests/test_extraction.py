@@ -393,6 +393,293 @@ def test_arabic_country_matching_is_substring():
           "country: the full Arabic country name matched")
 
 
+def test_a_save_button_does_not_become_the_notice():
+    """VERIFIED LIVE ON UNGM. Fifteen notices, fifteen identical titles.
+
+    Every row on the rendered listing opens with
+    `<a href="javascript:void(0);">Unsave this procurement opportunity.</a>`,
+    and taking the first anchor made that the title and the URL of every
+    notice. The result was a listing of buttons: no working link, no way to
+    tell two notices apart, and nothing a reader could act on.
+    """
+    result = H.extract(load("save_button_rows.html"),
+                       "https://www.ungm.org/Public/Notice",
+                       ["div.dataRow.notice-table"],
+                       anchor_hint="/Public/Notice/")
+    check_eq(len(result.rows), 4, "save button: four notices found")
+
+    titles = [row.title for row in result.rows]
+    check(not any("Unsave" in t for t in titles),
+          "save button: no row is titled after the save control", f"got {titles}")
+    check(len(set(titles)) == 4,
+          "save button: four notices produce four distinct titles")
+    check("water sector reform" in titles[0],
+          "save button: the title is the notice's own link text")
+
+    urls = [row.url or "" for row in result.rows]
+    check(not any("javascript:" in u for u in urls),
+          "save button: no row links to javascript:void(0)", f"got {urls}")
+    check(all("/Public/Notice/" in u for u in urls),
+          "save button: every row links to a real notice")
+
+
+def test_an_advertisement_does_not_become_the_notice_either():
+    """The second half of the UNGM defect, and the more dangerous half.
+
+    Skipping the save button landed on the NEXT anchor, which is an upsell:
+    <a href="/Public/TenderAlertService">UNGM Pro</a>. Every row came back
+    titled "UNGM Pro" pointing at the advertising page -- and unlike the save
+    button, those rows carried dates, so they cleared the quality gate and
+    would have been reported as tenders. A silent failure became a confident
+    wrong answer.
+
+    A portal that declares an anchor_hint has already said what its notice URLs
+    look like. Nothing else in the row distinguishes an advert from a notice.
+    """
+    html = load("save_button_rows.html")
+
+    # Without the hint, every row LINKS to the advert -- pinning the regression
+    # itself so a future change cannot quietly reintroduce it.
+    #
+    # The titles are correct here even unhinted, because span.ungm-title now
+    # supplies them. That makes this failure worse, not better: a plausible
+    # title over a link to the advertising page is harder to spot by eye than
+    # fifteen rows all called "UNGM Pro".
+    unhinted = H.extract_by_selectors(html, ["div.dataRow.notice-table"],
+                                      "https://www.ungm.org/Public/Notice")
+    check(all("TenderAlertService" in (r.url or "") for r in unhinted.rows),
+          "advert: without a hint every row links to the upsell page",
+          f"got {[r.url for r in unhinted.rows]}")
+
+    hinted = H.extract_by_selectors(html, ["div.dataRow.notice-table"],
+                                    "https://www.ungm.org/Public/Notice",
+                                    anchor_hint="/Public/Notice/")
+    check_eq(len(hinted.rows), 4, "advert: four rows with the hint applied")
+    check(not any("UNGM Pro" == r.title for r in hinted.rows),
+          "advert: the hint keeps the upsell out of the titles")
+    check(not any("TenderAlertService" in (r.url or "") for r in hinted.rows),
+          "advert: and out of the URLs")
+    check(all("/Public/Notice/" in (r.url or "") for r in hinted.rows),
+          "advert: every row links to the notice the hint describes")
+
+    # The hint is a preference, not a requirement: a row with no matching
+    # anchor still gets its first real link rather than nothing.
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(
+        '<div><a href="javascript:void(0);">Save</a>'
+        '<a href="/other/9">Advisory Services, Amman</a></div>', "html.parser")
+    row = H._node_to_row(soup.find("div"), "https://e.org/", "/Public/Notice/")
+    check_eq(row.url, "https://e.org/other/9",
+             "advert: an unmatched hint falls back to the first real link")
+
+
+def test_a_countdown_does_not_supply_the_deadline():
+    """VERIFIED ON UNGM, and the most dangerous defect found on that page.
+
+    Each row carries a relative countdown beside its dates:
+
+        30-Sep-2026 19:00 (GMT +3.00)  57.812  Expires in 57 days  20-Jul-2026
+
+    "expires" is a closing label, so the search started there and ran forward
+    to the next date-shaped text -- the PUBLICATION date. Every notice came
+    back with a deadline months earlier than its real one, and a deadline in
+    the past is dropped as closed. Open tenders would have vanished from the
+    report with nothing to indicate anything was wrong, and the rows scored
+    1.00 while doing it.
+    """
+    check(H._first_date_text(" in 57 days 20-Jul-2026 UNDP") is None,
+          "countdown: 'in 57 days' voids the date that follows it")
+    check(H._first_date_text(" within 24 hours 20-Jul-2026") is None,
+          "countdown: 'within 24 hours' does too")
+
+    # A real labelled date is unaffected -- this must not become a blanket
+    # refusal to read deadlines.
+    check_eq(H._first_date_text(": 30 September 2026"), "30 September 2026",
+             "countdown: an ordinary labelled deadline still reads")
+    check_eq(H._first_date_text(" 31.12.2026 (Ortszeit)"), "31.12.2026",
+             "countdown: and so does a German one")
+
+    result = H.extract(load("save_button_rows.html"),
+                       "https://www.ungm.org/Public/Notice",
+                       ["div.dataRow.notice-table"],
+                       anchor_hint="/Public/Notice/")
+    for row in result.rows:
+        closing = parse_date(row.closing_text)
+        check(closing is None or closing >= date(2026, 8, 3),
+              "countdown: no row reports a publication date as its deadline",
+              f"{row.title[:40]!r} -> {row.closing_text!r}")
+
+    check(result.quality >= H.QUALITY_THRESHOLD,
+          "countdown: the rows still clear the gate on their own dates",
+          f"quality {result.quality}")
+
+
+def test_portal_field_selectors_map_unlabelled_columns():
+    """The only honest way to read UNGM's two unlabelled dates.
+
+    The row holds them as sibling spans around a countdown:
+
+        span                          '30-Sep-2026 19:00 (GMT +3.00)'   deadline
+        span.remainingDaysToDeadline  '57.812'
+        span.remainingDays            'Expires in 57 days'
+        span                          '20-Jul-2026'                     published
+
+    Nothing in the markup says which is which. "The first date is the deadline"
+    is true here and FALSE on GIZ, whose table publishes Veröffentlicht before
+    Frist -- so inferring it would have silently swapped every GIZ deadline for
+    its publication date. Being siblings, they are addressable instead.
+    """
+    from jordan_tender_monitor.portals import ungm
+
+    result = H.extract(load("save_button_rows.html"),
+                       "https://www.ungm.org/Public/Notice",
+                       ungm.SPEC.selectors, ungm.SPEC.anchor_hint,
+                       field_selectors=ungm.SPEC.field_selectors)
+    check_eq(len(result.rows), 4, "field selectors: four notices")
+    check(result.quality >= H.QUALITY_THRESHOLD,
+          "field selectors: the rows clear the quality gate")
+
+    first = result.rows[0]
+    check_eq(parse_date(first.closing_text), date(2026, 9, 30),
+             "field selectors: the DEADLINE is the span before the countdown")
+    check_eq(parse_date(first.date_text), date(2026, 7, 20),
+             "field selectors: and the publication date the one after it")
+    check_eq(first.title, "Consultancy for water sector reform, Amman, Jordan",
+             "field selectors: the title comes from span.ungm-title")
+    check_eq(first.url, "https://www.ungm.org/Public/Notice/265432",
+             "field selectors: and the URL from the notice anchor")
+
+    for row in result.rows:
+        closing, posted = parse_date(row.closing_text), parse_date(row.date_text)
+        check(closing and posted and closing > posted,
+              "field selectors: every deadline is later than its publication date",
+              f"{row.title[:35]!r}: closing={closing} posted={posted}")
+
+    # "30-Sep-2026 19:00 (GMT +3.00)" -- the trailing timezone defeats the date
+    # parser outright, so a selector can find the right cell and still lose the
+    # deadline. Date fields are narrowed to their date span.
+    check_eq(parse_date("30-Sep-2026 19:00 (GMT +3.00)"), None,
+             "field selectors: the raw cell text genuinely does not parse")
+
+
+def test_a_stale_field_selector_degrades_rather_than_blanking():
+    """These are hints like the row selectors, and hints go stale.
+
+    A selector that stops matching must leave the generically-inferred value in
+    place. Blanking the field on a miss would turn one renamed class into a
+    listing with no dates at all, which is the failure the whole cascade exists
+    to avoid.
+    """
+    html = ('<div class="row"><span class="t">Advisory Services, Amman</span>'
+            '<a href="/n/1">link</a>'
+            '<span>Deadline: 30 September 2026</span></div>' * 3)
+    result = H.extract_by_selectors(
+        f"<html><body>{html}</body></html>", ["div.row"], "https://e.org/",
+        field_selectors={"closing": "span.class-that-no-longer-exists"})
+    check_eq(len(result.rows), 3, "stale selector: rows are still read")
+    check_eq(parse_date(result.rows[0].closing_text), date(2026, 9, 30),
+             "stale selector: the labelled deadline survives the miss")
+
+    # And a malformed selector must not take the run down with it.
+    broken = H.extract_by_selectors(
+        f"<html><body>{html}</body></html>", ["div.row"], "https://e.org/",
+        field_selectors={"closing": "span:::nonsense("})
+    check_eq(len(broken.rows), 3, "stale selector: an invalid hint is survivable")
+
+
+def test_dead_hrefs_are_never_a_rows_link():
+    """mailto:, tel: and # are the same defect wearing a different hat."""
+    from bs4 import BeautifulSoup
+
+    for dead in ("javascript:void(0);", "#", "mailto:bids@example.org", "tel:+962"):
+        soup = BeautifulSoup(
+            f'<div><a href="{dead}">Contact us</a>'
+            f'<a href="/notices/7">Advisory Services, Amman</a></div>',
+            "html.parser")
+        row = H._node_to_row(soup.find("div"), "https://e.org/")
+        check_eq(row.url, "https://e.org/notices/7",
+                 f"dead href: '{dead}' is skipped in favour of the real link")
+        check_eq(row.title, "Advisory Services, Amman",
+                 f"dead href: '{dead}' does not supply the title")
+
+
+def test_a_month_name_joined_by_hyphens_is_recognised():
+    """VERIFIED LIVE ON UNGM: "03-Aug-2026".
+
+    parse_date read this format all along. The extractor's date-span pattern
+    did not -- every alternation wanted either digits for the month or
+    whitespace around a named one -- so the date was never handed to the
+    parser, and the rows scored as dateless.
+    """
+    check_eq(parse_date("03-Aug-2026"), date(2026, 8, 3),
+             "hyphen month: the parser reads it")
+    check_eq(H._first_date_text("Deadline 03-Aug-2026 19:00 (GMT -4.00)"),
+             "03-Aug-2026",
+             "hyphen month: and the extractor now finds it in a row of text")
+    check_eq(H._first_date_text("Closing 12-Oct-2026 17:00"), "12-Oct-2026",
+             "hyphen month: October too")
+    check_eq(H._first_date_text("15/January/2027"), "15/January/2027",
+             "hyphen month: slashes and a full month name as well")
+
+    # The formats that already worked must keep working.
+    check_eq(H._first_date_text("Deadline: 30 September 2026"), "30 September 2026",
+             "hyphen month: spaced month names still parse")
+    check_eq(H._first_date_text("Frist 31.12.2026"), "31.12.2026",
+             "hyphen month: German numeric dates still parse")
+
+
+def test_an_unclosed_cell_does_not_swallow_the_rest_of_the_row():
+    """VERIFIED LIVE ON GIZ, 3 August 2026. Every deadline was unusable.
+
+    The German portal publishes `<td>n.v.<td>10030355 - Studie...` -- the
+    deadline cell is never closed, so the parser nests the title, the type and
+    the buyer inside it. Nothing about this looks wrong from the outside: the
+    table layer wins at quality 1.00, six cells are found in document order,
+    and the header maps correctly onto posted / closing / title. Only the cell
+    contents are wrong, and only for one column.
+    """
+    result = H.extract_tables(load("unclosed_cell_table.html"),
+                              "https://ausschreibungen.giz.de/x")
+    check_eq(len(result.rows), 2, "unclosed cell: both rows read")
+
+    broken, healthy = result.rows
+    check_eq(broken.closing_text, "n.v.",
+             "unclosed cell: the deadline cell keeps ONLY its own text")
+    check("Studie" not in broken.closing_text,
+          "unclosed cell: the title has not leaked into the deadline")
+    check("GIZ" not in broken.closing_text,
+          "unclosed cell: nor has the buyer, two columns further along")
+    check(parse_date(broken.closing_text) is None,
+          "unclosed cell: 'n.v.' is an absent deadline, not a parsed one")
+    check("Studie zum Ausbau" in broken.title,
+          "unclosed cell: the title is still read from its own cell")
+    check_eq(broken.date_text, "03.08.2026",
+             "unclosed cell: the posted date is untouched")
+    check(broken.url and broken.url.endswith("pid=51974"),
+          "unclosed cell: the link is still resolved from the title cell")
+
+    # The other half of the fix: valid markup must be completely unaffected.
+    check_eq(parse_date(healthy.closing_text), date(2027, 1, 15),
+             "unclosed cell: a well-formed row still parses '15. Januar 2027'")
+    check_eq(parse_date(healthy.date_text), date(2026, 7, 1),
+             "unclosed cell: and its posted date")
+    check("Verwaltungsreform" in healthy.title,
+          "unclosed cell: and its title")
+
+
+def test_own_text_is_identical_on_well_formed_cells():
+    """The fix must be a no-op wherever the markup is valid."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(
+        "<table><tr><td>Amman</td><td><b>15.</b> Januar <i>2027</i></td></tr></table>",
+        "html.parser")
+    cells = soup.find_all("td")
+    for cell in cells:
+        check_eq(H._own_text(cell), textutil.clean(cell.get_text(" ")),
+                 "own-text: matches get_text() when no cell is nested")
+
+
 TESTS = [
     test_drupal_views_listing,
     test_bootstrap_cards,
@@ -424,4 +711,13 @@ TESTS = [
     test_country_matching_word_boundaries,
     test_country_matching_strips_emails_but_trusts_jo_domain,
     test_arabic_country_matching_is_substring,
+    test_an_unclosed_cell_does_not_swallow_the_rest_of_the_row,
+    test_own_text_is_identical_on_well_formed_cells,
+    test_a_save_button_does_not_become_the_notice,
+    test_an_advertisement_does_not_become_the_notice_either,
+    test_a_countdown_does_not_supply_the_deadline,
+    test_portal_field_selectors_map_unlabelled_columns,
+    test_a_stale_field_selector_degrades_rather_than_blanking,
+    test_dead_hrefs_are_never_a_rows_link,
+    test_a_month_name_joined_by_hyphens_is_recognised,
 ]

@@ -27,6 +27,13 @@ msal>=1.25.0           # Microsoft Graph authentication
 # year-round), so this is load-bearing on a Windows host.
 tzdata>=2024.1; platform_system == "Windows"
 
-# Optional -- only needed for portals that turn out to be JavaScript-rendered.
-# Install with: pip install playwright && playwright install chromium
-# playwright>=1.40.0
+# Deliberately NOT here: playwright. Exactly one portal needs it (UNGM, whose
+# listing is assembled client-side), and it pulls ~400 MB of browser. Putting it
+# in this file would make a Windows deployment that never touches UNGM pay for
+# it. It lives in requirements-browser.txt instead:
+#
+#     pip install -r requirements-browser.txt
+#     playwright install chromium
+#
+# Without it UNGM reports "unavailable" with that instruction as its reason, and
+# the other twelve portals are unaffected.

@@ -2,91 +2,96 @@
 UNGM -- the United Nations Global Marketplace. Tier 2, and the single richest
 Jordan source: UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA all publish here.
 
-The public listing is JavaScript-driven, so fetching /Public/Notice returns a
-shell. The UI itself calls a POST search endpoint that returns rendered rows,
-which is what this module targets. If that endpoint changes, the HTML fallback
-below still runs through the cascade rather than the portal going dark.
+VERIFIED AGAINST THE LIVE SITE, and both HTTP-level approaches are dead ends:
 
-VERIFICATION STATUS: never run against the live site. The POST endpoint and its
-payload shape are the least certain part of this codebase -- confirm with
-`python run.py --capture ungm` before trusting this portal.
+  * POST /Public/Notice/Search returned 395 bytes -- no rows, no error. The
+    endpoint either moved or now requires a token the UI mints client-side.
+  * GET /Public/Notice returned 141 KB of pure navigation. The derived
+    selectors were menu containers; not one notice was in the markup. The
+    listing is assembled client-side after load.
+
+So this portal is rendered in a headless browser. Playwright is an OPTIONAL
+dependency (requirements-browser.txt) -- when it is absent this portal fails
+with an install instruction and the other twelve are unaffected.
 """
 
 from __future__ import annotations
 
-from . import base, harvester
+from . import base, browser, harvester
 from .harvester import HtmlSpec
 
 KEY = "ungm"
 LISTING = "https://www.ungm.org/Public/Notice"
-SEARCH = "https://www.ungm.org/Public/Notice/Search"
 
-# UNGM's own country id for Jordan. If results come back worldwide, this is the
-# value to check first.
-JORDAN_COUNTRY_ID = 113
-
-_PAYLOAD = {
-    "PageIndex": 0,
-    "PageSize": 100,
-    "Title": "",
-    "Description": "",
-    "Reference": "",
-    "PublishedFrom": "",
-    "PublishedTo": "",
-    "DeadlineFrom": "",
-    "DeadlineTo": "",
-    "Countries": [JORDAN_COUNTRY_ID],
-    "Agencies": [],
-    "UNSPSCs": [],
-    "NoticeTypes": [],
-    "SortField": "DatePublished",
-    "SortAscending": False,
-    "isPicker": False,
-}
+# A row selector to wait for before reading the DOM. A hint only: if it never
+# appears the page is still read after the settle delay, so a renamed class
+# degrades to a weak result the cascade can diagnose rather than a hard failure.
+ROW_HINT = "div.tableRow, table tbody tr, li.notice"
 
 
-def _fetch_search_html(url: str) -> str:
-    """POST to the search endpoint and return its HTML fragment.
+def _fetch_rendered(url: str) -> str:
+    """Render the listing in a headless browser and return the DOM.
 
-    Falls back to a plain GET of the listing page so that --capture still has
-    something to show, and so the cascade can diagnose a JavaScript shell
-    rather than the portal reporting a bare transport error.
+    A plain fetch cannot work here -- see the module docstring. If Playwright
+    is missing the error says how to install it, which is more useful than a
+    portal that silently reports zero.
     """
-    if url == SEARCH:
-        try:
-            response = base._request(
-                "POST", SEARCH, json=_PAYLOAD,
-                headers={"X-Requested-With": "XMLHttpRequest",
-                         "Referer": LISTING,
-                         "Accept": "text/html, */*; q=0.01"},
-            )
-            response.encoding = response.encoding or "utf-8"
-            return response.text
-        except Exception as exc:  # noqa: BLE001 - reported, never swallowed
-            raise base.PortalError(
-                f"POST search endpoint failed ({type(exc).__name__}: {exc}). "
-                f"The listing is JavaScript-driven, so a plain GET returns an "
-                f"empty shell; confirm the endpoint with --capture.", SEARCH) from exc
-    return base.fetch(url)
+    if not browser.available():
+        raise base.PortalError(
+            f"UNGM needs a headless browser: {browser.INSTALL_HINT}", url)
+    return browser.render(url, wait_for=ROW_HINT)
 
 
 SPEC = HtmlSpec(
     key=KEY,
-    urls=[SEARCH, LISTING],
-    # Hints only -- unverified against the live DOM.
+    urls=[LISTING],
+    # DERIVED FROM THE RENDERED DOM, not guessed: --capture on the browser
+    # output reported div.dataRow.notice-table with 15 matching blocks, and the
+    # structural and anchor layers independently found the same 15 rows.
+    #
+    # "table tbody tr" is deliberately NOT in this list. It matched six rows on
+    # the live page -- the Su/Mo/Tu/We/Th/Fr/Sa cells of the date-picker widget.
+    # An over-broad selector runs before the class-independent layers and would
+    # short-circuit the one that actually works; this is the exact failure the
+    # quality gate exists to catch, and there is no reason to hand it one.
     selectors=[
+        "div.dataRow.notice-table",
         "div.tableRow.dataRow",
         "div.tableRow",
         "tr.noticeRow",
-        "table tbody tr",
     ],
+    # DERIVED FROM THE LIVE ROW ANATOMY, not guessed. The row's columns are
+    # unlabelled sibling spans, in this order:
+    #
+    #     span                          '03-Aug-2026 22:59 (GMT -6.00)'
+    #     span.remainingDaysToDeadline  '0.234606972739583'
+    #     span.remainingDays            'Expires within 24 hours'
+    #     span                          '20-Jul-2026'
+    #
+    # Nothing in the markup says which date is which, so they cannot be read by
+    # inference: "the first date is the deadline" is true here and false on GIZ,
+    # and a wrong deadline silently drops an open tender. Being siblings, they
+    # ARE addressable -- the deadline is the span immediately before the
+    # remaining-days counter, and the publication date the one after it.
+    field_selectors={
+        "title": "span.ungm-title",
+        "closing": "span:has(+ span.remainingDaysToDeadline)",
+        # "~" rather than "+": the adjacent-sibling form worked on the fixture
+        # and matched nothing on the live page, so the publication date came
+        # back empty while the deadline read correctly. The published span is
+        # the first span AFTER the counter, but not necessarily the very next
+        # node. The deadline uses ":has(+ ...)" and does work live, which is
+        # what matters most -- a missing publication date costs ranking
+        # precision; a missing deadline would drop the notice.
+        "posted": "span.remainingDays ~ span",
+    },
     anchor_hint="/Public/Notice/",
     currency="USD",
-    # The search is already filtered to Jordan, but the HTML fallback is not,
-    # and a silently ignored country filter would flood the report.
+    # The rendered listing is worldwide -- no country filter is applied before
+    # it arrives, so this one is doing real work rather than defence in depth.
     filter_to_jordan=True,
-    fetcher=_fetch_search_html,
-    notes="POST search endpoint; JS-driven listing page",
+    fetcher=_fetch_rendered,
+    notes="JavaScript-rendered listing; needs Playwright",
 )
 
 

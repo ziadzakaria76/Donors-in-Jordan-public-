@@ -14,9 +14,11 @@ environment blocked all 13 domains.
 
 | | Status |
 |---|---|
-| **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **553 checks** |
-| **Known broken, live** | UNGM (POST search returns 3 rows, not a listing) · EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
+| **Verified against the live web** | EBRD — 4,012 notices scanned, 119 Jordan. UK Find a Tender (500 read), IsDB (144), GIZ (20) and KfW/GTAI (3) all read cleanly and had no open Jordan notices on the day. |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **671 checks** |
+| **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
+| **Confirmed live** | UNGM — renders in a headless browser and reads its full listing at quality 1.00: real titles, working notice links, correct deadlines. Six defects fixed. It reads page 1 only (15 notices, worldwide), so it contributes Jordan notices only when some fall on that page — pagination or a country filter is the next step. |
+| **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
 | **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
 
@@ -29,6 +31,16 @@ I wrote justifying the omission — so the first report led with a Caribbean
 education project and roughly 140 of 259 entries were not Jordan. Every module
 now filters client-side regardless, and a test enforces it structurally.
 
+**A high quality score is not a correct result.** GIZ's table won at quality
+1.00 with six cells found and the header mapped correctly onto
+posted / closing / title — and every deadline on the portal was still garbage,
+because one unclosed `<td>` nests the rest of the row inside the deadline cell.
+Scores measure whether something looks like a listing. They cannot see a single
+column being wrong, which is why `--capture` now prints the header-to-cell
+mapping and sample rows even when nothing wins.
+
+**Defence in depth is not depth when both layers read the same field.** The World Bank query `qterm=Jordan` is a full-text search, and this module stored the searched body as the record description — so the client-side text filter could not reject anything the API returned. It kept 500 of 500, and the report carried water-supply consultancies in Blantyre, Malawi. The country *field* now decides; text matching is kept only for notices that have no country field, where it is the only signal available.
+
 **A count alone cannot diagnose a portal.** Five portals reported `OK: 0` and
 the number could not distinguish "returned nothing" from "returned 500
 worldwide notices, none Jordan". Portal health now carries the pre-filter
@@ -39,12 +51,19 @@ in a single run.
 
 ```bash
 pip install -r requirements.txt
+pip install -r requirements-browser.txt && playwright install chromium  # UNGM only
 cp .env.example .env        # then fill it in
 python run.py --check-portals   # can this machine see the portals at all?
 python run.py --dry-run         # scrape, filter, print — change no state
 python run.py --capture ungm    # confirm one portal's selectors
 python run.py --run             # the real run: write the files into output/
 ```
+
+The second line is optional and needed by exactly one portal. UNGM builds its
+listing in JavaScript, so no HTTP fetch can read it. Skip it and UNGM reports
+`unavailable` with those two commands as its reason; the other twelve portals
+are unaffected. It costs roughly 400 MB of browser, which is why it is not in
+`requirements.txt`.
 
 ## Deploying
 
@@ -237,7 +256,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 553 checks, no network, no credentials
+python tests/run_all.py    # 671 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

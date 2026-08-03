@@ -118,6 +118,8 @@ def cmd_capture(portal_key: str) -> int:
     print(f"\nCapturing {portals.name(portal_key)}...\n")
 
     module = capturable[portal_key]
+    spec_selectors = list(getattr(module, "SPEC", None).selectors
+                          if getattr(module, "SPEC", None) else [])
     results = module.capture()
     any_saved = False
 
@@ -141,22 +143,41 @@ def cmd_capture(portal_key: str) -> int:
             print(f"    {layer.layer:16} {len(layer.rows):5} {layer.quality:8.2f}  "
                   f"{layer.note[:60]}{flag}")
 
-        if winner is None:
+        # Show rows even when NOTHING clears the gate. That is precisely the
+        # case you cannot debug without them: a layer that found 15 rows at
+        # quality 0.12 has found something, and whether those rows are real
+        # notices missing their dates or genuine rubbish is not a question the
+        # score can answer -- only the rows can.
+        best = winner
+        if best is None:
+            scored = [layer for layer in layers if layer.rows]
+            best = max(scored, key=lambda layer: layer.quality, default=None)
             print("    No layer cleared the quality gate. Diagnosis:")
             from jordan_tender_monitor.portals.htmlkit import diagnose
             print(f"      {diagnose(html, [])}")
-        else:
-            print(f"\n    Sample row from the winning '{winner.layer}' layer:")
-            row = winner.rows[0]
-            print(f"      title   : {row.title[:90]}")
-            print(f"      url     : {row.url}")
-            print(f"      posted  : {row.date_text}")
-            print(f"      closing : {row.closing_text}")
-            print(f"      value   : {(row.value_text or '')[:70]}")
+
+        if best is not None:
+            label = "winning" if winner is not None else "best-scoring (rejected)"
+            print(f"\n    Sample rows from the {label} '{best.layer}' layer:")
+            for row in best.rows[:3]:
+                print(f"      title   : {row.title[:90]}")
+                print(f"      url     : {row.url}")
+                print(f"      posted  : {row.date_text!r}   closing: {row.closing_text!r}")
+                print(f"      value   : {(row.value_text or '')[:70]!r}")
+                # The raw text is what the date and value parsers actually see.
+                # When a row has a date on screen but none in the record, the
+                # answer is almost always visible here and nowhere else.
+                print(f"      raw     : {row.raw_text[:200]!r}")
+                print()
 
         print("\n    Selectors this page actually uses (derived structurally):")
         for hint in _derive_selectors(html):
             print(f"      {hint}")
+
+        for line in _describe_tables(html):
+            print(f"      {line}")
+        for line in _describe_block(html, spec_selectors):
+            print(f"      {line}")
         print()
 
     if not any_saved:
@@ -190,6 +211,134 @@ def _derive_selectors(html: str, limit: int = 6) -> list[str]:
            for sel, n in counter.most_common(limit * 3) if n >= 3][:limit]
     return out or ["(no repeated class-bearing blocks -- this page needs the "
                    "class-independent layers)"]
+
+
+def _describe_tables(html: str, limit: int = 2) -> list[str]:
+    """Show how each table's header maps onto columns, and one row's cells.
+
+    A header can map correctly and the row still come out wrong -- nested
+    tables, colspans and responsive duplicate cells all shift the indices. The
+    per-layer summary cannot show that; only the cells side by side can.
+    """
+    from bs4 import BeautifulSoup
+
+    from jordan_tender_monitor.portals.htmlkit import _match_header, _own_text
+    from jordan_tender_monitor.utils.text import truncate
+
+    out: list[str] = []
+    soup = BeautifulSoup(html, "html.parser")
+    for index, table in enumerate(soup.find_all("table")[:limit], start=1):
+        rows = table.find_all("tr")
+        if len(rows) < 2:
+            continue
+        header = [_own_text(c) for c in rows[0].find_all(["th", "td"])]
+        if not header:
+            continue
+        out.append(f"\n    Table {index}: {len(rows) - 1} data row(s), "
+                   f"{len(header)} header cell(s)")
+        for i, cell in enumerate(header):
+            mapped = _match_header(cell) or "-"
+            out.append(f"      [{i}] {mapped:9} header={truncate(cell, 40)!r}")
+
+        body = table.find("tbody") or table
+        data = [r for r in body.find_all("tr") if r is not rows[0]]
+        if data:
+            cells = [_own_text(c) for c in data[0].find_all(["td", "th"])]
+            out.append(f"      first data row has {len(cells)} cell(s)"
+                       + ("  <-- MISMATCH with the header" if len(cells) != len(header) else ""))
+            for i, cell in enumerate(cells):
+                out.append(f"      [{i}] {truncate(cell, 70)!r}")
+    return out
+
+
+def _describe_block(html: str, selectors: list[str]) -> list[str]:
+    """Break one repeated row open and show what each part of it holds.
+
+    The table dump does this for tables. A div-based listing has no header to
+    map, so when its rows come out wrong there is nothing to look at -- UNGM
+    produced fifteen rows whose title was the save button and whose dates were
+    all None, and the summary could not say which element held the real title,
+    or whether "03-Aug-2026" was a deadline or a publication date.
+
+    Prints each descendant that carries its own text, with the tag and classes
+    that identify it, so a column can be mapped instead of guessed at.
+    """
+    from collections import Counter
+
+    from bs4 import BeautifulSoup
+
+    from jordan_tender_monitor.utils.text import clean, truncate
+
+    def own_text(element) -> str:
+        """Text belonging to this element and not to a nested one.
+
+        NOT htmlkit._own_text, which asks whether a string's nearest CELL
+        ancestor is the node -- outside a table that is None for everything, so
+        reusing it here reported every element as empty and the first anatomy
+        dump showed four blank anchors and nothing else.
+        """
+        return clean(" ".join(s for s in element.strings if s.parent is element))
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    node = None
+    for selector in selectors:
+        try:
+            found = soup.select(selector)
+        except Exception:  # noqa: BLE001 - an invalid hint is not fatal here
+            continue
+        if len(found) >= 3:
+            node = found[0]
+            break
+    if node is None:
+        # Fall back to the most repeated class-bearing block that has a link,
+        # which is what _derive_selectors reports.
+        counter: Counter[str] = Counter()
+        by_key: dict[str, object] = {}
+        for candidate in soup.find_all(True):
+            classes = candidate.get("class") or []
+            if not classes or not candidate.find("a", href=True):
+                continue
+            key = "{}.{}".format(candidate.name, ".".join(sorted(classes)[:2]))
+            counter[key] += 1
+            by_key.setdefault(key, candidate)
+        if not counter:
+            return []
+        key, count = counter.most_common(1)[0]
+        if count < 3:
+            return []
+        node = by_key[key]
+
+    classes = ".".join(node.get("class") or [])
+    out = [f"\n    Anatomy of one {node.name}"
+           f"{'.' + classes if classes else ''} row:"]
+    for child in node.find_all(True):
+        text = own_text(child) if child.name not in ("script", "style") else ""
+        href = child.get("href") if child.name == "a" else None
+        if not text and not href:
+            continue
+        label = child.name
+        child_classes = child.get("class") or []
+        if child_classes:
+            label += "." + ".".join(child_classes[:2])
+        # Indent by depth below the row. find_all() is recursive and returns
+        # document order, so a flat list cannot show whether two elements are
+        # siblings or nested -- and that is exactly what decides whether a
+        # column can be addressed by a CSS selector at all.
+        depth = 0
+        parent = child.parent
+        while parent is not None and parent is not node:
+            depth += 1
+            parent = parent.parent
+        label = ("  " * depth) + label
+        line = f"      {label:38} {truncate(text, 60)!r}"
+        if href:
+            line += f"  href={truncate(href, 50)!r}"
+        out.append(line)
+        if len(out) > 30:
+            out.append("      ... (truncated)")
+            break
+    return out
 
 
 def _run_pipeline(only: list[str] | None = None):

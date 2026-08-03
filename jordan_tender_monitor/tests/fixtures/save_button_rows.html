@@ -1,0 +1,118 @@
+<!--
+  UNGM's rendered listing. Rebuilt from the live row anatomy captured on
+  3 August 2026, so the element order, the classes and the empty-anchor pattern
+  are the page's own rather than an approximation of them:
+
+      a.save-notice-button               ''  href='javascript:void(0);'
+      title                              'Unsave this procurement opportunity.'
+      span.info-tooltip__text            'Subscribe to to be able to save ...'
+      a                                  'UNGM Pro'  href='/Public/TenderAlertService'
+      span.ungm-title.ungm-title--small  '2026/FLGUA/... Materiales de construcción ...'
+      a                                  ''  href='/Public/Notice/307972'
+      title                              'Open in a new window'
+      span                               '03-Aug-2026 22:59 (GMT -6.00)'
+      span.remainingDaysToDeadline       '0.239639041976852'
+      span.remainingDays                 'Expires within 24 hours'
+      span                               '20-Jul-2026'
+      span                               'FAO'
+      label                              'Request for quotation'
+      span                               '2026/FLGUA/FLGUA/137689'
+      span                               'Guatemala'
+
+  Three things this pins, each of which broke the extractor differently:
+
+  1. The row opens with a save button, <a href="javascript:void(0);">, so
+     taking the first anchor titled all fifteen notices "Unsave this
+     procurement opportunity." and linked them to javascript:void(0).
+
+  2. Skipping non-navigating hrefs then landed on an ADVERT --
+     <a href="/Public/TenderAlertService">UNGM Pro</a> -- which was worse:
+     those rows carry dates, so they cleared the quality gate and would have
+     been reported as tenders. Only the portal's anchor_hint tells the advert
+     and the notice apart.
+
+  3. The notice's own anchor has NO text. The title lives in span.ungm-title
+     and the anchor is labelled only by a title attribute reading "Open in a
+     new window". A row's title is not always its link text.
+
+  The two dates are unlabelled, DEADLINE first (carrying a time and a timezone)
+  and publication date second. Nothing in the markup says which is which, so
+  "the first date is the deadline" is not assumed anywhere in the code --
+  getting that backwards would misreport every deadline on the site.
+-->
+<html>
+<head><title>UNGM Procurement Notices</title></head>
+<body>
+<div class="notice-list">
+
+  <div class="tableRow dataRow notice-table">
+    <a href="javascript:void(0);" class="save-notice-button" title="Unsave this procurement opportunity."></a>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
+    <span class="ungm-title ungm-title--small">Consultancy for water sector reform, Amman, Jordan</span>
+    <a href="/Public/Notice/265432" title="Open in a new window"></a>
+    <span>30-Sep-2026 19:00 (GMT +3.00)</span>
+    <span class="remainingDaysToDeadline">57.812</span>
+    <span class="remainingDays">Expires in 57 days</span>
+    <span>20-Jul-2026</span>
+    <span>UNDP</span>
+    <label>Request for proposal</label>
+    <span>UNDP-JOR-00871</span>
+    <span>Jordan</span>
+  </div>
+
+  <div class="tableRow dataRow notice-table">
+    <a href="javascript:void(0);" class="save-notice-button" title="Unsave this procurement opportunity."></a>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
+    <span class="ungm-title ungm-title--small">Evaluation of education programming, Irbid, Jordan</span>
+    <a href="/Public/Notice/265433" title="Open in a new window"></a>
+    <span>12-Oct-2026 17:00 (GMT +3.00)</span>
+    <span class="remainingDaysToDeadline">69.755</span>
+    <span class="remainingDays">Expires in 69 days</span>
+    <span>22-Jul-2026</span>
+    <span>UNICEF</span>
+    <label>Request for quotation</label>
+    <span>UNICEF-JOR-00112</span>
+    <span>Jordan</span>
+  </div>
+
+  <div class="tableRow dataRow notice-table">
+    <a href="javascript:void(0);" class="save-notice-button" title="Unsave this procurement opportunity."></a>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
+    <span class="ungm-title ungm-title--small">2026/FLGUA/FLGUA/137689 Materiales de construcci&oacute;n para una escuela</span>
+    <a href="/Public/Notice/307972" title="Open in a new window"></a>
+    <span>03-Aug-2026 22:59 (GMT -6.00)</span>
+    <span class="remainingDaysToDeadline">0.2396</span>
+    <span class="remainingDays">Expires within 24 hours</span>
+    <span>20-Jul-2026</span>
+    <span>FAO</span>
+    <label>Request for quotation</label>
+    <span>2026/FLGUA/FLGUA/137689</span>
+    <span>Guatemala</span>
+  </div>
+
+  <div class="tableRow dataRow notice-table">
+    <a href="javascript:void(0);" class="save-notice-button" title="Unsave this procurement opportunity."></a>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
+    <span class="ungm-title ungm-title--small">Monitoring and Evaluation consultant</span>
+    <a href="/Public/Notice/265435" title="Open in a new window"></a>
+    <span>21-Sep-2026 12:00 (GMT +2.00)</span>
+    <span class="remainingDaysToDeadline">48.5</span>
+    <span class="remainingDays">Expires in 48 days</span>
+    <span>19-Jul-2026</span>
+    <span>WFP</span>
+    <label>Request for quotation</label>
+    <span>WFP-SDN-00220</span>
+    <span>Sudan</span>
+  </div>
+
+</div>
+</body>
+</html>

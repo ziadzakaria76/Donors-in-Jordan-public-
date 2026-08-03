@@ -1,0 +1,47 @@
+<!--
+  The GIZ defect, reduced. Captured from ausschreibungen.giz.de on 3 August 2026.
+
+  The deadline <td> is never closed, so an HTML parser nests the title, the
+  type and the buyer INSIDE it. find_all() still returns six cells in document
+  order and the header still maps correctly -- but the deadline cell's text
+  becomes the whole rest of the row, and every closing date on the portal was
+  unusable because of it.
+
+  Row 2 is well formed and must keep reading exactly as it did before: this
+  fixture has to prove the fix changes nothing for valid markup.
+-->
+<html>
+<head><title>Ausschreibungen</title></head>
+<body>
+<table class="publicationTable">
+  <thead>
+    <tr>
+      <th>Ver&ouml;ffentlicht</th>
+      <th>Angebots- / Teilnahmefrist</th>
+      <th>Bezeichnung</th>
+      <th>Typ</th>
+      <th>Ausschreibende Stelle</th>
+      <th>Aktion</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>03.08.2026</td>
+      <td>n.v.
+      <td><a href="/Satellite/public/company/projectForwarding.do?pid=51974">10030355 - Studie zum Ausbau der Kooperation mit dem Privatsektor, Jordanien</a></td>
+      <td>UVgO Vergebener Auftrag</td>
+      <td>Deutsche Gesellschaft f&uuml;r Internationale Zusammenarbeit (GIZ) GmbH</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>01.07.2026</td>
+      <td>15. Januar 2027</td>
+      <td><a href="/Satellite/public/company/projectForwarding.do?pid=51975">10030412 - Beratungsleistungen zur Verwaltungsreform, Amman, Jordanien</a></td>
+      <td>VgV Offenes Verfahren</td>
+      <td>Deutsche Gesellschaft f&uuml;r Internationale Zusammenarbeit (GIZ) GmbH</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+</body>
+</html>

@@ -166,6 +166,11 @@ def _drop_navish(rows: list[Row]) -> list[Row]:
 
 _DATE_HINT_RE = re.compile(
     r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b"
+    # Same hyphenated month name the extraction pattern needed ("03-Aug-2026").
+    # This one decides whether a row COUNTS as dated for the quality gate, so
+    # leaving it out would keep UNGM below the threshold even once its dates
+    # were being read correctly.
+    r"|\b\d{1,2}[-/][^\W\d_]{3,}[-/]\d{2,4}\b"
     r"|\b\d{1,2}\s+\w{3,}\s+\d{4}\b|[٠-٩]{1,2}\s",
 )
 
@@ -443,15 +448,60 @@ _VALUE_LABELS = ("value", "budget", "amount", "estimated", "contract value",
                  "wert", "القيمة", "قيمة العقد")
 
 
-def _node_to_row(node, base_url: str) -> Row:
+_DEAD_HREF_RE = re.compile(r"^\s*(?:javascript:|#|mailto:|tel:)", re.I)
+
+# Matches a class like "ungm-title", "card__title" or "noticeTitle", but NOT
+# "subtitle" -- a subtitle is a caption, and using it as the notice name would
+# be a quieter version of the same bug this is here to fix.
+_TITLE_CLASS_RE = re.compile(r"(?:^|[-_ ])title|Title", re.I)
+
+
+def _first_real_link(node, hint: str | None = None):
+    """The anchor that is actually the notice.
+
+    VERIFIED ON UNGM, in two stages, because the obvious fix was not enough.
+
+    Every row on the rendered listing begins with a save button --
+    <a href="javascript:void(0);">Unsave this procurement opportunity.</a> --
+    so taking the first anchor gave all fifteen notices the same title and a
+    URL of "javascript:void(0);". Skipping non-navigating hrefs then landed on
+    the NEXT anchor, which is an advertisement: every row came back titled
+    "UNGM Pro" and linking to /Public/TenderAlertService. Worse than before,
+    because those rows carried dates and cleared the quality gate.
+
+    A portal that declares an anchor_hint has already said what its notice URLs
+    look like ("/Public/Notice/"), so prefer an anchor that matches it and fall
+    back to the first navigating link only when none does. Bookmark, share,
+    print and upsell links are ordinary on a listing; none of them is ever the
+    notice, and the hint is the only thing that reliably tells them apart.
+    """
+    anchors = [a for a in node.find_all("a", href=True)
+               if not _DEAD_HREF_RE.match(a["href"])]
+    if hint:
+        for a in anchors:
+            if hint in a["href"]:
+                return a
+    return anchors[0] if anchors else None
+
+
+def _node_to_row(node, base_url: str, anchor_hint: str | None = None,
+                 field_selectors: dict | None = None) -> Row:
     text = clean(node.get_text(" "))
 
-    link = node.find("a", href=True)
+    link = _first_real_link(node, anchor_hint)
     url = urljoin(base_url, link["href"]) if link else None
 
     heading = node.find(["h1", "h2", "h3", "h4", "h5"])
+    titled = node.find(class_=_TITLE_CLASS_RE)
     if heading and clean(heading.get_text()):
         title = clean(heading.get_text())
+    elif titled and clean(titled.get_text()):
+        # An element whose CLASS says it is the title, when there is no
+        # heading. VERIFIED ON UNGM: the notice's own anchor carries no text at
+        # all -- it is labelled only by title="Open in a new window" -- and the
+        # notice name lives in <span class="ungm-title">. A row's title is not
+        # always its link text, and "*title*" is the convention CMSes reach for.
+        title = clean(titled.get_text())
     elif link and clean(link.get_text()):
         title = clean(link.get_text())
     else:
@@ -470,16 +520,86 @@ def _node_to_row(node, base_url: str) -> Row:
             row.date_text = clean(time_tag.get_text())
 
     _assign_labelled_fields(row, text)
+    _apply_field_selectors(row, node, field_selectors)
     return row
+
+
+_FIELD_ATTRS = {
+    "title": "title",
+    "closing": "closing_text",
+    "posted": "date_text",
+    "value": "value_text",
+    "reference": "reference",
+    "description": "description",
+}
+
+
+def _apply_field_selectors(row: Row, node, field_selectors: dict | None) -> None:
+    """Let a portal name the element holding each column, and trust it.
+
+    The generic rules read a row by inference -- labels, headings, the first
+    date-shaped text. That works on most listings and cannot work on UNGM,
+    where the deadline and the publication date are two unlabelled sibling
+    spans and NOTHING in the markup says which is which. Guessing "the first
+    date is the deadline" would be wrong on GIZ, which orders them the other
+    way round, and a wrong deadline silently drops an open tender.
+
+    What the page does provide is structure. From the live row anatomy:
+
+        span                          '03-Aug-2026 22:59 (GMT -6.00)'
+        span.remainingDaysToDeadline  '0.234606972739583'
+        span.remainingDays            'Expires within 24 hours'
+        span                          '20-Jul-2026'
+
+    They are siblings, so the deadline is "the span immediately before
+    .remainingDaysToDeadline" -- expressible, checkable, and not a guess.
+
+    These are hints like the row selectors, not contracts. A selector that
+    stops matching leaves the generically-inferred value in place rather than
+    blanking it, and the quality gate still judges the result.
+    """
+    if not field_selectors:
+        return
+    for name, selector in field_selectors.items():
+        attr = _FIELD_ATTRS.get(name)
+        if not attr:
+            continue
+        try:
+            element = node.select_one(selector)
+        except Exception:  # noqa: BLE001 - a bad hint must not kill the row
+            continue
+        if element is None:
+            continue
+        value = clean(element.get_text(" "))
+        if not value:
+            continue
+        if name in ("closing", "posted"):
+            # Narrow to the date span, exactly as a labelled field is narrowed.
+            # UNGM writes its deadline as "30-Sep-2026 19:00 (GMT +3.00)", and
+            # the trailing timezone defeats the parser outright -- the selector
+            # found the right cell and the deadline was still lost.
+            value = _first_date_text(value) or value
+        setattr(row, attr, value)
 
 
 _DATE_SPAN_RE = re.compile(
     r"\d{4}-\d{1,2}-\d{1,2}"
     r"|\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{2,4}"
+    # A month NAME joined by hyphens or slashes rather than spaces: UNGM
+    # publishes "03-Aug-2026", and every alternation above needs either digits
+    # for the month or whitespace around a named one, so the date was invisible
+    # to the extractor while parse_date() could read it perfectly well.
+    r"|\d{1,2}\s*[-/]\s*[^\W\d_]{3,}\s*[-/]\s*\d{2,4}"
     r"|\d{1,2}\.?\s+[^\W\d_]{3,}(?:\s+[^\W\d_]{3,})?\s+\d{4}"
     r"|[^\W\d_]{3,}\s+\d{1,2},?\s+\d{4}",
     re.UNICODE,
 )
+
+
+# "Expires in 57 days", "Closes within 24 hours" -- a countdown, not a date.
+_RELATIVE_DURATION_RE = re.compile(
+    r"\b(?:in|within|after)\s+(?:\d+(?:\.\d+)?|a|an)\s*"
+    r"(?:day|hour|week|month|minute)s?\b", re.I)
 
 
 def _first_date_text(tail: str) -> str | None:
@@ -488,9 +608,23 @@ def _first_date_text(tail: str) -> str | None:
     Without this, "Deadline: 30 September 2026 Estimated value: EUR 1,850,000"
     is stored whole and the fuzzy date parser is left to guess which of the
     numbers is the deadline.
+
+    A countdown between the label and the first date VOIDS the match, and this
+    is not a nicety. UNGM writes a relative countdown next to each notice:
+
+        30-Sep-2026 19:00 (GMT +3.00)  57.812  Expires in 57 days  20-Jul-2026
+
+    "expires" is a closing label, so the search began there and ran forward to
+    the next date-shaped text -- which is the PUBLICATION date. Every notice
+    came back with a deadline months earlier than its real one, and a deadline
+    in the past is silently dropped as closed. Open tenders would have
+    disappeared from the report with nothing to show anything was wrong.
     """
     m = _DATE_SPAN_RE.search(tail)
     if m and parse_date(m.group()):
+        countdown = _RELATIVE_DURATION_RE.search(tail[: m.start()])
+        if countdown:
+            return None
         return clean(m.group())
     return clean(tail) if parse_date(tail) else None
 
@@ -521,7 +655,9 @@ def _assign_labelled_fields(row: Row, text: str) -> None:
         row.value_text = text
 
 
-def extract_by_selectors(html: str, selectors: list[str], base_url: str = "") -> LayerResult:
+def extract_by_selectors(html: str, selectors: list[str], base_url: str = "",
+                         anchor_hint: str | None = None,
+                         field_selectors: dict | None = None) -> LayerResult:
     """Try each selector in order; keep the best-scoring result.
 
     Every selector is scored rather than the first non-empty one being taken,
@@ -541,7 +677,8 @@ def extract_by_selectors(html: str, selectors: list[str], base_url: str = "") ->
             continue
         if not nodes:
             continue
-        rows = [_node_to_row(n, base_url) for n in nodes[:400]]
+        rows = [_node_to_row(n, base_url, anchor_hint, field_selectors)
+                for n in nodes[:400]]
         rows = [r for r in rows if clean(r.title)]
         quality = score_rows(rows)
         if quality > best.quality:
@@ -566,6 +703,30 @@ _HEADER_MAP = {
                   "reference number", "id"),
     "type": ("type", "notice type", "procurement type", "category"),
 }
+
+
+def _own_text(cell) -> str:
+    """A cell's own text -- NOT the text of cells nested inside it.
+
+    VERIFIED AGAINST GIZ. One unclosed <td> is enough to break a table that
+    otherwise reads perfectly. The German portal publishes
+
+        <td>03.08.2026</td><td>n.v.<td>10030355 - Studie ...</td>...
+
+    with the deadline cell never closed, so html.parser nests the title, the
+    type and the buyer INSIDE the deadline cell. find_all() still returns six
+    cells in document order and the header still maps correctly -- the row just
+    comes out with a closing date of "n.v. 10030355 - Studie zum Ausbau der
+    Kooperation ... GIZ GmbH". Every deadline on the portal was unusable.
+
+    Taking only the strings whose nearest cell ancestor IS this cell fixes it
+    without touching well-formed tables, where the two are identical.
+    Restricting find_all to direct children would NOT: on this markup it
+    returns two cells rather than six, and the column indices collapse.
+    """
+    parts = [str(s) for s in cell.strings
+             if s.find_parent(["td", "th"]) is cell]
+    return clean(" ".join(parts))
 
 
 def _match_header(cell: str) -> str | None:
@@ -593,11 +754,11 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
         if head:
             tr = head.find("tr")
             if tr:
-                header_cells = [clean(c.get_text()) for c in tr.find_all(["th", "td"])]
+                header_cells = [_own_text(c) for c in tr.find_all(["th", "td"])]
         if not header_cells:
             first = table.find("tr")
             if first:
-                header_cells = [clean(c.get_text()) for c in first.find_all(["th", "td"])]
+                header_cells = [_own_text(c) for c in first.find_all(["th", "td"])]
 
         mapping = {}
         for i, cell in enumerate(header_cells):
@@ -614,7 +775,7 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
             cells = tr.find_all(["td", "th"])
             if not cells or len(cells) < 2:
                 continue
-            texts = [clean(c.get_text(" ")) for c in cells]
+            texts = [_own_text(c) for c in cells]
             if texts == header_cells:
                 continue
             row = Row(raw_text=" | ".join(texts))
@@ -624,7 +785,7 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
                 val = texts[i]
                 if fieldname == "title":
                     row.title = val
-                    link = cells[i].find("a", href=True)
+                    link = _first_real_link(cells[i])
                     if link:
                         row.url = urljoin(base_url, link["href"])
                 elif fieldname == "closing":
@@ -638,7 +799,7 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
                 elif fieldname == "type":
                     row.extra["notice_type"] = val
             if not row.url:
-                link = tr.find("a", href=True)
+                link = _first_real_link(tr)
                 if link:
                     row.url = urljoin(base_url, link["href"])
             if clean(row.title):
@@ -670,7 +831,8 @@ def _signature(node) -> str:
     return f"{node.name}|{','.join(kids)}|{has_link}"
 
 
-def extract_structural(html: str, base_url: str = "") -> LayerResult:
+def extract_structural(html: str, base_url: str = "",
+                       anchor_hint: str | None = None) -> LayerResult:
     """Find the largest repeated sibling block and read it as a listing.
 
     NOTE: there is deliberately NO cap that rejects a container for having too
@@ -716,7 +878,8 @@ def extract_structural(html: str, base_url: str = "") -> LayerResult:
         for sig, members in groups.items():
             if len(members) < 3:
                 continue
-            rows = _drop_navish([_node_to_row(m, base_url) for m in members])
+            rows = _drop_navish([_node_to_row(m, base_url, anchor_hint)
+                                 for m in members])
             if not rows:
                 continue
             quality = score_rows(rows)
@@ -791,7 +954,7 @@ def extract_anchor_pattern(html: str, base_url: str = "",
     groups: dict[str, list] = {}
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if href.startswith(("mailto:", "tel:", "javascript:")):
+        if _DEAD_HREF_RE.match(href):
             continue
         if hint and hint not in href:
             continue
@@ -830,14 +993,16 @@ LAYER_ORDER = ["feed", "embedded-json", "selectors", "table", "structural",
 
 def run_layers(content: str, base_url: str = "",
                selectors: list[str] | None = None,
-               anchor_hint: str | None = None) -> list[LayerResult]:
+               anchor_hint: str | None = None,
+               field_selectors: dict | None = None) -> list[LayerResult]:
     """Run every layer and return all results, best-effort, in cascade order."""
     results = [
         extract_feed(content, base_url),
         extract_embedded_json(content, base_url),
-        extract_by_selectors(content, selectors or [], base_url),
+        extract_by_selectors(content, selectors or [], base_url, anchor_hint,
+                             field_selectors),
         extract_tables(content, base_url),
-        extract_structural(content, base_url),
+        extract_structural(content, base_url, anchor_hint),
         extract_anchor_pattern(content, base_url, anchor_hint),
     ]
     return results
@@ -845,7 +1010,8 @@ def run_layers(content: str, base_url: str = "",
 
 def extract(content: str, base_url: str = "", selectors: list[str] | None = None,
             anchor_hint: str | None = None,
-            threshold: float = QUALITY_THRESHOLD) -> LayerResult:
+            threshold: float = QUALITY_THRESHOLD,
+            field_selectors: dict | None = None) -> LayerResult:
     """Run the cascade and return the first layer whose rows clear the gate.
 
     If none clears it, the best-scoring layer is returned with a note saying
@@ -859,9 +1025,10 @@ def extract(content: str, base_url: str = "", selectors: list[str] | None = None
     builders = [
         lambda: extract_feed(content, base_url),
         lambda: extract_embedded_json(content, base_url),
-        lambda: extract_by_selectors(content, selectors or [], base_url),
+        lambda: extract_by_selectors(content, selectors or [], base_url,
+                                     anchor_hint, field_selectors),
         lambda: extract_tables(content, base_url),
-        lambda: extract_structural(content, base_url),
+        lambda: extract_structural(content, base_url, anchor_hint),
         lambda: extract_anchor_pattern(content, base_url, anchor_hint),
     ]
 

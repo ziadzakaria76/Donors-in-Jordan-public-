@@ -42,6 +42,11 @@ class HtmlSpec:
     # Optional custom fetcher: (url) -> html. Used by portals behind a POST
     # search endpoint so that --capture can still reach them.
     fetcher: object | None = None
+    # Optional per-column CSS hooks, for a listing the generic rules cannot
+    # read by inference -- see htmlkit._apply_field_selectors. Applied only in
+    # the selector layer, so the class-independent layers stay class-independent
+    # and remain a real fallback when these stop matching.
+    field_selectors: dict = field(default_factory=dict)
     notes: str = ""
 
 
@@ -82,7 +87,8 @@ def harvest(spec: HtmlSpec) -> list[dict]:
             page_url = url
             for page_number in range(config.MAX_PAGINATION_PAGES if config.FOLLOW_PAGINATION else 1):
                 html = _fetch(spec, page_url)
-                result = extract(html, page_url, spec.selectors, spec.anchor_hint)
+                result = extract(html, page_url, spec.selectors, spec.anchor_hint,
+                                 field_selectors=spec.field_selectors)
                 if not result.rows:
                     if page_number == 0:
                         failures.append(f"{page_url}: {result.note}")
@@ -139,7 +145,8 @@ def _enrich_missing_deadlines(spec: HtmlSpec, records: list[dict]) -> None:
             continue
         budget -= 1
 
-        detail = extract(html, record["url"], spec.selectors, spec.anchor_hint)
+        detail = extract(html, record["url"], spec.selectors, spec.anchor_hint,
+                         field_selectors=spec.field_selectors)
         text = clean(BeautifulSoup(html, "html.parser").get_text(" "))
         from .htmlkit import Row, _assign_labelled_fields  # local: internal helper
         probe = Row(title=record["title"], raw_text=text)
@@ -172,5 +179,7 @@ def capture(spec: HtmlSpec) -> list[tuple[str, str, list[LayerResult]]]:
         except base.PortalError as exc:
             out.append((url, "", [LayerResult("error", [], 0.0, exc.reason)]))
             continue
-        out.append((url, html, run_layers(html, url, spec.selectors, spec.anchor_hint)))
+        out.append((url, html, run_layers(html, url, spec.selectors,
+                                          spec.anchor_hint,
+                                          spec.field_selectors)))
     return out
