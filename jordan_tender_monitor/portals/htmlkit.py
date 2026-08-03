@@ -484,7 +484,8 @@ def _first_real_link(node, hint: str | None = None):
     return anchors[0] if anchors else None
 
 
-def _node_to_row(node, base_url: str, anchor_hint: str | None = None) -> Row:
+def _node_to_row(node, base_url: str, anchor_hint: str | None = None,
+                 field_selectors: dict | None = None) -> Row:
     text = clean(node.get_text(" "))
 
     link = _first_real_link(node, anchor_hint)
@@ -519,7 +520,66 @@ def _node_to_row(node, base_url: str, anchor_hint: str | None = None) -> Row:
             row.date_text = clean(time_tag.get_text())
 
     _assign_labelled_fields(row, text)
+    _apply_field_selectors(row, node, field_selectors)
     return row
+
+
+_FIELD_ATTRS = {
+    "title": "title",
+    "closing": "closing_text",
+    "posted": "date_text",
+    "value": "value_text",
+    "reference": "reference",
+    "description": "description",
+}
+
+
+def _apply_field_selectors(row: Row, node, field_selectors: dict | None) -> None:
+    """Let a portal name the element holding each column, and trust it.
+
+    The generic rules read a row by inference -- labels, headings, the first
+    date-shaped text. That works on most listings and cannot work on UNGM,
+    where the deadline and the publication date are two unlabelled sibling
+    spans and NOTHING in the markup says which is which. Guessing "the first
+    date is the deadline" would be wrong on GIZ, which orders them the other
+    way round, and a wrong deadline silently drops an open tender.
+
+    What the page does provide is structure. From the live row anatomy:
+
+        span                          '03-Aug-2026 22:59 (GMT -6.00)'
+        span.remainingDaysToDeadline  '0.234606972739583'
+        span.remainingDays            'Expires within 24 hours'
+        span                          '20-Jul-2026'
+
+    They are siblings, so the deadline is "the span immediately before
+    .remainingDaysToDeadline" -- expressible, checkable, and not a guess.
+
+    These are hints like the row selectors, not contracts. A selector that
+    stops matching leaves the generically-inferred value in place rather than
+    blanking it, and the quality gate still judges the result.
+    """
+    if not field_selectors:
+        return
+    for name, selector in field_selectors.items():
+        attr = _FIELD_ATTRS.get(name)
+        if not attr:
+            continue
+        try:
+            element = node.select_one(selector)
+        except Exception:  # noqa: BLE001 - a bad hint must not kill the row
+            continue
+        if element is None:
+            continue
+        value = clean(element.get_text(" "))
+        if not value:
+            continue
+        if name in ("closing", "posted"):
+            # Narrow to the date span, exactly as a labelled field is narrowed.
+            # UNGM writes its deadline as "30-Sep-2026 19:00 (GMT +3.00)", and
+            # the trailing timezone defeats the parser outright -- the selector
+            # found the right cell and the deadline was still lost.
+            value = _first_date_text(value) or value
+        setattr(row, attr, value)
 
 
 _DATE_SPAN_RE = re.compile(
@@ -596,7 +656,8 @@ def _assign_labelled_fields(row: Row, text: str) -> None:
 
 
 def extract_by_selectors(html: str, selectors: list[str], base_url: str = "",
-                         anchor_hint: str | None = None) -> LayerResult:
+                         anchor_hint: str | None = None,
+                         field_selectors: dict | None = None) -> LayerResult:
     """Try each selector in order; keep the best-scoring result.
 
     Every selector is scored rather than the first non-empty one being taken,
@@ -616,7 +677,8 @@ def extract_by_selectors(html: str, selectors: list[str], base_url: str = "",
             continue
         if not nodes:
             continue
-        rows = [_node_to_row(n, base_url, anchor_hint) for n in nodes[:400]]
+        rows = [_node_to_row(n, base_url, anchor_hint, field_selectors)
+                for n in nodes[:400]]
         rows = [r for r in rows if clean(r.title)]
         quality = score_rows(rows)
         if quality > best.quality:
@@ -931,12 +993,14 @@ LAYER_ORDER = ["feed", "embedded-json", "selectors", "table", "structural",
 
 def run_layers(content: str, base_url: str = "",
                selectors: list[str] | None = None,
-               anchor_hint: str | None = None) -> list[LayerResult]:
+               anchor_hint: str | None = None,
+               field_selectors: dict | None = None) -> list[LayerResult]:
     """Run every layer and return all results, best-effort, in cascade order."""
     results = [
         extract_feed(content, base_url),
         extract_embedded_json(content, base_url),
-        extract_by_selectors(content, selectors or [], base_url, anchor_hint),
+        extract_by_selectors(content, selectors or [], base_url, anchor_hint,
+                             field_selectors),
         extract_tables(content, base_url),
         extract_structural(content, base_url, anchor_hint),
         extract_anchor_pattern(content, base_url, anchor_hint),
@@ -946,7 +1010,8 @@ def run_layers(content: str, base_url: str = "",
 
 def extract(content: str, base_url: str = "", selectors: list[str] | None = None,
             anchor_hint: str | None = None,
-            threshold: float = QUALITY_THRESHOLD) -> LayerResult:
+            threshold: float = QUALITY_THRESHOLD,
+            field_selectors: dict | None = None) -> LayerResult:
     """Run the cascade and return the first layer whose rows clear the gate.
 
     If none clears it, the best-scoring layer is returned with a note saying
@@ -960,7 +1025,8 @@ def extract(content: str, base_url: str = "", selectors: list[str] | None = None
     builders = [
         lambda: extract_feed(content, base_url),
         lambda: extract_embedded_json(content, base_url),
-        lambda: extract_by_selectors(content, selectors or [], base_url, anchor_hint),
+        lambda: extract_by_selectors(content, selectors or [], base_url,
+                                     anchor_hint, field_selectors),
         lambda: extract_tables(content, base_url),
         lambda: extract_structural(content, base_url, anchor_hint),
         lambda: extract_anchor_pattern(content, base_url, anchor_hint),

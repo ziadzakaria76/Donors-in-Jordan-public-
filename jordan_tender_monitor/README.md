@@ -15,9 +15,9 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **641 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **655 checks** |
 | **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
-| **Reading, deadlines pending** | UNGM — the headless browser renders the listing and the rows now come back with correct titles and working notice links, clearing the quality gate. Four defects were fixed to get there (save button as title, advert as URL, unreadable `03-Aug-2026`, and a countdown supplying the wrong deadline). Deadlines are reported as unknown rather than guessed: the two dates in a row are unlabelled, and mapping them needs the row's nesting, which the next capture will show. |
+| **Rebuilt, pending live confirmation** | UNGM — renders in a headless browser and every column now maps: title, notice link, deadline and publication date. Five defects were fixed to get there. Verified against a fixture rebuilt from the live row anatomy; the live re-run is the last step. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
 | **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
@@ -254,7 +254,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 641 checks, no network, no credentials
+python tests/run_all.py    # 655 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

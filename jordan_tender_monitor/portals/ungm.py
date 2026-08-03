@@ -60,6 +60,24 @@ SPEC = HtmlSpec(
         "div.tableRow",
         "tr.noticeRow",
     ],
+    # DERIVED FROM THE LIVE ROW ANATOMY, not guessed. The row's columns are
+    # unlabelled sibling spans, in this order:
+    #
+    #     span                          '03-Aug-2026 22:59 (GMT -6.00)'
+    #     span.remainingDaysToDeadline  '0.234606972739583'
+    #     span.remainingDays            'Expires within 24 hours'
+    #     span                          '20-Jul-2026'
+    #
+    # Nothing in the markup says which date is which, so they cannot be read by
+    # inference: "the first date is the deadline" is true here and false on GIZ,
+    # and a wrong deadline silently drops an open tender. Being siblings, they
+    # ARE addressable -- the deadline is the span immediately before the
+    # remaining-days counter, and the publication date the one after it.
+    field_selectors={
+        "title": "span.ungm-title",
+        "closing": "span:has(+ span.remainingDaysToDeadline)",
+        "posted": "span.remainingDays + span",
+    },
     anchor_hint="/Public/Notice/",
     currency="USD",
     # The rendered listing is worldwide -- no country filter is applied before

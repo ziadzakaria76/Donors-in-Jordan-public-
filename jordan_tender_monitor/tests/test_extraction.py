@@ -514,6 +514,79 @@ def test_a_countdown_does_not_supply_the_deadline():
           f"quality {result.quality}")
 
 
+def test_portal_field_selectors_map_unlabelled_columns():
+    """The only honest way to read UNGM's two unlabelled dates.
+
+    The row holds them as sibling spans around a countdown:
+
+        span                          '30-Sep-2026 19:00 (GMT +3.00)'   deadline
+        span.remainingDaysToDeadline  '57.812'
+        span.remainingDays            'Expires in 57 days'
+        span                          '20-Jul-2026'                     published
+
+    Nothing in the markup says which is which. "The first date is the deadline"
+    is true here and FALSE on GIZ, whose table publishes Veröffentlicht before
+    Frist -- so inferring it would have silently swapped every GIZ deadline for
+    its publication date. Being siblings, they are addressable instead.
+    """
+    from jordan_tender_monitor.portals import ungm
+
+    result = H.extract(load("save_button_rows.html"),
+                       "https://www.ungm.org/Public/Notice",
+                       ungm.SPEC.selectors, ungm.SPEC.anchor_hint,
+                       field_selectors=ungm.SPEC.field_selectors)
+    check_eq(len(result.rows), 4, "field selectors: four notices")
+    check(result.quality >= H.QUALITY_THRESHOLD,
+          "field selectors: the rows clear the quality gate")
+
+    first = result.rows[0]
+    check_eq(parse_date(first.closing_text), date(2026, 9, 30),
+             "field selectors: the DEADLINE is the span before the countdown")
+    check_eq(parse_date(first.date_text), date(2026, 7, 20),
+             "field selectors: and the publication date the one after it")
+    check_eq(first.title, "Consultancy for water sector reform, Amman, Jordan",
+             "field selectors: the title comes from span.ungm-title")
+    check_eq(first.url, "https://www.ungm.org/Public/Notice/265432",
+             "field selectors: and the URL from the notice anchor")
+
+    for row in result.rows:
+        closing, posted = parse_date(row.closing_text), parse_date(row.date_text)
+        check(closing and posted and closing > posted,
+              "field selectors: every deadline is later than its publication date",
+              f"{row.title[:35]!r}: closing={closing} posted={posted}")
+
+    # "30-Sep-2026 19:00 (GMT +3.00)" -- the trailing timezone defeats the date
+    # parser outright, so a selector can find the right cell and still lose the
+    # deadline. Date fields are narrowed to their date span.
+    check_eq(parse_date("30-Sep-2026 19:00 (GMT +3.00)"), None,
+             "field selectors: the raw cell text genuinely does not parse")
+
+
+def test_a_stale_field_selector_degrades_rather_than_blanking():
+    """These are hints like the row selectors, and hints go stale.
+
+    A selector that stops matching must leave the generically-inferred value in
+    place. Blanking the field on a miss would turn one renamed class into a
+    listing with no dates at all, which is the failure the whole cascade exists
+    to avoid.
+    """
+    html = ('<div class="row"><span class="t">Advisory Services, Amman</span>'
+            '<a href="/n/1">link</a>'
+            '<span>Deadline: 30 September 2026</span></div>' * 3)
+    result = H.extract_by_selectors(
+        f"<html><body>{html}</body></html>", ["div.row"], "https://e.org/",
+        field_selectors={"closing": "span.class-that-no-longer-exists"})
+    check_eq(len(result.rows), 3, "stale selector: rows are still read")
+    check_eq(parse_date(result.rows[0].closing_text), date(2026, 9, 30),
+             "stale selector: the labelled deadline survives the miss")
+
+    # And a malformed selector must not take the run down with it.
+    broken = H.extract_by_selectors(
+        f"<html><body>{html}</body></html>", ["div.row"], "https://e.org/",
+        field_selectors={"closing": "span:::nonsense("})
+    check_eq(len(broken.rows), 3, "stale selector: an invalid hint is survivable")
+
+
 def test_dead_hrefs_are_never_a_rows_link():
     """mailto:, tel: and # are the same defect wearing a different hat."""
     from bs4 import BeautifulSoup
@@ -643,6 +716,8 @@ TESTS = [
     test_a_save_button_does_not_become_the_notice,
     test_an_advertisement_does_not_become_the_notice_either,
     test_a_countdown_does_not_supply_the_deadline,
+    test_portal_field_selectors_map_unlabelled_columns,
+    test_a_stale_field_selector_degrades_rather_than_blanking,
     test_dead_hrefs_are_never_a_rows_link,
     test_a_month_name_joined_by_hyphens_is_recognised,
 ]
