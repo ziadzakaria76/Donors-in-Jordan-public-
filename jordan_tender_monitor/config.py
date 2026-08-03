@@ -193,7 +193,11 @@ UNKNOWN_DEADLINE_NOTE = "Deadline not published - verify on portal"
 # The first run reports everything because the database starts empty; that is
 # expected, not a bug. `run.py --reset-db` forgets everything and re-sends once.
 # --------------------------------------------------------------------------
-NEW_ONLY_MODE = True
+# JTM_NEW_ONLY=0 turns this off for one run without editing the file. The
+# GitHub Actions workflow uses it: a scheduled run wants "what changed", but a
+# run you triggered by hand from your phone almost always wants the full
+# current pipeline, because you are looking at it now.
+NEW_ONLY_MODE = os.getenv("JTM_NEW_ONLY", "1").strip().lower() not in ("0", "false", "no")
 
 # --------------------------------------------------------------------------
 # Q8 -- LANGUAGE: include Arabic, keep original text, flag it.
@@ -363,7 +367,12 @@ DESCRIPTION_CHAR_LIMIT = 1500
 # longer emitted -- add them back here if a downstream system ever needs them,
 # since reporter.write_json / write_csv / write_html are still present.
 # --------------------------------------------------------------------------
-OUTPUT_FORMATS = ["docx", "excel"]
+# JTM_OUTPUT_FORMATS overrides this for one run, comma-separated. CI adds
+# "markdown", which is not a deliverable -- it is rendered into the GitHub
+# Actions run page so results are readable on a phone without downloading
+# anything.
+OUTPUT_FORMATS = [f.strip() for f in os.getenv(
+    "JTM_OUTPUT_FORMATS", "docx,excel").split(",") if f.strip()]
 EMAIL_ATTACH_FORMATS = ["docx", "excel"]
 
 # Run health is encoded in the OUTPUT FILENAME as well as inside the documents.

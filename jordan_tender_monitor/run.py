@@ -248,7 +248,8 @@ def _warn_if_alerting_is_blind() -> None:
               f"Verify with: python run.py --test-alert\n")
 
 
-def cmd_run(send: bool, only: list[str] | None = None) -> int:
+def cmd_run(send: bool, only: list[str] | None = None,
+            fail_on_alert: bool = False) -> int:
     store = tracker.Tracker()
     first_run = store.is_first_run()
 
@@ -292,6 +293,15 @@ def cmd_run(send: bool, only: list[str] | None = None) -> int:
         store.record(reported)
         store.log_run(processed["scanned"], len(reported),
                       len(scrape_result.ok_portals), len(scrape_result.health))
+
+    # A non-zero exit turns a CI run red, which is how a total outage becomes
+    # visible on a phone: GitHub shows a failed run and notifies you, with no
+    # mail credentials involved. Off by default so a local run is not confusing.
+    if fail_on_alert:
+        needed, reason = emailer.should_alert(scrape_result.health)
+        if needed:
+            print(f"\nExiting non-zero: {reason}. The files were still written.")
+            return 2
     return 0
 
 
@@ -477,6 +487,9 @@ def main(argv: list[str] | None = None) -> int:
                        help="forget every reported tender")
     group.add_argument("--schedule", action="store_true",
                        help="run continuously on the configured schedule")
+    parser.add_argument("--fail-on-alert", action="store_true",
+                        help="exit non-zero when the run needs attention, so a "
+                             "CI job turns red. Files are still written")
     parser.add_argument("--only", nargs="+", metavar="PORTAL",
                         help="restrict to these portals")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -499,7 +512,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_reset_db()
     if args.schedule:
         return cmd_schedule()
-    return cmd_run(send=args.send, only=args.only)
+    return cmd_run(send=args.send, only=args.only,
+                   fail_on_alert=args.fail_on_alert)
 
 
 if __name__ == "__main__":

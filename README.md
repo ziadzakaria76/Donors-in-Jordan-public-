@@ -15,7 +15,7 @@ worked around.
 
 - **Verified against the live web:** nothing
 - **Verified offline against fixtures:** extraction, parsing, filtering,
-  scoring, reporting, delivery fallback — 507 checks
+  scoring, reporting, delivery fallback — 534 checks
 - **Not verified:** every portal URL, every CSS selector, every API response
   shape, and email delivery
 
@@ -73,6 +73,18 @@ over-broad guess like bare `article` would otherwise match a navigation menu and
 short-circuit the layer that works. Rows are scored for listing-likeness, with
 carrying a date weighted most heavily and gated outright.
 
+## Running it from your phone
+
+No install and no server: a GitHub Actions workflow gives you a **Run workflow**
+button that works in a mobile browser, plus a weekday schedule. Results render
+on the run page — a tappable table of opportunities and every portal's status —
+with the Word and Excel files attached as artifacts.
+
+**[`jordan_tender_monitor/RUN-FROM-YOUR-PHONE.md`](jordan_tender_monitor/RUN-FROM-YOUR-PHONE.md)**
+
+A total portal outage makes the run exit non-zero, so GitHub marks it failed and
+notifies you. That is the failure alert, with no mail credentials involved.
+
 ## Deploying
 
 Step-by-step setup for a Windows Server, including Azure app registration and
@@ -85,7 +97,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 507 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 534 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

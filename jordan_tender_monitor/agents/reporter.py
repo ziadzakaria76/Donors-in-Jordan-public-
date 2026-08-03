@@ -554,6 +554,67 @@ def write_csv(tenders: list[dict], path: Path) -> Path:
     return path
 
 
+def write_markdown(tenders: list[dict], health: list, result: dict, path: Path) -> Path:
+    """Markdown summary, for the GitHub Actions run page.
+
+    Not a deliverable -- the Word and Excel files are. This exists so results
+    are readable on a phone without downloading a .docx: GitHub renders it into
+    the workflow run page, so tapping "Run workflow" and then reading the
+    outcome is two taps and no file manager.
+    """
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    lines: list[str] = []
+
+    if broken and len(broken) == total:
+        lines.append(f"# {config.ACTION_NEEDED_PREFIX}")
+    elif tenders:
+        lines.append(f"# {len(tenders)} Jordan opportunit"
+                     f"{'y' if len(tenders) == 1 else 'ies'}")
+    else:
+        lines.append("# No new opportunities")
+
+    lines += [f"\n{status_line(len(tenders), health)}\n",
+              f"_{result.get('scanned', 0)} notices scanned across {total} portals "
+              f"on {date.today().isoformat()}._\n"]
+
+    if tenders:
+        lines += ["\n## Opportunities\n",
+                  "| Score | Title | Portal | Deadline | Value |",
+                  "|---:|---|---|---|---|"]
+        for t in tenders[:40]:
+            title = (t.get("title") or "").replace("|", "\\|")
+            if t.get("url"):
+                title = f"[{title}]({t['url']})"
+            lines.append(
+                f"| {t.get('score')} | {title} | {t.get('portal_name')} | "
+                f"{t.get('closing_display')} | {t.get('value_display')} |")
+        if len(tenders) > 40:
+            lines.append(f"\n_{len(tenders) - 40} more in the attached Word and "
+                         f"Excel files._")
+
+    lines += ["\n## Portal status\n",
+              "| Portal | Status | Detail |", "|---|---|---|"]
+    for h in health:
+        if h.status == "ok":
+            detail = f"{h.count} notice(s)"
+            if h.layer:
+                detail += f" via `{h.layer}`"
+        else:
+            detail = (h.reason or "").replace("|", "\\|")[:160]
+        mark = {"ok": "OK", "unconfigured": "not configured"}.get(h.status, "**UNAVAILABLE**")
+        lines.append(f"| {h.name} | {mark} | {detail} |")
+
+    if broken:
+        lines.append("\n### Check by hand\n")
+        for h in broken:
+            if h.urls:
+                lines.append(f"- {h.name}: <{h.urls[0]}>")
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
 def write_html(body_html: str, path: Path) -> Path:
     path.write_text(body_html, encoding="utf-8")
     return path
@@ -589,6 +650,9 @@ def write_outputs(result: dict, health: list, body_html: str,
                 written["csv"] = write_csv(tenders, output_dir / f"{base}.csv")
             elif fmt_name == "html":
                 written["html"] = write_html(body_html, output_dir / f"{base}.html")
+            elif fmt_name == "markdown":
+                written["markdown"] = write_markdown(tenders, health, result,
+                                                     output_dir / f"{base}.md")
         except Exception as exc:  # noqa: BLE001 - one format must not lose the rest
             log.error("could not write %s output: %s", fmt_name, exc)
 

@@ -16,7 +16,7 @@ it was not worked around.
 | | Status |
 |---|---|
 | **Verified against the live web** | **Nothing.** Zero portal domains were reachable. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **507 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **534 checks** |
 | **Verified in this environment (no portals)** | Dependency install, `pyflakes`, `--check-portals`, `--dry-run`, `--capture`, `--self-test` all run end to end and behave correctly under total portal failure |
 | **Not verified at all** | Every portal URL · every CSS selector · **whether the real APIs return the shapes assumed** · the UNGM POST payload · email delivery (no credentials were present) |
 
@@ -54,6 +54,11 @@ python run.py --run             # the real run: write the files into output/
 ```
 
 ## Deploying
+
+**[Run it from your phone](RUN-FROM-YOUR-PHONE.md)** — a GitHub Actions workflow
+with a tappable Run button, a weekday schedule, results rendered on the run page
+and the files attached as artifacts. Nothing to install, and a failed run is the
+alert.
 
 **[Windows Server deployment guide](DEPLOYMENT-WINDOWS.md)** — Python setup,
 Azure app registration with mailbox scoping, portal verification, and Task
@@ -239,7 +244,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 507 checks, no network, no credentials
+python tests/run_all.py    # 534 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test
