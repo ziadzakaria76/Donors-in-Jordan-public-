@@ -141,18 +141,32 @@ def cmd_capture(portal_key: str) -> int:
             print(f"    {layer.layer:16} {len(layer.rows):5} {layer.quality:8.2f}  "
                   f"{layer.note[:60]}{flag}")
 
-        if winner is None:
+        # Show rows even when NOTHING clears the gate. That is precisely the
+        # case you cannot debug without them: a layer that found 15 rows at
+        # quality 0.12 has found something, and whether those rows are real
+        # notices missing their dates or genuine rubbish is not a question the
+        # score can answer -- only the rows can.
+        best = winner
+        if best is None:
+            scored = [layer for layer in layers if layer.rows]
+            best = max(scored, key=lambda layer: layer.quality, default=None)
             print("    No layer cleared the quality gate. Diagnosis:")
             from jordan_tender_monitor.portals.htmlkit import diagnose
             print(f"      {diagnose(html, [])}")
-        else:
-            print(f"\n    Sample row from the winning '{winner.layer}' layer:")
-            row = winner.rows[0]
-            print(f"      title   : {row.title[:90]}")
-            print(f"      url     : {row.url}")
-            print(f"      posted  : {row.date_text}")
-            print(f"      closing : {row.closing_text}")
-            print(f"      value   : {(row.value_text or '')[:70]}")
+
+        if best is not None:
+            label = "winning" if winner is not None else "best-scoring (rejected)"
+            print(f"\n    Sample rows from the {label} '{best.layer}' layer:")
+            for row in best.rows[:3]:
+                print(f"      title   : {row.title[:90]}")
+                print(f"      url     : {row.url}")
+                print(f"      posted  : {row.date_text!r}   closing: {row.closing_text!r}")
+                print(f"      value   : {(row.value_text or '')[:70]!r}")
+                # The raw text is what the date and value parsers actually see.
+                # When a row has a date on screen but none in the record, the
+                # answer is almost always visible here and nowhere else.
+                print(f"      raw     : {row.raw_text[:200]!r}")
+                print()
 
         print("\n    Selectors this page actually uses (derived structurally):")
         for hint in _derive_selectors(html):
@@ -204,8 +218,8 @@ def _describe_tables(html: str, limit: int = 2) -> list[str]:
     """
     from bs4 import BeautifulSoup
 
-    from jordan_tender_monitor.portals.htmlkit import _match_header
-    from jordan_tender_monitor.utils.text import clean, truncate
+    from jordan_tender_monitor.portals.htmlkit import _match_header, _own_text
+    from jordan_tender_monitor.utils.text import truncate
 
     out: list[str] = []
     soup = BeautifulSoup(html, "html.parser")
@@ -213,7 +227,7 @@ def _describe_tables(html: str, limit: int = 2) -> list[str]:
         rows = table.find_all("tr")
         if len(rows) < 2:
             continue
-        header = [clean(c.get_text()) for c in rows[0].find_all(["th", "td"])]
+        header = [_own_text(c) for c in rows[0].find_all(["th", "td"])]
         if not header:
             continue
         out.append(f"\n    Table {index}: {len(rows) - 1} data row(s), "
@@ -225,7 +239,7 @@ def _describe_tables(html: str, limit: int = 2) -> list[str]:
         body = table.find("tbody") or table
         data = [r for r in body.find_all("tr") if r is not rows[0]]
         if data:
-            cells = [clean(c.get_text(" ")) for c in data[0].find_all(["td", "th"])]
+            cells = [_own_text(c) for c in data[0].find_all(["td", "th"])]
             out.append(f"      first data row has {len(cells)} cell(s)"
                        + ("  <-- MISMATCH with the header" if len(cells) != len(header) else ""))
             for i, cell in enumerate(cells):

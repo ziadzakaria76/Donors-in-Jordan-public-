@@ -15,7 +15,7 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **591 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **606 checks** |
 | **Diagnosed and reworked** | UNGM — both HTTP routes are dead ends (POST search: 395 bytes; GET listing: 141 KB of pure navigation, no notices). It now renders in a headless browser. GIZ — the English giz.de page carries no listing at all and has been dropped; the German portal reads cleanly at quality 1.00. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) · GIZ deadline column mis-mapped |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
@@ -245,7 +245,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 591 checks, no network, no credentials
+python tests/run_all.py    # 606 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

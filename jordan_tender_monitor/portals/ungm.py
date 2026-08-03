@@ -45,12 +45,20 @@ def _fetch_rendered(url: str) -> str:
 SPEC = HtmlSpec(
     key=KEY,
     urls=[LISTING],
-    # Hints only -- unverified against the live DOM.
+    # DERIVED FROM THE RENDERED DOM, not guessed: --capture on the browser
+    # output reported div.dataRow.notice-table with 15 matching blocks, and the
+    # structural and anchor layers independently found the same 15 rows.
+    #
+    # "table tbody tr" is deliberately NOT in this list. It matched six rows on
+    # the live page -- the Su/Mo/Tu/We/Th/Fr/Sa cells of the date-picker widget.
+    # An over-broad selector runs before the class-independent layers and would
+    # short-circuit the one that actually works; this is the exact failure the
+    # quality gate exists to catch, and there is no reason to hand it one.
     selectors=[
+        "div.dataRow.notice-table",
         "div.tableRow.dataRow",
         "div.tableRow",
         "tr.noticeRow",
-        "table tbody tr",
     ],
     anchor_hint="/Public/Notice/",
     currency="USD",

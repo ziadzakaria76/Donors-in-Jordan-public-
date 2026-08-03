@@ -568,6 +568,30 @@ _HEADER_MAP = {
 }
 
 
+def _own_text(cell) -> str:
+    """A cell's own text -- NOT the text of cells nested inside it.
+
+    VERIFIED AGAINST GIZ. One unclosed <td> is enough to break a table that
+    otherwise reads perfectly. The German portal publishes
+
+        <td>03.08.2026</td><td>n.v.<td>10030355 - Studie ...</td>...
+
+    with the deadline cell never closed, so html.parser nests the title, the
+    type and the buyer INSIDE the deadline cell. find_all() still returns six
+    cells in document order and the header still maps correctly -- the row just
+    comes out with a closing date of "n.v. 10030355 - Studie zum Ausbau der
+    Kooperation ... GIZ GmbH". Every deadline on the portal was unusable.
+
+    Taking only the strings whose nearest cell ancestor IS this cell fixes it
+    without touching well-formed tables, where the two are identical.
+    Restricting find_all to direct children would NOT: on this markup it
+    returns two cells rather than six, and the column indices collapse.
+    """
+    parts = [str(s) for s in cell.strings
+             if s.find_parent(["td", "th"]) is cell]
+    return clean(" ".join(parts))
+
+
 def _match_header(cell: str) -> str | None:
     c = clean(cell).lower().strip(" :*")
     if not c:
@@ -593,11 +617,11 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
         if head:
             tr = head.find("tr")
             if tr:
-                header_cells = [clean(c.get_text()) for c in tr.find_all(["th", "td"])]
+                header_cells = [_own_text(c) for c in tr.find_all(["th", "td"])]
         if not header_cells:
             first = table.find("tr")
             if first:
-                header_cells = [clean(c.get_text()) for c in first.find_all(["th", "td"])]
+                header_cells = [_own_text(c) for c in first.find_all(["th", "td"])]
 
         mapping = {}
         for i, cell in enumerate(header_cells):
@@ -614,7 +638,7 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
             cells = tr.find_all(["td", "th"])
             if not cells or len(cells) < 2:
                 continue
-            texts = [clean(c.get_text(" ")) for c in cells]
+            texts = [_own_text(c) for c in cells]
             if texts == header_cells:
                 continue
             row = Row(raw_text=" | ".join(texts))

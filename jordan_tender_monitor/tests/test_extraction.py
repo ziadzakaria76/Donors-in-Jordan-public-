@@ -393,6 +393,58 @@ def test_arabic_country_matching_is_substring():
           "country: the full Arabic country name matched")
 
 
+def test_an_unclosed_cell_does_not_swallow_the_rest_of_the_row():
+    """VERIFIED LIVE ON GIZ, 3 August 2026. Every deadline was unusable.
+
+    The German portal publishes `<td>n.v.<td>10030355 - Studie...` -- the
+    deadline cell is never closed, so the parser nests the title, the type and
+    the buyer inside it. Nothing about this looks wrong from the outside: the
+    table layer wins at quality 1.00, six cells are found in document order,
+    and the header maps correctly onto posted / closing / title. Only the cell
+    contents are wrong, and only for one column.
+    """
+    result = H.extract_tables(load("unclosed_cell_table.html"),
+                              "https://ausschreibungen.giz.de/x")
+    check_eq(len(result.rows), 2, "unclosed cell: both rows read")
+
+    broken, healthy = result.rows
+    check_eq(broken.closing_text, "n.v.",
+             "unclosed cell: the deadline cell keeps ONLY its own text")
+    check("Studie" not in broken.closing_text,
+          "unclosed cell: the title has not leaked into the deadline")
+    check("GIZ" not in broken.closing_text,
+          "unclosed cell: nor has the buyer, two columns further along")
+    check(parse_date(broken.closing_text) is None,
+          "unclosed cell: 'n.v.' is an absent deadline, not a parsed one")
+    check("Studie zum Ausbau" in broken.title,
+          "unclosed cell: the title is still read from its own cell")
+    check_eq(broken.date_text, "03.08.2026",
+             "unclosed cell: the posted date is untouched")
+    check(broken.url and broken.url.endswith("pid=51974"),
+          "unclosed cell: the link is still resolved from the title cell")
+
+    # The other half of the fix: valid markup must be completely unaffected.
+    check_eq(parse_date(healthy.closing_text), date(2027, 1, 15),
+             "unclosed cell: a well-formed row still parses '15. Januar 2027'")
+    check_eq(parse_date(healthy.date_text), date(2026, 7, 1),
+             "unclosed cell: and its posted date")
+    check("Verwaltungsreform" in healthy.title,
+          "unclosed cell: and its title")
+
+
+def test_own_text_is_identical_on_well_formed_cells():
+    """The fix must be a no-op wherever the markup is valid."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(
+        "<table><tr><td>Amman</td><td><b>15.</b> Januar <i>2027</i></td></tr></table>",
+        "html.parser")
+    cells = soup.find_all("td")
+    for cell in cells:
+        check_eq(H._own_text(cell), textutil.clean(cell.get_text(" ")),
+                 "own-text: matches get_text() when no cell is nested")
+
+
 TESTS = [
     test_drupal_views_listing,
     test_bootstrap_cards,
@@ -424,4 +476,6 @@ TESTS = [
     test_country_matching_word_boundaries,
     test_country_matching_strips_emails_but_trusts_jo_domain,
     test_arabic_country_matching_is_substring,
+    test_an_unclosed_cell_does_not_swallow_the_rest_of_the_row,
+    test_own_text_is_identical_on_well_formed_cells,
 ]

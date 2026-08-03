@@ -374,6 +374,22 @@ def test_ungm_routes_its_rendered_html_through_the_cascade():
           "browser: the cascade runs over the rendered DOM")
 
 
+def test_ungm_selectors_come_from_the_rendered_dom():
+    """And 'table tbody tr' is kept out, because it matched the date picker.
+
+    On the rendered page that selector found six rows: the Su/Mo/Tu/We/Th/Fr/Sa
+    cells of a calendar widget. Selectors run before the class-independent
+    layers, so an over-broad one short-circuits the layer that would have
+    worked -- the exact failure the quality gate exists to catch. Handing it
+    one on purpose is not a reasonable thing to do.
+    """
+    check_eq(ungm.SPEC.selectors[0], "div.dataRow.notice-table",
+             "ungm: the selector derived from the live rendered DOM comes first")
+    check(not any("table tbody tr" in s for s in ungm.SPEC.selectors),
+          "ungm: the date-picker selector is NOT in the list",
+          f"got {ungm.SPEC.selectors}")
+
+
 def test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan():
     check(ungm.SPEC.fetcher is ungm._fetch_rendered,
           "ungm: the spec uses the rendered fetcher")
@@ -431,6 +447,7 @@ TESTS = [
     test_render_returns_the_rendered_dom_and_closes_the_browser,
     test_a_selector_that_never_appears_is_a_hint_not_a_failure,
     test_ungm_routes_its_rendered_html_through_the_cascade,
+    test_ungm_selectors_come_from_the_rendered_dom,
     test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan,
     test_the_workflow_installs_the_browser,
     test_giz_dropped_the_page_that_carried_no_listing,
