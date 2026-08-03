@@ -14,7 +14,7 @@ environment blocked all 13 domains.
 
 | | Status |
 |---|---|
-| **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
+| **Verified against the live web** | EBRD — 4,012 notices scanned, 119 Jordan. UK Find a Tender (500 read), IsDB (144), GIZ (20) and KfW/GTAI (3) all read cleanly and had no open Jordan notices on the day. |
 | **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **671 checks** |
 | **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
 | **Confirmed live** | UNGM — renders in a headless browser and reads its full listing at quality 1.00: real titles, working notice links, correct deadlines. Six defects fixed. It reads page 1 only (15 notices, worldwide), so it contributes Jordan notices only when some fall on that page — pagination or a country filter is the next step. |
