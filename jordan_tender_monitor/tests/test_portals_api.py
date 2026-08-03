@@ -441,9 +441,44 @@ def test_scan_count_distinguishes_empty_from_filtered_out():
              "each other's numbers")
 
 
+def test_worldbank_titles_are_per_notice_not_per_project():
+    """One project raises many notices; they must not all share a title.
+
+    Reading the title from project_name made six different notices appear as
+    six identical lines of "Jordan Education Reform Support Program" in the
+    first corrected live run.
+    """
+    payload = {"procnotices": [
+        {"id": "1", "project_name": "Jordan Education Reform Support Program",
+         "bid_description": "Consultancy for curriculum assessment, Amman",
+         "noticedate": "2026-06-01T00:00:00Z"},
+        {"id": "2", "project_name": "Jordan Education Reform Support Program",
+         "bid_description": "Supply of school laboratory equipment, Irbid",
+         "noticedate": "2026-06-02T00:00:00Z"},
+        {"id": "3", "project_name": "Jordan Education Reform Support Program",
+         "notice_title": "Teacher training programme evaluation, Jordan",
+         "noticedate": "2026-06-03T00:00:00Z"},
+    ]}
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+
+    check_eq(len(records), 3, "worldbank: all three notices are kept")
+    titles = [r["title"] for r in records]
+    check(len(set(titles)) == 3,
+          "worldbank: three notices produce three DISTINCT titles",
+          f"got {titles}")
+    check(any("curriculum" in t for t in titles),
+          "worldbank: the notice description drives the title")
+    check(all("Jordan Education Reform" in t for t in titles),
+          "worldbank: the project name is retained as context")
+    check(len({r["id"] for r in records}) == 3,
+          "worldbank: and each keeps a distinct identity")
+
+
 TESTS = [
     test_worldbank_parses_documented_shape,
     test_worldbank_filters_to_jordan_even_when_the_api_does_not,
+    test_worldbank_titles_are_per_notice_not_per_project,
     test_every_api_module_applies_the_jordan_filter,
     test_scan_count_distinguishes_empty_from_filtered_out,
     test_worldbank_accepts_alternative_response_keys,

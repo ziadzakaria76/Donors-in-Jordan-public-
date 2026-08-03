@@ -70,8 +70,22 @@ def fetch_tenders() -> list[dict]:
     for item in items:
         if not isinstance(item, dict):
             continue
-        title = _pick(item, "project_name", "projectname", "title", "notice_title",
-                      "bid_description", "bid_desc", default="")
+        # NOTICE-specific fields first, project name only as a last resort.
+        #
+        # A World Bank project raises many procurement notices, and they all
+        # share one project_name. Reading the title from that field made six
+        # different notices appear in the report as six identical lines of
+        # "Jordan Education Reform Support Program" -- unreadable, and it
+        # inflated the count with what looked like duplicates.
+        title = _pick(item, "notice_title", "noticetitle", "bid_description",
+                      "bid_desc", "title", default="")
+        project = _pick(item, "project_name", "projectname")
+        if not title:
+            title = project or ""
+        elif project and project.lower() not in title.lower():
+            # Keep the project as context; it is how these are grouped on the
+            # portal and it is genuinely useful when scanning the report.
+            title = f"{title} ({project})"
         if not title:
             continue
         url = _pick(item, "url", "notice_url", "pdf_url", "noticeurl")
@@ -85,8 +99,8 @@ def fetch_tenders() -> list[dict]:
                           "deadline", "submissiondeadline", "closing_date"),
             value_text=_pick(item, "contract_value", "estimated_cost",
                              "totalvalue", "amount"),
-            description=_pick(item, "bid_description", "notice_text",
-                              "description", "project_ctry_name"),
+            description=_pick(item, "notice_text", "description",
+                              "bid_description", "project_ctry_name"),
             notice_type=_pick(item, "notice_type", "noticetype", "procurement_type"),
             contact=_pick(item, "contact_email", "contact_name", "agency_name"),
             reference=_pick(item, "id", "notice_no", "bid_reference_no", "project_id"),
