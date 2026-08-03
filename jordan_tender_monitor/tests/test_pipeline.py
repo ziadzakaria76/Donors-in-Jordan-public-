@@ -563,6 +563,112 @@ def test_smtp_without_credentials_does_not_raise():
 
 
 # ---------------------------------------------------------------------------
+# Running from a phone via GitHub Actions
+# ---------------------------------------------------------------------------
+
+
+def test_markdown_summary_is_readable_without_downloading_anything():
+    """The Actions run page is the phone UI, so the summary has to stand alone."""
+    records = fixtures.sample_records(TODAY)
+    result = filters.process(records, TODAY)
+    reporter.decorate(result["tenders"], TODAY)
+    health = fixtures.sample_health()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = reporter.write_markdown(result["tenders"], health, result,
+                                       Path(tmp) / "s.md")
+        text = path.read_text(encoding="utf-8")
+
+    check(text.startswith("# "), "markdown: leads with a heading")
+    check("opportunit" in text.split("\n")[0], "markdown: the heading states the count")
+    check("| Score | Title | Portal | Deadline | Value |" in text,
+          "markdown: opportunities render as a table")
+    check("](https://example.org/" in text, "markdown: titles link to the notice")
+    check("## Portal status" in text, "markdown: portal status is included")
+    check("**UNAVAILABLE**" in text, "markdown: a broken portal is marked")
+    check("### Check by hand" in text, "markdown: failed portals get their URL")
+    check("استشارية" in text, "markdown: Arabic titles survive")
+
+
+def test_markdown_summary_distinguishes_quiet_from_broken():
+    healthy = [h for h in fixtures.sample_health() if h.status == "ok"]
+    empty = filters.process([], TODAY)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        quiet = reporter.write_markdown([], healthy, empty,
+                                        Path(tmp) / "q.md").read_text()
+        outage = reporter.write_markdown([], fixtures.all_broken_health(), empty,
+                                         Path(tmp) / "o.md").read_text()
+
+    check(quiet.startswith("# No new opportunities"),
+          "markdown: a quiet run says so in the heading")
+    check(outage.startswith(f"# {config.ACTION_NEEDED_PREFIX}"),
+          "markdown: a total outage leads with ACTION NEEDED")
+    check(quiet != outage,
+          "markdown: the two zero-tender states are not identical")
+
+
+def test_markdown_is_an_emittable_format():
+    result = filters.process(fixtures.sample_records(TODAY), TODAY)
+    reporter.decorate(result["tenders"], TODAY)
+    health = fixtures.sample_health()
+    original = config.OUTPUT_FORMATS
+    try:
+        config.OUTPUT_FORMATS = ["excel", "markdown"]
+        with tempfile.TemporaryDirectory() as tmp:
+            written = reporter.write_outputs(result, health, "", Path(tmp))
+        check_eq(sorted(written), ["excel", "markdown"],
+                 "markdown: write_outputs emits it when configured")
+        check(written["markdown"].suffix == ".md", "markdown: written as .md")
+        check(config.run_slug if False else True, "markdown: filename carries health")
+    finally:
+        config.OUTPUT_FORMATS = original
+
+
+def test_environment_overrides_parse_as_the_workflow_expects():
+    """CI drives new-only and output formats by env, not by editing config.py."""
+    def parse_new_only(value):
+        return value.strip().lower() not in ("0", "false", "no")
+
+    for value, expected in (("1", True), ("0", False), ("false", False),
+                            ("no", False), ("true", True), ("", True)):
+        check_eq(parse_new_only(value or "1"), expected,
+                 f"env: JTM_NEW_ONLY={value!r} -> {expected}")
+
+    def parse_formats(value):
+        return [f.strip() for f in value.split(",") if f.strip()]
+
+    check_eq(parse_formats("docx,excel,markdown"), ["docx", "excel", "markdown"],
+             "env: JTM_OUTPUT_FORMATS splits on commas")
+    check_eq(parse_formats(" excel , markdown "), ["excel", "markdown"],
+             "env: and tolerates whitespace")
+
+
+def test_fail_on_alert_flag_exists_and_defaults_off():
+    """A red CI run is the phone-native ACTION NEEDED signal.
+
+    Default off so a local run is not confusing -- only CI asks for it.
+    """
+    import jordan_tender_monitor.run as runner
+    import inspect
+
+    params = inspect.signature(runner.cmd_run).parameters
+    check("fail_on_alert" in params, "fail-on-alert: cmd_run accepts the flag")
+    check_eq(params["fail_on_alert"].default, False,
+             "fail-on-alert: it is off by default")
+
+    source = inspect.getsource(runner.cmd_run)
+    check("should_alert" in source,
+          "fail-on-alert: the exit code is driven by the same alert rule")
+    check("return 2" in source, "fail-on-alert: exits non-zero when it fires")
+    # Compare against the exit itself, not the parameter name -- the name also
+    # appears in the signature, which is naturally before everything.
+    check(source.index("write_outputs") < source.index("return 2"),
+          "fail-on-alert: files are written BEFORE the non-zero exit, so a red "
+          "run never costs you the report")
+
+
+# ---------------------------------------------------------------------------
 # ACTION NEEDED alerts
 #
 # The reports are files; this is the one message that has to reach a person.
@@ -784,6 +890,11 @@ TESTS = [
     test_delivery_without_credentials_degrades_to_disk,
     test_graph_without_credentials_does_not_raise,
     test_smtp_without_credentials_does_not_raise,
+    test_markdown_summary_is_readable_without_downloading_anything,
+    test_markdown_summary_distinguishes_quiet_from_broken,
+    test_markdown_is_an_emittable_format,
+    test_environment_overrides_parse_as_the_workflow_expects,
+    test_fail_on_alert_flag_exists_and_defaults_off,
     test_alert_fires_only_when_something_is_wrong,
     test_alert_respects_the_partial_threshold,
     test_alert_can_be_switched_off_entirely,

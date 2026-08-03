@@ -1,0 +1,106 @@
+name: Jordan tender monitor
+
+# Run it from a phone.
+#
+# workflow_dispatch puts a "Run workflow" button on the Actions page, which
+# works in a mobile browser. The schedule fires on GitHub's servers, so it does
+# not depend on a device being awake, charged or on a network -- which is the
+# reason this is not a Termux job on the handset.
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "What to report"
+        required: true
+        default: "everything currently open"
+        type: choice
+        options:
+          - "everything currently open"
+          - "only what is new since the last run"
+      portals:
+        description: "Limit to these portals (space-separated keys, blank = all)"
+        required: false
+        default: ""
+        type: string
+  schedule:
+    # 04:00 UTC = 07:00 Asia/Amman. Jordan is UTC+3 year-round (DST abolished
+    # in 2022), so this needs no seasonal adjustment. GitHub cron is always UTC.
+    - cron: "0 4 * * 1-5"
+
+# Never let two runs write the seen-tenders cache at once.
+concurrency:
+  group: jordan-tender-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r jordan_tender_monitor/requirements.txt
+
+      # New-only mode needs state to survive between runs, and a runner is
+      # thrown away after each job. The cache carries the SQLite file forward.
+      # A cache miss is harmless: the run simply reports the full open pipeline,
+      # exactly as a first run does.
+      - name: Restore the seen-tenders database
+        if: github.event.inputs.scope != 'everything currently open'
+        uses: actions/cache@v4
+        with:
+          path: jordan_tender_monitor/data
+          key: seen-tenders-${{ github.run_id }}
+          restore-keys: seen-tenders-
+
+      - name: Run the monitor
+        id: run
+        env:
+          # A run you triggered by hand almost always wants the whole current
+          # pipeline -- you are looking at it now. The schedule wants what
+          # changed. The dispatch input overrides either way.
+          JTM_NEW_ONLY: >-
+            ${{ (github.event_name == 'schedule' ||
+                 github.event.inputs.scope == 'only what is new since the last run')
+                && '1' || '0' }}
+          # markdown is not a deliverable; it is rendered into the run page so
+          # results are readable on a phone without downloading a .docx.
+          JTM_OUTPUT_FORMATS: "docx,excel,markdown"
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+        run: |
+          python jordan_tender_monitor/run.py --run --fail-on-alert \
+            ${{ github.event.inputs.portals != '' && format('--only {0}', github.event.inputs.portals) || '' }}
+
+      # always(): the summary matters most when the run failed.
+      - name: Show the results on the run page
+        if: always()
+        run: |
+          if compgen -G "jordan_tender_monitor/output/*.md" > /dev/null; then
+            cat jordan_tender_monitor/output/*.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## The run produced no report" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "It failed before writing anything. See the log above." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the Word and Excel reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jordan-tenders-${{ github.run_number }}
+          path: |
+            jordan_tender_monitor/output/*.docx
+            jordan_tender_monitor/output/*.xlsx
+          if-no-files-found: warn
+          retention-days: 90
