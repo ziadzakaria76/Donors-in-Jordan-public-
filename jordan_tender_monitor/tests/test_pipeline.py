@@ -334,41 +334,142 @@ def test_health_table_names_the_failure_and_the_url():
 # ---------------------------------------------------------------------------
 
 
-def test_all_formats_written_and_arabic_survives():
+def test_configured_formats_written_and_arabic_survives():
+    """Only the configured formats are emitted, and Arabic survives both."""
     records = fixtures.sample_records(TODAY)
     result = filters.process(records, TODAY)
     reporter.decorate(result["tenders"], TODAY)
     health = fixtures.sample_health()
     body = reporter.build_email_html(result, health)
 
+    check_eq(config.OUTPUT_FORMATS, ["docx", "excel"],
+             "outputs: Word and Excel only -- no JSON, CSV or HTML")
+
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)
         written = reporter.write_outputs(result, health, body, out)
-        for fmt_name in config.OUTPUT_FORMATS:
-            check(fmt_name in written, f"outputs: {fmt_name} was written")
+        check_eq(sorted(written), ["docx", "excel"],
+                 "outputs: exactly two files are produced")
+        for fmt_name in ("docx", "excel"):
             check(written[fmt_name].exists() and written[fmt_name].stat().st_size > 0,
                   f"outputs: {fmt_name} is non-empty")
-
-        payload = json.loads(written["json"].read_text(encoding="utf-8"))
-        arabic_json = [t for t in payload["tenders"] if t["language"] == "ar"]
-        check(arabic_json, "arabic: survives JSON")
-        check("استشارية" in json.dumps(payload, ensure_ascii=False),
-              "arabic: JSON keeps Arabic characters, not \\uXXXX escapes")
-
-        with written["csv"].open(encoding="utf-8-sig") as fh:
-            rows = list(csv.reader(fh))
-        check(any("استشارية" in " ".join(r) for r in rows), "arabic: survives CSV")
+        check_eq(len(list(out.iterdir())), 2,
+                 "outputs: nothing else is left in the output directory")
 
         from openpyxl import load_workbook
-        ws = load_workbook(written["excel"]).active
-        cells = [str(c.value) for row in ws.iter_rows() for c in row if c.value]
+        wb = load_workbook(written["excel"])
+        cells = [str(c.value) for ws in wb.worksheets
+                 for row in ws.iter_rows() for c in row if c.value]
         check(any("استشارية" in c for c in cells), "arabic: survives Excel")
 
         from docx import Document
         doc = Document(written["docx"])
-        text = "\n".join(p.text for p in doc.paragraphs)
-        check(any("استشارية" in p.text for p in doc.paragraphs) or "استشارية" in text,
+        check(any("استشارية" in p.text for p in doc.paragraphs),
               "arabic: survives Word")
+
+
+def test_retained_json_and_csv_writers_still_handle_arabic():
+    """write_json/write_csv are no longer emitted but remain available.
+
+    Kept tested so re-enabling them in OUTPUT_FORMATS is a config change rather
+    than a bug hunt.
+    """
+    records = filters.process(fixtures.sample_records(TODAY), TODAY)["tenders"]
+    reporter.decorate(records, TODAY)
+    health = fixtures.sample_health()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        json_path = reporter.write_json(records, health, out / "r.json")
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        check(any(t["language"] == "ar" for t in payload["tenders"]),
+              "arabic: survives JSON")
+        check("استشارية" in json.dumps(payload, ensure_ascii=False),
+              "arabic: JSON keeps Arabic characters, not \\uXXXX escapes")
+
+        csv_path = reporter.write_csv(records, out / "r.csv")
+        with csv_path.open(encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        check(any("استشارية" in " ".join(r) for r in rows), "arabic: survives CSV")
+
+
+def test_filename_states_the_run_health():
+    """The filename carries what the email subject line used to.
+
+    With output going to disk, a total outage and a quiet week both leave a
+    file behind. Identically-named files make a dead monitor invisible.
+    """
+    healthy = [h for h in fixtures.sample_health() if h.status == "ok"]
+
+    quiet = reporter.run_slug(0, healthy)
+    outage = reporter.run_slug(0, fixtures.all_broken_health())
+    normal = reporter.run_slug(7, healthy)
+    partial = reporter.run_slug(4, fixtures.sample_health())
+
+    check("no-new-opportunities" in quiet, "filename: a quiet day says so")
+    check("portals-OK" in quiet, "filename: and confirms the portals were read")
+    check(outage.startswith(config.ACTION_NEEDED_PREFIX.replace(" ", "-")),
+          "filename: a total outage is an ACTION NEEDED alert", f"got {outage}")
+    check("unreachable" in outage, "filename: and says the portals were unreachable")
+    check(quiet != outage,
+          "filename: zero-tender runs are NOT indistinguishable -- the whole point")
+    check("7-opportunities" in normal, "filename: a normal run states the count")
+    check("1-opportunity" in reporter.run_slug(1, healthy),
+          "filename: singular reads correctly")
+    check("unavailable" in partial, "filename: partial degradation is visible")
+
+    for slug in (quiet, outage, normal, partial):
+        check(not any(c in slug for c in r'\/:*?"<>| '),
+              f"filename: '{slug}' is safe on Windows and Linux")
+
+
+def test_documents_state_the_run_health_inside():
+    """Opening the file weeks later must not require inferring from an empty list."""
+    healthy = [h for h in fixtures.sample_health() if h.status == "ok"]
+    empty = filters.process([], TODAY)
+    body = reporter.build_email_html(empty, healthy)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        written = reporter.write_outputs(empty, healthy, body, out)
+
+        from docx import Document
+        text = "\n".join(p.text for p in Document(written["docx"]).paragraphs)
+        check("No new opportunities" in text,
+              "docx: the quiet-run status is stated in words")
+        check("not" in text.lower() and "failed" in text.lower(),
+              "docx: and says explicitly that this is not a failure")
+
+        from openpyxl import load_workbook
+        wb = load_workbook(written["excel"])
+        check("Run status" in wb.sheetnames,
+              "excel: a Run status sheet is present")
+        status = wb["Run status"]
+        cells = [str(c.value) for row in status.iter_rows() for c in row if c.value]
+        check(any("No new opportunities" in c for c in cells),
+              "excel: the status sheet states the run health")
+        check(any("World Bank" in c for c in cells),
+              "excel: and lists every portal")
+
+    outage = filters.process([], TODAY)
+    broken = fixtures.all_broken_health()
+    with tempfile.TemporaryDirectory() as tmp:
+        written = reporter.write_outputs(
+            outage, broken, reporter.build_email_html(outage, broken), Path(tmp))
+        from docx import Document
+        text = "\n".join(p.text for p in Document(written["docx"]).paragraphs)
+        check(config.ACTION_NEEDED_PREFIX in text,
+              "docx: a total outage is flagged ACTION NEEDED inside the document")
+        check("nothing could be read" in text,
+              "docx: and explains the report is empty for the wrong reason")
+
+        from openpyxl import load_workbook
+        status = load_workbook(written["excel"])["Run status"]
+        cells = [str(c.value) for row in status.iter_rows() for c in row if c.value]
+        check(any(config.ACTION_NEEDED_PREFIX in c for c in cells),
+              "excel: the status sheet flags the outage too")
+        check(any("UNAVAILABLE" in c for c in cells),
+              "excel: individual portals are marked unavailable")
 
 
 def test_excel_with_zero_rows_does_not_crash():
@@ -410,17 +511,38 @@ def test_excel_colours_are_bare_hex():
 # ---------------------------------------------------------------------------
 
 
+def test_default_is_file_only_and_sends_nothing():
+    """The configured default writes files and sends no mail at all."""
+    check_eq(config.EMAIL_METHOD, "none",
+             "delivery: email is off by default -- files on disk are the product")
+    result = emailer.deliver("subject", "<html></html>", "text", [])
+    check_eq(result.method, "file", "delivery: reports the file-only path")
+    check(result.sent, "delivery: treated as handled, not as a failure")
+    check("nothing sent" in result.detail.lower(),
+          "delivery: and says plainly that nothing was sent")
+
+
 def test_delivery_without_credentials_degrades_to_disk():
-    original = config.EMAIL_RECIPIENTS
+    """If email is switched back on, a missing credential must not lose a run."""
+    original_method = config.EMAIL_METHOD
+    original_recipients = config.EMAIL_RECIPIENTS
     try:
+        config.EMAIL_METHOD = "graph"
         config.EMAIL_RECIPIENTS = []
         result = emailer.deliver("subject", "<html></html>", "text", [])
         check_eq(result.method, "file", "delivery: falls back to file with no recipients")
         check(result.sent, "delivery: reported as handled, not as a failure")
-        check("no mail was sent" in result.detail or "no EMAIL_RECIPIENTS" in result.detail,
+        check("no mail was sent" in result.detail or "EMAIL_RECIPIENTS" in result.detail,
               "delivery: the reason is stated plainly")
+
+        config.EMAIL_RECIPIENTS = ["someone@example.com"]
+        result = emailer.deliver("subject", "<html></html>", "text", [])
+        check_eq(result.method, "file",
+                 "delivery: with recipients but no credentials it still degrades to disk")
+        check(result.sent, "delivery: a credential problem never loses the run")
     finally:
-        config.EMAIL_RECIPIENTS = original
+        config.EMAIL_METHOD = original_method
+        config.EMAIL_RECIPIENTS = original_recipients
 
 
 def test_graph_without_credentials_does_not_raise():
@@ -522,9 +644,13 @@ TESTS = [
     test_subject_singular_and_plural,
     test_email_overflow_moves_nothing_is_dropped,
     test_health_table_names_the_failure_and_the_url,
-    test_all_formats_written_and_arabic_survives,
+    test_configured_formats_written_and_arabic_survives,
+    test_retained_json_and_csv_writers_still_handle_arabic,
+    test_filename_states_the_run_health,
+    test_documents_state_the_run_health_inside,
     test_excel_with_zero_rows_does_not_crash,
     test_excel_colours_are_bare_hex,
+    test_default_is_file_only_and_sends_nothing,
     test_delivery_without_credentials_degrades_to_disk,
     test_graph_without_credentials_does_not_raise,
     test_smtp_without_credentials_does_not_raise,

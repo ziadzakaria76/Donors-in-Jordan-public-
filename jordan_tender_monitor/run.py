@@ -3,8 +3,10 @@
 Jordan Tender Intelligence Monitor -- command line entry point.
 
     python run.py --check-portals   are the portals reachable from this machine?
-    python run.py --dry-run         scrape, filter, print. Send nothing.
-    python run.py --send            build, save, and email
+    python run.py --dry-run         scrape, filter, print. Change no state.
+    python run.py --run             the real run: write the Word and Excel files
+                                    into output/ and record what was reported
+                                    (--send is kept as an alias)
     python run.py --capture PORTAL  fetch a portal's live pages and report
                                     which extraction layer works
     python run.py --self-test       run the pipeline on offline fixtures
@@ -252,13 +254,17 @@ def cmd_run(send: bool, only: list[str] | None = None) -> int:
         print(f"  wrote {name:6} {path}")
 
     if not send:
-        print("\nDry run: nothing was sent, and nothing was recorded as seen.\n"
-              "Re-run with --send to email it.\n")
+        print("\nDry run. The files above were written, but nothing was recorded "
+              "as seen,\nso the next run will report these same tenders again. "
+              "Use --run for the real thing.\n")
         return 0
 
     attachments = reporter.attachments_for_email(written)
     delivery = emailer.deliver(subject, body_html, body_text, attachments, written)
-    print(f"\nDelivery via {delivery.method}: {delivery.detail}")
+    if delivery.method == "file":
+        print(f"\nSaved to disk. {delivery.detail}")
+    else:
+        print(f"\nDelivery via {delivery.method}: {delivery.detail}")
 
     # Only record as seen once the report has actually gone out. Recording
     # first would lose a run's tenders permanently if delivery failed.
@@ -387,9 +393,11 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--check-portals", action="store_true",
                        help="test reachability of every enabled portal")
     group.add_argument("--dry-run", action="store_true",
-                       help="scrape, filter and print; send nothing, record nothing")
-    group.add_argument("--send", action="store_true",
-                       help="build the report, write the files, and email it")
+                       help="scrape, filter and print; record nothing as seen")
+    group.add_argument("--run", "--send", action="store_true", dest="send",
+                       help="the real run: write the report files into output/ "
+                            "and record what was reported. Sends email only if "
+                            "EMAIL_METHOD is configured (it is off by default)")
     group.add_argument("--capture", metavar="PORTAL",
                        help="fetch a portal's live pages and report which "
                             "extraction layer works")

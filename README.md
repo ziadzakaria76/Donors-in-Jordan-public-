@@ -2,7 +2,8 @@
 
 Automated multi-agent system that monitors 13 donor and international financial
 institution procurement portals for Jordan-related consulting opportunities,
-scores them for relevance, and delivers a structured report by email.
+scores them for relevance, and writes a Word bid-review pack and an Excel
+working file to disk.
 
 Full documentation: **[`jordan_tender_monitor/README.md`](jordan_tender_monitor/README.md)**
 
@@ -14,7 +15,7 @@ worked around.
 
 - **Verified against the live web:** nothing
 - **Verified offline against fixtures:** extraction, parsing, filtering,
-  scoring, reporting, delivery fallback — 459 checks
+  scoring, reporting, delivery fallback — 481 checks
 - **Not verified:** every portal URL, every CSS selector, every API response
   shape, and email delivery
 
@@ -29,8 +30,8 @@ HTML portal before trusting it.
 |---|---|
 | Scrapers | Fetch notices from each portal, normalise to one record schema |
 | Filter & scorer | Filter, score 0–100, deduplicate across portals |
-| Reporter | Build the email body plus Word, Excel, JSON, CSV and HTML files |
-| Emailer | Send via Microsoft Graph, falling back to SMTP, then to disk |
+| Reporter | Build the Word bid-review pack and the Excel working file |
+| Writer | Save them to `output/`, with the run's health in the filename |
 
 **Portals:** World Bank, EU TED, SAM.gov and UK Find a Tender (REST APIs); UNGM
 — covering UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA — plus EBRD, EIB, GIZ, KfW
@@ -39,7 +40,7 @@ HTML portal before trusting it.
 
 A failing portal is skipped with a diagnosed reason and reported as unavailable
 with the URL to check by hand. It never aborts the run, and a broken run never
-looks like a quiet one — portal health is in the email subject line.
+looks like a quiet one — portal health is in the output filename.
 
 ## Quick start
 
@@ -49,8 +50,8 @@ cp jordan_tender_monitor/.env.example jordan_tender_monitor/.env   # then fill i
 cd jordan_tender_monitor
 
 python run.py --check-portals   # can this machine reach the portals?
-python run.py --dry-run         # scrape and print, send nothing
-python run.py --send            # build, save, and email
+python run.py --dry-run         # scrape and print, change no state
+python run.py --run             # the real run: write the files into output/
 ```
 
 Everything is configured in
@@ -82,7 +83,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 459 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 481 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`
@@ -90,11 +91,11 @@ and on pull requests.
 
 ## Security
 
-`.env` is never committed; recipients live there rather than in `config.py`
-because this repository is public. If `Mail.Send` is granted as an Azure
-*application* permission it is **tenant-wide** — scope it to a single mailbox
-with an `ApplicationAccessPolicy`. See the
-[full README](jordan_tender_monitor/README.md#security).
+Email is off by default, so no mail credentials are required — nothing to leak
+or rotate. `.env` is never committed and holds only the optional SAM.gov API
+key. If you later switch delivery back on, read the `Mail.Send` scoping warning
+in the [full README](jordan_tender_monitor/README.md#security) first: as an
+Azure *application* permission it is tenant-wide.
 
 ## License
 

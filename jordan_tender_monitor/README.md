@@ -1,7 +1,8 @@
 # Jordan Tender Intelligence Monitor
 
 Monitors 13 donor and IFI procurement portals for Jordan-related consulting
-opportunities, scores them, and delivers a structured report by email.
+opportunities, scores them, and writes a Word bid-review pack and an Excel
+working file to disk.
 
 ---
 
@@ -15,7 +16,7 @@ it was not worked around.
 | | Status |
 |---|---|
 | **Verified against the live web** | **Nothing.** Zero portal domains were reachable. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **459 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **481 checks** |
 | **Verified in this environment (no portals)** | Dependency install, `pyflakes`, `--check-portals`, `--dry-run`, `--capture`, `--self-test` all run end to end and behave correctly under total portal failure |
 | **Not verified at all** | Every portal URL · every CSS selector · **whether the real APIs return the shapes assumed** · the UNGM POST payload · email delivery (no credentials were present) |
 
@@ -47,9 +48,9 @@ procurement URLs are years out of date; treat these as a starting point.
 pip install -r requirements.txt
 cp .env.example .env        # then fill it in
 python run.py --check-portals   # can this machine see the portals at all?
-python run.py --dry-run         # scrape, filter, print — send nothing
+python run.py --dry-run         # scrape, filter, print — change no state
 python run.py --capture ungm    # confirm one portal's selectors
-python run.py --send            # build, save, and email
+python run.py --run             # the real run: write the files into output/
 ```
 
 ## Deploying
@@ -66,8 +67,8 @@ running service, and no email is sent until `--send` is scheduled.
 | Command | What it does |
 |---|---|
 | `--check-portals` | Reachability of every enabled portal, with a diagnosed reason per failure |
-| `--dry-run` | Full pipeline, printed. Sends nothing, records nothing as seen |
-| `--send` | Builds the report, writes the files, emails it, then records what was sent |
+| `--dry-run` | Full pipeline, printed. Writes the files but records nothing as seen |
+| `--run` (alias `--send`) | The real run: writes the Word and Excel files into `output/` and records what was reported |
 | `--capture PORTAL` | Fetches a portal's live pages, saves them under `tests/fixtures/live/`, and reports per-layer row counts and quality, which layer won, and the selectors the page actually uses |
 | `--self-test` | Runs the whole pipeline on offline fixtures in a temp directory |
 | `--reset-db` | Forgets every reported tender, so the next run reports in full once |
@@ -91,11 +92,11 @@ interview question it answers.
 | Language | Arabic included in the original, flagged for manual review |
 | Eligibility | National-only flagged and penalised 25 points, never excluded |
 | Portals | All 13, tiered by reliability |
-| Delivery | Graph → SMTP → disk; recipients in `.env` |
+| Delivery | **Files on disk.** Email is off (`EMAIL_METHOD = "none"`) |
 | Report | Full detail, top 50 inline, the rest tabled |
-| Outputs | Word, Excel, JSON, CSV, HTML — Word and Excel attached |
+| Outputs | **Word and Excel**, written to `output/` |
 | Schedule | Weekdays 07:00, pinned to `Asia/Amman` |
-| Alerting | Portal health in the subject line + a diagnosed status table |
+| Alerting | Portal health in the **filename** + a status page in both documents |
 
 ### Two settings worth understanding
 
@@ -166,19 +167,25 @@ is never mistaken for a broken one.
 
 ## Knowing the difference between quiet and broken
 
-The subject line carries portal health, because a subject reading
-"0 opportunities" whether every portal failed or every portal worked lets a dead
-monitor go unnoticed for weeks:
+**The filename states the run's health.** With output going to disk rather than
+an inbox, a total outage and a quiet week both leave a file behind — and
+identically-named files make a dead monitor invisible until someone asks why a
+bid was missed. The folder listing has to show the difference:
 
 ```
-Jordan Tenders - 7 new opportunities
-Jordan Tenders - no new opportunities (13/13 portals OK)
-Jordan Tenders - 4 new opportunities, 3 of 13 portals unavailable
-ACTION NEEDED: Jordan Tenders - all 13 portals unreachable
+jordan_tenders_20260803_0700_7-opportunities.docx
+jordan_tenders_20260803_0700_no-new-opportunities-13-of-13-portals-OK.docx
+jordan_tenders_20260803_0700_4-opportunities-3-of-13-portals-unavailable.docx
+jordan_tenders_20260803_0700_ACTION-NEEDED-all-13-portals-unreachable.docx
 ```
 
-The body carries a per-portal table with the diagnosed cause and the URL to
-check by hand.
+Inside, the Word pack opens with the run status in words, and the Excel file
+carries a **Run status** sheet listing every portal, its diagnosed failure
+reason, and the URL to check by hand.
+
+**The one state the monitor cannot report on itself is not running at all.** No
+new file on a weekday means the scheduled job did not fire — check the
+scheduler, not the portals.
 
 ## Security
 
@@ -211,7 +218,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 459 checks, no network, no credentials
+python tests/run_all.py    # 481 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test
