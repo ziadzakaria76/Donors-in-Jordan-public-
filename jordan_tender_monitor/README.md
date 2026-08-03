@@ -15,9 +15,9 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **655 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **671 checks** |
 | **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
-| **Rebuilt, pending live confirmation** | UNGM — renders in a headless browser and every column now maps: title, notice link, deadline and publication date. Five defects were fixed to get there. Verified against a fixture rebuilt from the live row anatomy; the live re-run is the last step. |
+| **Confirmed live** | UNGM — renders in a headless browser and reads its full listing at quality 1.00: real titles, working notice links, correct deadlines. Six defects fixed. It reads page 1 only (15 notices, worldwide), so it contributes Jordan notices only when some fall on that page — pagination or a country filter is the next step. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
 | **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
@@ -38,6 +38,8 @@ because one unclosed `<td>` nests the rest of the row inside the deadline cell.
 Scores measure whether something looks like a listing. They cannot see a single
 column being wrong, which is why `--capture` now prints the header-to-cell
 mapping and sample rows even when nothing wins.
+
+**Defence in depth is not depth when both layers read the same field.** The World Bank query `qterm=Jordan` is a full-text search, and this module stored the searched body as the record description — so the client-side text filter could not reject anything the API returned. It kept 500 of 500, and the report carried water-supply consultancies in Blantyre, Malawi. The country *field* now decides; text matching is kept only for notices that have no country field, where it is the only signal available.
 
 **A count alone cannot diagnose a portal.** Five portals reported `OK: 0` and
 the number could not distinguish "returned nothing" from "returned 500
@@ -254,7 +256,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 655 checks, no network, no credentials
+python tests/run_all.py    # 671 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

@@ -480,8 +480,83 @@ def test_worldbank_titles_are_per_notice_not_per_project():
           "worldbank: and each keeps a distinct identity")
 
 
+def test_worldbank_country_field_beats_a_full_text_match():
+    """VERIFIED LIVE: the text filter was a no-op, and kept 500 of 500.
+
+    qterm=Jordan is a FULL-TEXT search, so every notice the API returns has the
+    word "Jordan" somewhere in its indexed text -- and this module stores that
+    same searched body as the record description. The client-side text filter
+    therefore could not reject anything the API returned, and the report
+    carried water-supply consultancies in Blantyre, Malawi as Jordan
+    opportunities. Defence in depth is not depth when both layers read the
+    same field.
+    """
+    payload = {"procnotices": [
+        # Malawi. Mentions Jordan only as desirable prior experience -- a
+        # genuine full-text hit AND a genuine non-Jordan tender.
+        {"id": "1", "project_ctry_name": "Malawi",
+         "bid_description": "Consultancy for supervision of Blantyre water supply",
+         "notice_text": "Prior experience in Jordan and Egypt is an advantage.",
+         "noticedate": "2026-06-01T00:00:00Z"},
+        # Jordan by country field, and its text names neither Jordan nor Amman.
+        # The old text filter would have DROPPED this real tender.
+        {"id": "2", "project_ctry_name": "Jordan",
+         "bid_description": "Supply of laboratory equipment, Package 3",
+         "notice_text": "Sealed bids are invited from eligible bidders.",
+         "noticedate": "2026-06-02T00:00:00Z"},
+        # No country field at all: the text check is the only signal, and it
+        # is still applied.
+        {"id": "3", "bid_description": "Advisory Services, Amman, Jordan",
+         "noticedate": "2026-06-03T00:00:00Z"},
+        {"id": "4", "bid_description": "Road works, Lilongwe",
+         "noticedate": "2026-06-04T00:00:00Z"},
+    ]}
+    base.take_scanned()
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+    scanned = base.take_scanned()
+
+    titles = [r["title"] for r in records]
+    check(len(records) == 2, "worldbank: two of four notices survive",
+          f"got {titles}")
+    check(not any("Blantyre" in t for t in titles),
+          "worldbank: a Malawi notice is rejected despite matching the full-text search")
+    check(any("laboratory equipment" in t for t in titles),
+          "worldbank: a Jordan notice is KEPT even though its text never says Jordan",
+          f"got {titles}")
+    check(any("Amman" in t for t in titles),
+          "worldbank: a notice with no country field still passes on its text")
+    check(not any("Lilongwe" in t for t in titles),
+          "worldbank: and is still rejected when the text does not match")
+    check_eq(scanned, 4,
+             "worldbank: the pre-filter total counts every notice read, not "
+             "just the slice the text filter saw")
+
+
+def test_worldbank_country_field_accepts_several_spellings():
+    """The field name could not be confirmed, so several are read."""
+    for field_name in ("project_ctry_name", "countryshortname", "country_name",
+                       "countryname", "country"):
+        payload = {"procnotices": [
+            {"id": "x", field_name: "Malawi",
+             "bid_description": "Works in Blantyre",
+             "notice_text": "Experience in Jordan preferred.",
+             "noticedate": "2026-06-01T00:00:00Z"},
+            {"id": "y", field_name: "Jordan",
+             "bid_description": "Institutional support, Package 1",
+             "noticedate": "2026-06-01T00:00:00Z"},
+        ]}
+        with _Stub(payload):
+            records = worldbank.fetch_tenders()
+        check_eq(len(records), 1, f"worldbank: '{field_name}' is read as the country")
+        check("Institutional support" in records[0]["title"],
+              f"worldbank: and '{field_name}' selects the right notice")
+
+
 TESTS = [
     test_worldbank_parses_documented_shape,
+    test_worldbank_country_field_beats_a_full_text_match,
+    test_worldbank_country_field_accepts_several_spellings,
     test_worldbank_filters_to_jordan_even_when_the_api_does_not,
     test_worldbank_titles_are_per_notice_not_per_project,
     test_every_api_module_applies_the_jordan_filter,
