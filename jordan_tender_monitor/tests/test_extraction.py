@@ -393,6 +393,76 @@ def test_arabic_country_matching_is_substring():
           "country: the full Arabic country name matched")
 
 
+def test_a_save_button_does_not_become_the_notice():
+    """VERIFIED LIVE ON UNGM. Fifteen notices, fifteen identical titles.
+
+    Every row on the rendered listing opens with
+    `<a href="javascript:void(0);">Unsave this procurement opportunity.</a>`,
+    and taking the first anchor made that the title and the URL of every
+    notice. The result was a listing of buttons: no working link, no way to
+    tell two notices apart, and nothing a reader could act on.
+    """
+    result = H.extract(load("save_button_rows.html"),
+                       "https://www.ungm.org/Public/Notice",
+                       ["div.dataRow.notice-table"])
+    check_eq(len(result.rows), 4, "save button: four notices found")
+
+    titles = [row.title for row in result.rows]
+    check(not any("Unsave" in t for t in titles),
+          "save button: no row is titled after the save control", f"got {titles}")
+    check(len(set(titles)) == 4,
+          "save button: four notices produce four distinct titles")
+    check("water sector reform" in titles[0],
+          "save button: the title is the notice's own link text")
+
+    urls = [row.url or "" for row in result.rows]
+    check(not any("javascript:" in u for u in urls),
+          "save button: no row links to javascript:void(0)", f"got {urls}")
+    check(all("/Public/Notice/" in u for u in urls),
+          "save button: every row links to a real notice")
+
+
+def test_dead_hrefs_are_never_a_rows_link():
+    """mailto:, tel: and # are the same defect wearing a different hat."""
+    from bs4 import BeautifulSoup
+
+    for dead in ("javascript:void(0);", "#", "mailto:bids@example.org", "tel:+962"):
+        soup = BeautifulSoup(
+            f'<div><a href="{dead}">Contact us</a>'
+            f'<a href="/notices/7">Advisory Services, Amman</a></div>',
+            "html.parser")
+        row = H._node_to_row(soup.find("div"), "https://e.org/")
+        check_eq(row.url, "https://e.org/notices/7",
+                 f"dead href: '{dead}' is skipped in favour of the real link")
+        check_eq(row.title, "Advisory Services, Amman",
+                 f"dead href: '{dead}' does not supply the title")
+
+
+def test_a_month_name_joined_by_hyphens_is_recognised():
+    """VERIFIED LIVE ON UNGM: "03-Aug-2026".
+
+    parse_date read this format all along. The extractor's date-span pattern
+    did not -- every alternation wanted either digits for the month or
+    whitespace around a named one -- so the date was never handed to the
+    parser, and the rows scored as dateless.
+    """
+    check_eq(parse_date("03-Aug-2026"), date(2026, 8, 3),
+             "hyphen month: the parser reads it")
+    check_eq(H._first_date_text("Deadline 03-Aug-2026 19:00 (GMT -4.00)"),
+             "03-Aug-2026",
+             "hyphen month: and the extractor now finds it in a row of text")
+    check_eq(H._first_date_text("Closing 12-Oct-2026 17:00"), "12-Oct-2026",
+             "hyphen month: October too")
+    check_eq(H._first_date_text("15/January/2027"), "15/January/2027",
+             "hyphen month: slashes and a full month name as well")
+
+    # The formats that already worked must keep working.
+    check_eq(H._first_date_text("Deadline: 30 September 2026"), "30 September 2026",
+             "hyphen month: spaced month names still parse")
+    check_eq(H._first_date_text("Frist 31.12.2026"), "31.12.2026",
+             "hyphen month: German numeric dates still parse")
+
+
 def test_an_unclosed_cell_does_not_swallow_the_rest_of_the_row():
     """VERIFIED LIVE ON GIZ, 3 August 2026. Every deadline was unusable.
 
@@ -478,4 +548,7 @@ TESTS = [
     test_arabic_country_matching_is_substring,
     test_an_unclosed_cell_does_not_swallow_the_rest_of_the_row,
     test_own_text_is_identical_on_well_formed_cells,
+    test_a_save_button_does_not_become_the_notice,
+    test_dead_hrefs_are_never_a_rows_link,
+    test_a_month_name_joined_by_hyphens_is_recognised,
 ]

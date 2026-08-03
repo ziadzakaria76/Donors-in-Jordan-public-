@@ -443,10 +443,32 @@ _VALUE_LABELS = ("value", "budget", "amount", "estimated", "contract value",
                  "wert", "القيمة", "قيمة العقد")
 
 
+_DEAD_HREF_RE = re.compile(r"^\s*(?:javascript:|#|mailto:|tel:)", re.I)
+
+
+def _first_real_link(node):
+    """The first anchor that actually navigates somewhere.
+
+    VERIFIED ON UNGM. Every row on the rendered listing begins with a save
+    button -- <a href="javascript:void(0);">Unsave this procurement
+    opportunity.</a> -- so taking the first anchor gave all fifteen notices the
+    same title, "Unsave this procurement opportunity.", and a URL of
+    "javascript:void(0);". The notice's own link sits further down the row.
+
+    Bookmark, share and print controls are ordinary on a listing, and none of
+    them is ever the notice.
+    """
+    for a in node.find_all("a", href=True):
+        if _DEAD_HREF_RE.match(a["href"]):
+            continue
+        return a
+    return None
+
+
 def _node_to_row(node, base_url: str) -> Row:
     text = clean(node.get_text(" "))
 
-    link = node.find("a", href=True)
+    link = _first_real_link(node)
     url = urljoin(base_url, link["href"]) if link else None
 
     heading = node.find(["h1", "h2", "h3", "h4", "h5"])
@@ -476,6 +498,11 @@ def _node_to_row(node, base_url: str) -> Row:
 _DATE_SPAN_RE = re.compile(
     r"\d{4}-\d{1,2}-\d{1,2}"
     r"|\d{1,2}\s*[./-]\s*\d{1,2}\s*[./-]\s*\d{2,4}"
+    # A month NAME joined by hyphens or slashes rather than spaces: UNGM
+    # publishes "03-Aug-2026", and every alternation above needs either digits
+    # for the month or whitespace around a named one, so the date was invisible
+    # to the extractor while parse_date() could read it perfectly well.
+    r"|\d{1,2}\s*[-/]\s*[^\W\d_]{3,}\s*[-/]\s*\d{2,4}"
     r"|\d{1,2}\.?\s+[^\W\d_]{3,}(?:\s+[^\W\d_]{3,})?\s+\d{4}"
     r"|[^\W\d_]{3,}\s+\d{1,2},?\s+\d{4}",
     re.UNICODE,
@@ -648,7 +675,7 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
                 val = texts[i]
                 if fieldname == "title":
                     row.title = val
-                    link = cells[i].find("a", href=True)
+                    link = _first_real_link(cells[i])
                     if link:
                         row.url = urljoin(base_url, link["href"])
                 elif fieldname == "closing":
@@ -662,7 +689,7 @@ def extract_tables(html: str, base_url: str = "") -> LayerResult:
                 elif fieldname == "type":
                     row.extra["notice_type"] = val
             if not row.url:
-                link = tr.find("a", href=True)
+                link = _first_real_link(tr)
                 if link:
                     row.url = urljoin(base_url, link["href"])
             if clean(row.title):
@@ -815,7 +842,7 @@ def extract_anchor_pattern(html: str, base_url: str = "",
     groups: dict[str, list] = {}
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if href.startswith(("mailto:", "tel:", "javascript:")):
+        if _DEAD_HREF_RE.match(href):
             continue
         if hint and hint not in href:
             continue

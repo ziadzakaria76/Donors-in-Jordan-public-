@@ -1,0 +1,70 @@
+<!--
+  UNGM's rendered listing, reduced. Captured 3 August 2026.
+
+  Every row opens with a save/bookmark control:
+
+      <a href="javascript:void(0);">Unsave this procurement opportunity.</a>
+
+  Taking the first anchor in the row therefore gave all fifteen notices the
+  identical title "Unsave this procurement opportunity." and a URL of
+  "javascript:void(0);" -- a listing of fifteen buttons. The notice's own link
+  is further down the row.
+
+  The dates are "03-Aug-2026": a month NAME joined by hyphens. parse_date reads
+  that format fine, but the extractor's date-span pattern wanted either digits
+  for the month or whitespace around a named one, so it never saw them.
+
+  The deadline carries NO label -- no "Deadline:", no <time> tag -- exactly as
+  the live rows do. That is deliberate: adding a label here would make the
+  fixture easier than the page it came from, and the suite would then claim
+  UNGM works while the portal returned nothing. It does not yet clear the
+  quality gate on this fixture, and that is the honest state of it.
+-->
+<html>
+<head><title>UNGM Procurement Notices</title></head>
+<body>
+<div class="notice-list">
+
+  <div class="dataRow notice-table">
+    <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
+    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <div class="ungm-list-item">UNDP-JOR-00871</div>
+    <div class="ungm-list-item">
+      <a href="/Public/Notice/265432">Consultancy for water sector reform, Amman, Jordan</a>
+    </div>
+    <div class="ungm-list-item deadline">30-Sep-2026 19:00 (GMT +3.00)</div>
+  </div>
+
+  <div class="dataRow notice-table">
+    <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
+    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <div class="ungm-list-item">UNICEF-JOR-00112</div>
+    <div class="ungm-list-item">
+      <a href="/Public/Notice/265433">Evaluation of education programming, Irbid, Jordan</a>
+    </div>
+    <div class="ungm-list-item deadline">12-Oct-2026 17:00 (GMT +3.00)</div>
+  </div>
+
+  <div class="dataRow notice-table">
+    <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
+    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <div class="ungm-list-item">UNDP-ECU-00953</div>
+    <div class="ungm-list-item">
+      <a href="/Public/Notice/265434">Construcci&oacute;n de obras civiles en Esmeraldas</a>
+    </div>
+    <div class="ungm-list-item deadline">03-Aug-2026 19:00 (GMT -4.00)</div>
+  </div>
+
+  <div class="dataRow notice-table">
+    <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
+    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <div class="ungm-list-item">WFP-SDN-00220</div>
+    <div class="ungm-list-item">
+      <a href="/Public/Notice/265435">Monitoring and Evaluation consultant</a>
+    </div>
+    <div class="ungm-list-item deadline">21-Sep-2026 12:00 (GMT +2.00)</div>
+  </div>
+
+</div>
+</body>
+</html>

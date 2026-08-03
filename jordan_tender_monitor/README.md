@@ -15,8 +15,9 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **606 checks** |
-| **Diagnosed and reworked** | UNGM — both HTTP routes are dead ends (POST search: 395 bytes; GET listing: 141 KB of pure navigation, no notices). It now renders in a headless browser. GIZ — the English giz.de page carries no listing at all and has been dropped; the German portal reads cleanly at quality 1.00. |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **626 checks** |
+| **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
+| **Partly fixed, not yet reading** | UNGM — the headless browser renders the listing (15 notices, up from zero), and two of three defects on those rows are fixed: a `javascript:void(0)` save button was becoming every notice's title and URL, and `03-Aug-2026` was a date format the extractor could not see. The rows still carry no labelled deadline, so they score below the quality gate and the portal returns nothing. One more capture is needed to map the columns. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
 | **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
@@ -253,7 +254,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 606 checks, no network, no credentials
+python tests/run_all.py    # 626 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

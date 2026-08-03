@@ -118,6 +118,8 @@ def cmd_capture(portal_key: str) -> int:
     print(f"\nCapturing {portals.name(portal_key)}...\n")
 
     module = capturable[portal_key]
+    spec_selectors = list(getattr(module, "SPEC", None).selectors
+                          if getattr(module, "SPEC", None) else [])
     results = module.capture()
     any_saved = False
 
@@ -173,6 +175,8 @@ def cmd_capture(portal_key: str) -> int:
             print(f"      {hint}")
 
         for line in _describe_tables(html):
+            print(f"      {line}")
+        for line in _describe_block(html, spec_selectors):
             print(f"      {line}")
         print()
 
@@ -244,6 +248,77 @@ def _describe_tables(html: str, limit: int = 2) -> list[str]:
                        + ("  <-- MISMATCH with the header" if len(cells) != len(header) else ""))
             for i, cell in enumerate(cells):
                 out.append(f"      [{i}] {truncate(cell, 70)!r}")
+    return out
+
+
+def _describe_block(html: str, selectors: list[str]) -> list[str]:
+    """Break one repeated row open and show what each part of it holds.
+
+    The table dump does this for tables. A div-based listing has no header to
+    map, so when its rows come out wrong there is nothing to look at -- UNGM
+    produced fifteen rows whose title was the save button and whose dates were
+    all None, and the summary could not say which element held the real title,
+    or whether "03-Aug-2026" was a deadline or a publication date.
+
+    Prints each descendant that carries its own text, with the tag and classes
+    that identify it, so a column can be mapped instead of guessed at.
+    """
+    from collections import Counter
+
+    from bs4 import BeautifulSoup
+
+    from jordan_tender_monitor.portals.htmlkit import _own_text
+    from jordan_tender_monitor.utils.text import clean, truncate
+
+    soup = BeautifulSoup(html, "html.parser")
+
+    node = None
+    for selector in selectors:
+        try:
+            found = soup.select(selector)
+        except Exception:  # noqa: BLE001 - an invalid hint is not fatal here
+            continue
+        if len(found) >= 3:
+            node = found[0]
+            break
+    if node is None:
+        # Fall back to the most repeated class-bearing block that has a link,
+        # which is what _derive_selectors reports.
+        counter: Counter[str] = Counter()
+        by_key: dict[str, object] = {}
+        for candidate in soup.find_all(True):
+            classes = candidate.get("class") or []
+            if not classes or not candidate.find("a", href=True):
+                continue
+            key = "{}.{}".format(candidate.name, ".".join(sorted(classes)[:2]))
+            counter[key] += 1
+            by_key.setdefault(key, candidate)
+        if not counter:
+            return []
+        key, count = counter.most_common(1)[0]
+        if count < 3:
+            return []
+        node = by_key[key]
+
+    classes = ".".join(node.get("class") or [])
+    out = [f"\n    Anatomy of one {node.name}"
+           f"{'.' + classes if classes else ''} row:"]
+    for child in node.find_all(True):
+        text = _own_text(child) if child.name not in ("script", "style") else ""
+        href = child.get("href") if child.name == "a" else None
+        if not text and not href:
+            continue
+        label = child.name
+        child_classes = child.get("class") or []
+        if child_classes:
+            label += "." + ".".join(child_classes[:2])
+        line = f"      {label:34} {truncate(clean(text), 60)!r}"
+        if href:
+            line += f"  href={truncate(href, 50)!r}"
+        out.append(line)
+        if len(out) > 30:
+            out.append("      ... (truncated)")
+            break
     return out
 
 
