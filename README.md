@@ -15,7 +15,7 @@ worked around.
 
 - **Verified against the live web:** nothing
 - **Verified offline against fixtures:** extraction, parsing, filtering,
-  scoring, reporting, delivery fallback — 481 checks
+  scoring, reporting, delivery fallback — 507 checks
 - **Not verified:** every portal URL, every CSS selector, every API response
   shape, and email delivery
 
@@ -40,7 +40,9 @@ HTML portal before trusting it.
 
 A failing portal is skipped with a diagnosed reason and reported as unavailable
 with the URL to check by hand. It never aborts the run, and a broken run never
-looks like a quiet one — portal health is in the output filename.
+looks like a quiet one — portal health is in the output filename, and an
+optional short **ACTION NEEDED** email fires when a run cannot read its sources
+at all.
 
 ## Quick start
 
@@ -83,7 +85,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 481 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 507 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

@@ -10,6 +10,7 @@ Jordan Tender Intelligence Monitor -- command line entry point.
     python run.py --capture PORTAL  fetch a portal's live pages and report
                                     which extraction layer works
     python run.py --self-test       run the pipeline on offline fixtures
+    python run.py --test-alert      prove the failure-alert path works
     python run.py --reset-db        forget every reported tender
     python run.py --schedule        run on the configured schedule
 
@@ -230,6 +231,23 @@ def _print_summary(scrape_result, processed, reported: list[dict]) -> None:
     print("-" * 78 + "\n")
 
 
+def _warn_if_alerting_is_blind() -> None:
+    """Say so when alerting is enabled but could not actually send.
+
+    Printed on every real run, not only on failing ones -- an alert path is
+    only worth having if you know it works before you need it.
+    """
+    if not config.ALERT_EMAIL:
+        return
+    ok, detail = emailer.alert_configured()
+    if not ok:
+        print(f"\n  NOTE: failure alerting is enabled but cannot send - {detail}.\n"
+              f"        Runs will still write their files, and the filename will "
+              f"still state the run's health,\n"
+              f"        but nothing will reach your inbox if the scrapers break. "
+              f"Verify with: python run.py --test-alert\n")
+
+
 def cmd_run(send: bool, only: list[str] | None = None) -> int:
     store = tracker.Tracker()
     first_run = store.is_first_run()
@@ -259,6 +277,8 @@ def cmd_run(send: bool, only: list[str] | None = None) -> int:
               "Use --run for the real thing.\n")
         return 0
 
+    _send_alert_if_needed(scrape_result.health, written)
+
     attachments = reporter.attachments_for_email(written)
     delivery = emailer.deliver(subject, body_html, body_text, attachments, written)
     if delivery.method == "file":
@@ -273,6 +293,53 @@ def cmd_run(send: bool, only: list[str] | None = None) -> int:
         store.log_run(processed["scanned"], len(reported),
                       len(scrape_result.ok_portals), len(scrape_result.health))
     return 0
+
+
+def _send_alert_if_needed(health: list, written: dict) -> None:
+    """Send the ACTION NEEDED alert, if this run warrants one.
+
+    Called after the files are written, so a failure here can never cost the
+    report. Any outcome is printed: a silently unsent alert would defeat the
+    purpose of having one.
+    """
+    needed, reason = emailer.should_alert(health)
+    if not needed:
+        return
+
+    subject, html_body, text_body = reporter.build_alert(health, reason, written)
+    result = emailer.send_alert(subject, html_body, text_body)
+    if result.sent:
+        print(f"\n  ALERT SENT ({reason}) via {result.method}.")
+    else:
+        print(f"\n  *** THIS RUN NEEDED ATTENTION ({reason}) AND THE ALERT COULD "
+              f"NOT BE SENT ***\n      {result.detail}\n"
+              f"      Fix the mail configuration, or watch "
+              f"{config.OUTPUT_DIR} by hand.\n")
+
+
+def cmd_test_alert() -> int:
+    """Send a specimen alert so the path is proven before it is relied on."""
+    from jordan_tender_monitor import fixtures
+
+    ok, detail = emailer.alert_configured()
+    print(f"\nAlert configuration: {'OK -- via ' + detail if ok else 'NOT USABLE'}")
+    if not ok:
+        print(f"  {detail}\n\nNothing was sent. Fix .env and try again.\n")
+        return 1
+
+    health = fixtures.all_broken_health()
+    needed, reason = emailer.should_alert(health)
+    subject, html_body, text_body = reporter.build_alert(health, reason or "test")
+    print(f"  recipients : {', '.join(config.alert_recipients())}")
+    print(f"  subject    : {subject}")
+
+    result = emailer.send_alert("[TEST] " + subject, html_body, text_body)
+    if result.sent:
+        print(f"\nTest alert sent via {result.method}. Confirm it arrived -- and "
+              f"check it is not filtered as spam.\n")
+        return 0
+    print(f"\nTest alert FAILED: {result.detail}\n")
+    return 1
 
 
 def cmd_self_test() -> int:
@@ -403,6 +470,9 @@ def main(argv: list[str] | None = None) -> int:
                             "extraction layer works")
     group.add_argument("--self-test", action="store_true",
                        help="run the pipeline on offline fixtures in a temp dir")
+    group.add_argument("--test-alert", action="store_true",
+                       help="send a specimen ACTION NEEDED alert, to prove the "
+                            "alert path works before you rely on it")
     group.add_argument("--reset-db", action="store_true",
                        help="forget every reported tender")
     group.add_argument("--schedule", action="store_true",
@@ -415,10 +485,14 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(args.verbose)
     load_env()
 
+    if args.send:
+        _warn_if_alerting_is_blind()
     if args.check_portals:
         return cmd_check_portals()
     if args.capture:
         return cmd_capture(args.capture)
+    if args.test_alert:
+        return cmd_test_alert()
     if args.self_test:
         return cmd_self_test()
     if args.reset_db:

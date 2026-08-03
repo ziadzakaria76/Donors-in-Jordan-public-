@@ -214,3 +214,78 @@ def deliver(subject: str, html_body: str, text_body: str,
     return DeliveryResult("file", True,
                           f"no mail sent ({'; '.join(failures)}). "
                           f"The report is in {config.OUTPUT_DIR}")
+
+
+# ---------------------------------------------------------------------------
+# ACTION NEEDED alerts
+#
+# Separate from delivery on purpose. The reports are files; this is the one
+# thing that has to reach a person, and it fires only when something is wrong.
+# ---------------------------------------------------------------------------
+
+
+def should_alert(health: list) -> tuple[bool, str]:
+    """Whether this run warrants an alert, and why.
+
+    Total outage always alerts. Partial degradation alerts only if a threshold
+    is configured -- a single flaky portal is visible in the report filename and
+    does not need to interrupt anyone.
+    """
+    if not config.ALERT_EMAIL:
+        return False, ""
+
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+
+    if total and len(broken) == total:
+        return True, f"all {total} portals unreachable"
+
+    threshold = config.ALERT_ON_PARTIAL_BROKEN
+    if threshold is not None and len(broken) >= threshold:
+        return True, f"{len(broken)} of {total} portals unavailable"
+
+    return False, ""
+
+
+def alert_configured() -> tuple[bool, str]:
+    """Whether an alert could actually be sent right now.
+
+    Checked up front rather than at the moment of failure. An alert path you
+    only discover is broken when you need it is not an alert path.
+    """
+    if not config.ALERT_EMAIL:
+        return False, "alerting is switched off (ALERT_EMAIL = False)"
+    if not config.alert_recipients():
+        return False, ("no ALERT_RECIPIENTS or EMAIL_RECIPIENTS in .env - "
+                       "an alert would have nowhere to go")
+
+    has_graph = bool(config.AZURE_TENANT_ID and config.AZURE_CLIENT_ID
+                     and config.AZURE_CLIENT_SECRET and config.SENDER_EMAIL)
+    has_smtp = bool(config.SMTP_USER and config.SMTP_PASS)
+    if not (has_graph or has_smtp):
+        return False, ("no mail credentials in .env - set the Azure Graph "
+                       "values (or SMTP) so alerts can be sent")
+    return True, "graph" if has_graph else "smtp"
+
+
+def send_alert(subject: str, html_body: str, text_body: str) -> DeliveryResult:
+    """Send the alert, trying Graph then SMTP. Never attaches the report."""
+    recipients = config.alert_recipients()
+    if not recipients:
+        return DeliveryResult("file", False, "no alert recipients configured")
+
+    failures = []
+    for method in ("graph", "smtp"):
+        if method == "graph":
+            result = send_via_graph(subject, html_body, recipients, [], [])
+        else:
+            result = send_via_smtp(subject, html_body, text_body, recipients, [], [])
+        if result.sent:
+            return result
+        failures.append(f"{method}: {result.detail}")
+
+    # An alert that could not be sent is itself worth shouting about, because
+    # the thing it was warning about is now invisible.
+    log.error("ALERT COULD NOT BE SENT (%s). The run needed attention and "
+              "nobody was told.", "; ".join(failures))
+    return DeliveryResult("file", False, "; ".join(failures))

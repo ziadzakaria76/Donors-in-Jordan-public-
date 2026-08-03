@@ -563,6 +563,136 @@ def test_smtp_without_credentials_does_not_raise():
 
 
 # ---------------------------------------------------------------------------
+# ACTION NEEDED alerts
+#
+# The reports are files; this is the one message that has to reach a person.
+# Its whole value rests on firing when something is wrong and STAYING SILENT
+# otherwise -- an alert that arrives on healthy days is one people filter.
+# ---------------------------------------------------------------------------
+
+
+def test_alert_fires_only_when_something_is_wrong():
+    healthy = [h for h in fixtures.sample_health() if h.status == "ok"]
+
+    needed, _ = emailer.should_alert(healthy)
+    check(not needed, "alert: a healthy run sends nothing")
+
+    needed, _ = emailer.should_alert(fixtures.sample_health())
+    check(not needed,
+          "alert: one flaky portal does not interrupt anyone -- it is visible "
+          "in the report filename")
+
+    needed, reason = emailer.should_alert(fixtures.all_broken_health())
+    check(needed, "alert: a total outage DOES alert")
+    check("unreachable" in reason, "alert: and says why", f"got {reason!r}")
+
+
+def test_alert_respects_the_partial_threshold():
+    original = config.ALERT_ON_PARTIAL_BROKEN
+    try:
+        health = fixtures.sample_health()          # exactly one broken portal
+        config.ALERT_ON_PARTIAL_BROKEN = 1
+        needed, reason = emailer.should_alert(health)
+        check(needed, "alert: a configured threshold catches partial degradation")
+        check("unavailable" in reason, "alert: the partial reason names the count")
+
+        config.ALERT_ON_PARTIAL_BROKEN = 5
+        needed, _ = emailer.should_alert(health)
+        check(not needed, "alert: below the threshold stays silent")
+    finally:
+        config.ALERT_ON_PARTIAL_BROKEN = original
+
+
+def test_alert_can_be_switched_off_entirely():
+    original = config.ALERT_EMAIL
+    try:
+        config.ALERT_EMAIL = False
+        needed, _ = emailer.should_alert(fixtures.all_broken_health())
+        check(not needed, "alert: ALERT_EMAIL = False silences even a total outage")
+    finally:
+        config.ALERT_EMAIL = original
+
+
+def test_alert_configuration_is_checked_before_it_is_needed():
+    """An alert path you only discover is broken when you need it is not one."""
+    original = (config.EMAIL_RECIPIENTS, config.AZURE_TENANT_ID,
+                config.AZURE_CLIENT_ID, config.AZURE_CLIENT_SECRET,
+                config.SENDER_EMAIL, config.SMTP_USER, config.SMTP_PASS)
+    try:
+        config.EMAIL_RECIPIENTS = []
+        ok, detail = emailer.alert_configured()
+        check(not ok, "alert-config: no recipients means not usable")
+        check("nowhere to go" in detail, "alert-config: and says so plainly")
+
+        config.EMAIL_RECIPIENTS = ["someone@example.com"]
+        config.AZURE_TENANT_ID = config.AZURE_CLIENT_ID = ""
+        config.AZURE_CLIENT_SECRET = config.SENDER_EMAIL = ""
+        config.SMTP_USER = config.SMTP_PASS = ""
+        ok, detail = emailer.alert_configured()
+        check(not ok, "alert-config: recipients without credentials is not usable")
+        check("credentials" in detail, "alert-config: and names what is missing")
+
+        config.AZURE_TENANT_ID = "t"
+        config.AZURE_CLIENT_ID = "c"
+        config.AZURE_CLIENT_SECRET = "s"
+        config.SENDER_EMAIL = "from@example.com"
+        ok, detail = emailer.alert_configured()
+        check(ok, "alert-config: complete Graph credentials are usable")
+        check_eq(detail, "graph", "alert-config: reports which path would be used")
+    finally:
+        (config.EMAIL_RECIPIENTS, config.AZURE_TENANT_ID, config.AZURE_CLIENT_ID,
+         config.AZURE_CLIENT_SECRET, config.SENDER_EMAIL, config.SMTP_USER,
+         config.SMTP_PASS) = original
+
+
+def test_alert_body_is_short_actionable_and_unattached():
+    health = fixtures.all_broken_health()
+    _, reason = emailer.should_alert(health)
+    subject, html_body, text_body = reporter.build_alert(health, reason)
+
+    check(subject.startswith(config.ACTION_NEEDED_PREFIX),
+          "alert: the subject leads with ACTION NEEDED")
+    check("unreachable" in subject, "alert: the subject states the failure")
+
+    check("bot wall" in html_body or "transport error" in html_body,
+          "alert: the diagnosed cause is in the body")
+    check("ebrd.com" in html_body or "worldbank" in html_body,
+          "alert: a URL to check by hand is included")
+    check("--capture" in html_body,
+          "alert: the body says what to run next")
+    check(str(config.OUTPUT_DIR) in html_body,
+          "alert: and where the files are")
+
+    check(len(html_body) < 12_000,
+          "alert: the body stays short -- this is an alert, not a digest",
+          f"{len(html_body)} chars")
+    check("World Bank" in text_body, "alert: a plain-text alternative is built")
+
+    # The alert must never carry the report. An alert with a workbook attached
+    # gets filtered, and it is the one message that must arrive.
+    import inspect
+    source = inspect.getsource(emailer.send_alert)
+    check("[]" in source, "alert: send_alert passes no attachments")
+
+
+def test_alert_without_credentials_reports_failure_rather_than_raising():
+    original = (config.EMAIL_RECIPIENTS, config.SMTP_USER, config.SMTP_PASS)
+    try:
+        config.EMAIL_RECIPIENTS = ["someone@example.com"]
+        config.SMTP_USER = config.SMTP_PASS = ""
+        result = emailer.send_alert("subject", "<html></html>", "text")
+        check(not result.sent,
+              "alert: an unsendable alert reports failure instead of raising")
+        check(result.detail, "alert: and carries the reason for the log")
+    finally:
+        (config.EMAIL_RECIPIENTS, config.SMTP_USER, config.SMTP_PASS) = original
+
+    config_recipients = config.alert_recipients()
+    check(isinstance(config_recipients, list),
+          "alert: recipient resolution always returns a list")
+
+
+# ---------------------------------------------------------------------------
 # New-only mode, and the rule that diagnostics never touch real state
 # ---------------------------------------------------------------------------
 
@@ -654,6 +784,12 @@ TESTS = [
     test_delivery_without_credentials_degrades_to_disk,
     test_graph_without_credentials_does_not_raise,
     test_smtp_without_credentials_does_not_raise,
+    test_alert_fires_only_when_something_is_wrong,
+    test_alert_respects_the_partial_threshold,
+    test_alert_can_be_switched_off_entirely,
+    test_alert_configuration_is_checked_before_it_is_needed,
+    test_alert_body_is_short_actionable_and_unattached,
+    test_alert_without_credentials_reports_failure_rather_than_raising,
     test_new_only_mode_reports_each_tender_once,
     test_diagnostics_do_not_touch_the_real_database,
     test_tender_ids_are_stable_across_runs,

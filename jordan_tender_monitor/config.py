@@ -398,12 +398,52 @@ SCHEDULE_TIMEZONE = "Asia/Amman"
 SCHEDULE_CRON_UTC = "0 4 * * 1-5"
 
 # --------------------------------------------------------------------------
-# Q15 -- FAILURE ALERTING: portal health in the subject, diagnosed table in the
-# body. A subject reading "0 opportunities" whether every portal failed or
-# every portal worked lets a dead monitor go unnoticed for weeks.
+# Q15 -- FAILURE ALERTING.
+#
+# The reports themselves are files, and their filenames carry the run's health
+# (see HEALTH_IN_FILENAME). That covers every case except one: a scheduler that
+# stops firing produces no file at all, and with no email arriving there is
+# nothing to notice. The alert below is the positive signal for that gap.
+#
+# It is NOT the report. It is short, carries no attachments, and fires only
+# when something is actually wrong -- so an alert in the inbox always means
+# act, and never means "here is your daily reading".
 # --------------------------------------------------------------------------
 HEALTH_IN_SUBJECT = True
 ACTION_NEEDED_PREFIX = "ACTION NEEDED"
+
+# Send a short alert email when a run needs attention.
+#
+# Enabling this reintroduces the mail credentials that file-only output removed,
+# and with them the Mail.Send scoping requirement -- see the emailer module and
+# the README before granting it as an Azure application permission. That is a
+# real cost for a small surface, which is why it is separate from the report
+# and off unless credentials are actually present.
+ALERT_EMAIL = True
+
+# Always alerts when EVERY portal is unreachable -- the ACTION NEEDED state.
+#
+# Set a number to also alert on partial degradation, e.g. 4 means "alert when
+# four or more portals are unavailable". None means total outage only, which is
+# the conservative default: a single flaky portal is visible in the filename
+# and does not need to interrupt anyone.
+ALERT_ON_PARTIAL_BROKEN: int | None = None
+
+# A persistent outage re-alerts on every run rather than being suppressed after
+# the first. Silence during a week-long outage is exactly the failure this
+# exists to prevent, and a weekday schedule caps the noise at five.
+ALERT_SUBJECT_PREFIX = "ACTION NEEDED: Jordan Tender Monitor"
+
+
+def alert_recipients() -> list[str]:
+    """Who receives alerts. Falls back to EMAIL_RECIPIENTS when unset.
+
+    The fallback reads the module attribute rather than the environment, so
+    alerting and report delivery can never disagree about who the recipients
+    are -- EMAIL_RECIPIENTS is refreshed from .env by refresh_credentials(),
+    and re-reading os.environ here would silently bypass any later change.
+    """
+    return _addresses("ALERT_RECIPIENTS") or list(EMAIL_RECIPIENTS)
 
 # --------------------------------------------------------------------------
 # Country matching.
