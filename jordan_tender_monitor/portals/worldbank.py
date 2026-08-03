@@ -1,8 +1,13 @@
 """
 World Bank procurement notices -- REST API, Tier 1.
 
-The API takes a country filter directly, so unlike the scraped portals this one
-does not need country matching applied afterwards.
+VERIFIED AGAINST THE LIVE API: countryshortname=Jordan is IGNORED. The endpoint
+returned 200 worldwide notices -- Pakistan, Laos, Bolivia, the Caribbean -- and
+because this module trusted the parameter and skipped jordan_only(), the first
+live report led with a Caribbean education project. The country filter is now
+applied client-side regardless of what the API claims to do, and a free-text
+term narrows the server-side result set so the client filter has Jordan notices
+to find.
 
 VERIFICATION STATUS: the endpoint and its parameters are documented and stable,
 but this code has never run against it -- every portal domain is blocked from
@@ -29,9 +34,15 @@ def _pick(item: dict, *names, default=None):
 
 def fetch_tenders() -> list[dict]:
     params = {
+        # Kept even though the API was observed to ignore it: harmless, and it
+        # may start working. jordan_only() below is what actually guarantees
+        # the result, so nothing depends on this.
         "countryshortname": "Jordan",
+        # Free-text narrowing, because without it the response is worldwide and
+        # a 200-row page may contain no Jordan notices at all.
+        "qterm": "Jordan",
         "format": "json",
-        "rows": 200,
+        "rows": 500,
         "os": 0,
     }
     payload = base.fetch_json(API, params=params)
@@ -59,8 +70,22 @@ def fetch_tenders() -> list[dict]:
     for item in items:
         if not isinstance(item, dict):
             continue
-        title = _pick(item, "project_name", "projectname", "title", "notice_title",
-                      "bid_description", "bid_desc", default="")
+        # NOTICE-specific fields first, project name only as a last resort.
+        #
+        # A World Bank project raises many procurement notices, and they all
+        # share one project_name. Reading the title from that field made six
+        # different notices appear in the report as six identical lines of
+        # "Jordan Education Reform Support Program" -- unreadable, and it
+        # inflated the count with what looked like duplicates.
+        title = _pick(item, "notice_title", "noticetitle", "bid_description",
+                      "bid_desc", "title", default="")
+        project = _pick(item, "project_name", "projectname")
+        if not title:
+            title = project or ""
+        elif project and project.lower() not in title.lower():
+            # Keep the project as context; it is how these are grouped on the
+            # portal and it is genuinely useful when scanning the report.
+            title = f"{title} ({project})"
         if not title:
             continue
         url = _pick(item, "url", "notice_url", "pdf_url", "noticeurl")
@@ -74,11 +99,14 @@ def fetch_tenders() -> list[dict]:
                           "deadline", "submissiondeadline", "closing_date"),
             value_text=_pick(item, "contract_value", "estimated_cost",
                              "totalvalue", "amount"),
-            description=_pick(item, "bid_description", "notice_text",
-                              "description", "project_ctry_name"),
+            description=_pick(item, "notice_text", "description",
+                              "bid_description", "project_ctry_name"),
             notice_type=_pick(item, "notice_type", "noticetype", "procurement_type"),
             contact=_pick(item, "contact_email", "contact_name", "agency_name"),
             reference=_pick(item, "id", "notice_no", "bid_reference_no", "project_id"),
             default_currency="USD",
         ))
-    return records
+
+    # Defence in depth. See the module docstring: the API's own country filter
+    # was observed not to work.
+    return base.jordan_only(records)

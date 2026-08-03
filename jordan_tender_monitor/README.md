@@ -6,41 +6,34 @@ working file to disk.
 
 ---
 
-## ⚠️ Verification status — read this first
+## Verification status — read this first
 
-**No scraper in this repository has ever run against a live page.** It was built
-in an environment whose egress policy blocked all 13 portal domains with
-`HTTP 403` at the proxy. That is a policy denial, not a transient failure, and
-it was not worked around.
+**The scrapers ran against live pages for the first time on 3 August 2026.**
+Before that date nothing here had ever touched a real portal; the build
+environment blocked all 13 domains.
 
 | | Status |
 |---|---|
-| **Verified against the live web** | **Nothing.** Zero portal domains were reachable. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **534 checks** |
-| **Verified in this environment (no portals)** | Dependency install, `pyflakes`, `--check-portals`, `--dry-run`, `--capture`, `--self-test` all run end to end and behave correctly under total portal failure |
-| **Not verified at all** | Every portal URL · every CSS selector · **whether the real APIs return the shapes assumed** · the UNGM POST payload · email delivery (no credentials were present) |
+| **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **553 checks** |
+| **Known broken, live** | UNGM (POST search returns 3 rows, not a listing) · EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
+| **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
+| **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
 
-On the REST modules specifically: their parsing is now exercised against payloads
-in the shapes the documentation describes, which proves the parsing is correct
-*given* those shapes. It does not prove the shapes are right. If an API returns
-something different, these tests still pass and the portal still fails — though
-it will fail with a diagnosed `PortalError` rather than silently returning
-nothing, which is the property the tests do guarantee.
+### What the first live run taught us
 
-**The CSS selectors are guesses.** They are informed by the CMS each portal
-appears to run, but not one has been checked against the live DOM. The same
-applies to the API field names — the World Bank, TED, SAM.gov and Find a Tender
-modules read several possible spellings for each field precisely because the
-real ones could not be confirmed.
+**Never trust a source's own country filter.** The World Bank API accepts
+`countryshortname=Jordan` and ignores it, returning worldwide notices. That
+module was the only one skipping `jordan_only()` — on the strength of a comment
+I wrote justifying the omission — so the first report led with a Caribbean
+education project and roughly 140 of 259 entries were not Jordan. Every module
+now filters client-side regardless, and a test enforces it structurally.
 
-The quality gate stops a wrong selector from producing *bad* data — it falls
-through to a class-independent layer instead. It cannot make a wrong selector
-*right*. **Run `--capture` against each HTML portal before trusting this.**
-
-The portal URLs could not be checked either. Several published lists of donor
-procurement URLs are years out of date; treat these as a starting point.
-
----
+**A count alone cannot diagnose a portal.** Five portals reported `OK: 0` and
+the number could not distinguish "returned nothing" from "returned 500
+worldwide notices, none Jordan". Portal health now carries the pre-filter
+count, which turned those five identical zeroes into five different diagnoses
+in a single run.
 
 ## Quick start
 
@@ -244,7 +237,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 534 checks, no network, no credentials
+python tests/run_all.py    # 553 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

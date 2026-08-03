@@ -163,6 +163,8 @@ def _health_table(health: list) -> str:
         if h.status == "ok":
             status = '<span style="color:#2E7D32">OK</span>'
             detail = f"{h.count} Jordan notice(s)"
+            if h.scanned is not None and h.scanned != h.count:
+                detail += f" &middot; {h.scanned} read, {h.scanned - h.count} not Jordan"
             if h.layer:
                 detail += f" &middot; via {_e(h.layer)} layer (quality {h.quality:.2f})"
         elif h.status == "unconfigured":
@@ -597,7 +599,9 @@ def write_markdown(tenders: list[dict], health: list, result: dict, path: Path) 
               "| Portal | Status | Detail |", "|---|---|---|"]
     for h in health:
         if h.status == "ok":
-            detail = f"{h.count} notice(s)"
+            detail = f"{h.count} Jordan notice(s)"
+            if h.scanned is not None and h.scanned != h.count:
+                detail += f" — {h.scanned} read, {h.scanned - h.count} not Jordan"
             if h.layer:
                 detail += f" via `{h.layer}`"
         else:

@@ -246,12 +246,37 @@ def rows_from_html(html: str, base_url: str, selectors: list[str] | None = None,
     return result
 
 
+# How many notices a portal returned BEFORE Jordan filtering.
+#
+# Without this, a portal reporting "OK: 0" is ambiguous: it could have returned
+# nothing, or returned 500 worldwide notices of which none were Jordan. Those
+# need completely different fixes, and the first live run cost real time to
+# diagnose for exactly this reason. Thread-local because portals run in a
+# ThreadPoolExecutor, one thread each.
+_scanned = threading.local()
+
+
+def note_scanned(count: int) -> None:
+    _scanned.value = count
+
+
+def take_scanned() -> int | None:
+    """Read and clear the count for the current thread."""
+    value = getattr(_scanned, "value", None)
+    _scanned.value = None
+    return value
+
+
 def jordan_only(records: list[dict]) -> list[dict]:
     """Keep records that actually refer to Jordan.
 
-    Applied to portals that publish worldwide. See utils.text.mentions_jordan
-    for why this is not a substring match.
+    Applied to EVERY portal, including those whose API claims to filter by
+    country already. The World Bank API silently ignored countryshortname and
+    returned worldwide notices; because that module trusted the parameter and
+    skipped this function, the first live report led with a Caribbean education
+    project. Never trust a source's own filter -- verify it here.
     """
+    note_scanned(len(records))
     kept = []
     for record in records:
         if textutil.mentions_jordan(

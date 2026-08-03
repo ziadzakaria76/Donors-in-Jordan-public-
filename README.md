@@ -7,22 +7,35 @@ working file to disk.
 
 Full documentation: **[`jordan_tender_monitor/README.md`](jordan_tender_monitor/README.md)**
 
-## Status — the scrapers have never run against a live page
+## Status — first live run completed 3 August 2026
 
-This was built in an environment whose egress policy blocked **all 13 portal
-domains** with `HTTP 403` at the proxy. That is a policy denial, and it was not
-worked around.
+The scrapers have now run against live pages. Results by portal:
 
-- **Verified against the live web:** nothing
-- **Verified offline against fixtures:** extraction, parsing, filtering,
-  scoring, reporting, delivery fallback — 534 checks
-- **Not verified:** every portal URL, every CSS selector, every API response
-  shape, and email delivery
+| Portal | Live result |
+|---|---|
+| **EBRD** | **Working.** 4,004 notices scanned, 119 Jordan |
+| **World Bank** | **Working** after a fix — the API ignores its own country filter |
+| UK Find a Tender | Working. 500 read, no Jordan notices currently open |
+| IsDB | Working. 144 read, no Jordan notices currently open |
+| GIZ | Reachable, but only 23 rows read — extraction needs checking |
+| **UNGM** | **Broken.** 3 rows read; the POST search is not returning a listing |
+| EU TED | Broken. HTTP 400 — the v3 query grammar is wrong |
+| KfW (via GTAI) | Blocked. HTTP 403 bot wall from a data-centre IP |
+| EIB | Blocked. Cloudflare bot wall |
+| Saudi Fund | Unreachable. Connection timeout |
+| ADFD | Reachable, no listing found — needs `--capture` |
+| JICA | HTTP 404 — the URL has moved |
+| SAM.gov | Awaiting an API key |
 
-**The CSS selectors are guesses.** The quality gate stops a wrong selector from
-producing bad data — it falls through to a class-independent layer. It cannot
-make a wrong selector right. Run `python run.py --capture PORTAL` against each
-HTML portal before trusting it.
+**Two defects the first run exposed, both now fixed.** The World Bank API
+silently ignores `countryshortname=Jordan`; because that module trusted the
+parameter and skipped client-side filtering, the first report led with a
+Caribbean education project and roughly 140 of 259 entries were not Jordan at
+all. And World Bank titles were read from `project_name`, so six different
+notices rendered as six identical lines.
+
+**Still unverified:** the CSS selectors for the portals that have not yet
+returned a clean listing. Run `python run.py --capture PORTAL` against those.
 
 ## What it does
 
@@ -97,7 +110,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 534 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 553 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`
