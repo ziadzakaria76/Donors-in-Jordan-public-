@@ -22,6 +22,14 @@ on:
         required: false
         default: ""
         type: string
+      mode:
+        description: "What to do"
+        required: true
+        default: "produce the report"
+        type: choice
+        options:
+          - "produce the report"
+          - "diagnose portals (--capture)"
   schedule:
     # 04:00 UTC = 07:00 Asia/Amman. Jordan is UTC+3 year-round (DST abolished
     # in 2022), so this needs no seasonal adjustment. GitHub cron is always UTC.
@@ -63,8 +71,37 @@ jobs:
           key: seen-tenders-${{ github.run_id }}
           restore-keys: seen-tenders-
 
+      # Diagnosis mode. --capture fetches a portal's live pages and reports,
+      # per extraction layer, how many rows it found and at what quality, which
+      # layer won, and the selectors the page actually uses -- derived from the
+      # DOM rather than guessed. This is how an unverified selector gets
+      # confirmed, and running it here means it can be done from a phone.
+      - name: Diagnose portals
+        if: github.event.inputs.mode == 'diagnose portals (--capture)'
+        env:
+          JTM_OUTPUT_FORMATS: "markdown"
+        run: |
+          set +e
+          targets="${{ github.event.inputs.portals }}"
+          [ -z "$targets" ] && targets="ungm ebrd eib giz kfw isdb sfd adfd jica"
+          for p in $targets; do
+            echo "=============================================================="
+            python jordan_tender_monitor/run.py --capture "$p"
+          done
+          exit 0
+
+      - name: Upload the captured pages
+        if: github.event.inputs.mode == 'diagnose portals (--capture)'
+        uses: actions/upload-artifact@v4
+        with:
+          name: captured-pages-${{ github.run_number }}
+          path: jordan_tender_monitor/tests/fixtures/live/
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Run the monitor
         id: run
+        if: github.event.inputs.mode != 'diagnose portals (--capture)' 
         env:
           # A run you triggered by hand almost always wants the whole current
           # pipeline -- you are looking at it now. The schedule wants what
@@ -83,7 +120,7 @@ jobs:
 
       # always(): the summary matters most when the run failed.
       - name: Show the results on the run page
-        if: always()
+        if: always() && github.event.inputs.mode != 'diagnose portals (--capture)' 
         run: |
           if compgen -G "jordan_tender_monitor/output/*.md" > /dev/null; then
             cat jordan_tender_monitor/output/*.md >> "$GITHUB_STEP_SUMMARY"
@@ -95,7 +132,7 @@ jobs:
           fi
 
       - name: Upload the Word and Excel reports
-        if: always()
+        if: always() && github.event.inputs.mode != 'diagnose portals (--capture)' 
         uses: actions/upload-artifact@v4
         with:
           name: jordan-tenders-${{ github.run_number }}
