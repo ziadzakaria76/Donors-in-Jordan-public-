@@ -58,7 +58,7 @@ def test_every_html_portal_is_capturable():
 
 
 def test_ungm_with_custom_fetcher_is_included():
-    """UNGM posts to a search endpoint rather than fetching a page.
+    """UNGM renders its listing in a browser rather than fetching a page.
 
     A capture command built only around plain GETs would silently omit it --
     and UNGM is the richest Jordan source, so omitting it would matter most.
@@ -69,7 +69,7 @@ def test_ungm_with_custom_fetcher_is_included():
           "capture: UNGM is capturable despite its custom fetcher")
     check(ungm.SPEC.fetcher is not None, "capture: UNGM does have a custom fetcher")
 
-    spec = HtmlSpec(key="ungm", urls=[ungm.SEARCH], selectors=ungm.SPEC.selectors,
+    spec = HtmlSpec(key="ungm", urls=[ungm.LISTING], selectors=ungm.SPEC.selectors,
                     anchor_hint=ungm.SPEC.anchor_hint,
                     fetcher=_serve("nextjs_json.html"))
     results = harvester.capture(spec)

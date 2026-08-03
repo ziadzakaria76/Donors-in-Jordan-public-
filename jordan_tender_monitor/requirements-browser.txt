@@ -1,0 +1,14 @@
+# Optional: headless browser rendering.
+#
+# Needed ONLY by UNGM, whose listing is assembled client-side -- its page
+# arrives as 141 KB of navigation with no notices in it, and its search
+# endpoint returns 395 bytes to a plain POST. Every other portal works over
+# plain HTTP.
+#
+# Kept out of requirements.txt so a Windows deployment does not pull ~400 MB it
+# may not want. Without it, UNGM reports a clear instruction and the other
+# twelve portals are unaffected.
+#
+#   pip install -r requirements-browser.txt
+#   playwright install chromium
+playwright>=1.40.0

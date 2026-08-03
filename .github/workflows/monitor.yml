@@ -59,6 +59,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r jordan_tender_monitor/requirements.txt
 
+      # UNGM only. Its listing is assembled client-side -- the page arrives as
+      # navigation with no notices in it -- so it needs a real browser. Kept
+      # out of requirements.txt so a Windows deployment is not forced to pull
+      # ~400 MB; every other portal works over plain HTTP.
+      - name: Install the headless browser (UNGM)
+        run: |
+          pip install -r jordan_tender_monitor/requirements-browser.txt
+          playwright install --with-deps chromium
+
       # New-only mode needs state to survive between runs, and a runner is
       # thrown away after each job. The cache carries the SQLite file forward.
       # A cache miss is harmless: the run simply reports the full open pipeline,

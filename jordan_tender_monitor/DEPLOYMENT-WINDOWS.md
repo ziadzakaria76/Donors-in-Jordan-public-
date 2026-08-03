@@ -85,6 +85,20 @@ If `Activate.ps1` is blocked by execution policy:
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
+**Optional: the headless browser, for UNGM only.** UNGM is the richest Jordan
+source — UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA all publish there — and it
+is the one portal that cannot be read over plain HTTP: its listing is assembled
+in the browser after the page loads, so a fetch returns navigation and nothing
+else. Reading it needs a real browser, which is about 400 MB:
+
+```powershell
+pip install -r jordan_tender_monitor\requirements-browser.txt
+playwright install chromium
+```
+
+Skip this and nothing breaks: UNGM reports `unavailable` with those two
+commands as its stated reason, and the other twelve portals run normally.
+
 **Confirm the time zone database installed.** Windows ships no IANA time zone
 database, so the schedule — pinned to `Asia/Amman` — depends on the `tzdata`
 package. It is in `requirements.txt` for Windows, but verify:
@@ -102,7 +116,7 @@ Now prove the code itself is sound before touching credentials:
 python jordan_tender_monitor\tests\run_all.py
 ```
 
-Expect **All 459 checks passed**. This needs no network and no credentials, so
+Expect **All 591 checks passed**. This needs no network and no credentials, so
 a failure here is an install problem, not a configuration one.
 
 ---

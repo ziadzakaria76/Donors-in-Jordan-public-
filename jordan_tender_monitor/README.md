@@ -15,8 +15,9 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **553 checks** |
-| **Known broken, live** | UNGM (POST search returns 3 rows, not a listing) · EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **591 checks** |
+| **Diagnosed and reworked** | UNGM — both HTTP routes are dead ends (POST search: 395 bytes; GET listing: 141 KB of pure navigation, no notices). It now renders in a headless browser. GIZ — the English giz.de page carries no listing at all and has been dropped; the German portal reads cleanly at quality 1.00. |
+| **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) · GIZ deadline column mis-mapped |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
 | **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
 
@@ -39,12 +40,19 @@ in a single run.
 
 ```bash
 pip install -r requirements.txt
+pip install -r requirements-browser.txt && playwright install chromium  # UNGM only
 cp .env.example .env        # then fill it in
 python run.py --check-portals   # can this machine see the portals at all?
 python run.py --dry-run         # scrape, filter, print — change no state
 python run.py --capture ungm    # confirm one portal's selectors
 python run.py --run             # the real run: write the files into output/
 ```
+
+The second line is optional and needed by exactly one portal. UNGM builds its
+listing in JavaScript, so no HTTP fetch can read it. Skip it and UNGM reports
+`unavailable` with those two commands as its reason; the other twelve portals
+are unaffected. It costs roughly 400 MB of browser, which is why it is not in
+`requirements.txt`.
 
 ## Deploying
 
@@ -237,7 +245,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 553 checks, no network, no credentials
+python tests/run_all.py    # 591 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test
