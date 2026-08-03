@@ -343,14 +343,23 @@ Get-ScheduledTaskInfo -TaskName "Jordan Tender Monitor"
 Get-Content C:\Services\jordan-tenders\logs\task.log -Tail 50
 ```
 
-Worth doing: a weekly calendar reminder to glance at the folder. Since there is
-no email arriving, nothing else will prompt you to notice a silent scheduler.
+If you configured the `ACTION NEEDED` alert, a broken run emails you and a
+healthy run stays silent -- but a *task that never fires* still sends nothing,
+because nothing ran to notice. A weekly glance at the folder remains the only
+guard against that, alert or no alert.
+
+Re-verify the alert path after any credential rotation:
+
+```powershell
+python jordan_tender_monitor\run.py --test-alert
+```
 
 ## Routine maintenance
 
 | When | Do |
 |---|---|
 | A portal reports unavailable for several days | `--capture` that portal; the site has probably been redesigned or moved |
+| Azure client secret expiry (if alerts are on) | Rotate in Azure, update `.env`, then re-run `--test-alert`. Set the reminder now. |
 | SAM.gov key arrives | Put it in `.env`; the portal switches from *not configured* to live on the next run |
 | Output folder grows | Archive or delete old reports; nothing prunes them automatically |
 | Updating the code | `git pull`, then `pip install -r jordan_tender_monitor\requirements.txt`, then re-run the test suite |

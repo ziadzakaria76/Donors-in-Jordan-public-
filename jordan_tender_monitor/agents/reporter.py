@@ -595,5 +595,76 @@ def write_outputs(result: dict, health: list, body_html: str,
     return written
 
 
+def build_alert(health: list, reason: str, written: dict[str, Path] | None = None
+                ) -> tuple[str, str, str]:
+    """The ACTION NEEDED alert: subject, HTML body, plain-text body.
+
+    Deliberately short and unattached. This is not the report -- it is the one
+    message that has to reach a person, so it says what broke, what to check,
+    and nothing else. An alert that arrives with a 2 MB workbook attached gets
+    filtered; an alert that reads like a daily digest gets ignored.
+    """
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    today = date.today()
+
+    subject = f"{config.ALERT_SUBJECT_PREFIX} - {reason} ({today.isoformat()})"
+
+    rows = "".join(
+        f"<tr><td>{_e(h.name)}</td><td>{_e(h.reason)}</td>"
+        f"<td><a href=\"{_e(h.urls[0] if h.urls else '')}\">"
+        f"{_e(h.urls[0] if h.urls else 'no URL recorded')}</a></td></tr>"
+        for h in broken
+    )
+
+    where = ""
+    if written:
+        where = (f"<p class='small'>The run still wrote its files to "
+                 f"<code>{_e(config.OUTPUT_DIR)}</code>, but they are empty or "
+                 f"partial for the reason above.</p>")
+
+    html = f"""<html><head><meta charset='utf-8'><style>{_CSS}</style></head><body>
+<h1>Jordan Tender Monitor needs attention</h1>
+<div class="err"><b>{_e(reason.capitalize())}</b> on {today.strftime('%A %d %B %Y')}.
+This is not a quiet day &mdash; the monitor could not read
+{"any of its sources" if len(broken) == total else "some of its sources"},
+so any opportunity published today may have been missed.</div>
+
+<h2>What failed</h2>
+<table><tr><th>Portal</th><th>Diagnosed cause</th><th>Check by hand</th></tr>
+{rows}</table>
+{where}
+
+<h2>What to do</h2>
+<ol>
+  <li>Open one of the URLs above in a browser <b>on the server</b>. If it does
+      not load, the problem is the network or a firewall, not the scraper.</li>
+  <li>If it loads fine by hand, the site has changed. Run
+      <code>python run.py --capture PORTAL</code> for that portal &mdash; it
+      reports which extraction layer works and the selectors the page now
+      uses.</li>
+  <li>A <b>bot wall</b> means the site is blocking automated access: try a
+      different network, or install Playwright.</li>
+</ol>
+<p class="small">You are receiving this because the monitor alerts on failure
+only. A run that works quietly sends nothing &mdash; the reports are files in
+{_e(config.OUTPUT_DIR)}.</p>
+</body></html>"""
+
+    text_lines = [
+        f"{config.ALERT_SUBJECT_PREFIX} - {reason}",
+        f"{today.isoformat()}",
+        "",
+        "Failed portals:",
+    ]
+    for h in broken:
+        text_lines.append(f"  {h.name}: {h.reason}")
+        if h.urls:
+            text_lines.append(f"    check: {h.urls[0]}")
+    text_lines += ["", f"Reports (empty or partial) are in {config.OUTPUT_DIR}"]
+
+    return subject, html, "\n".join(text_lines)
+
+
 def attachments_for_email(written: dict[str, Path]) -> list[Path]:
     return [written[f] for f in config.EMAIL_ATTACH_FORMATS if f in written]

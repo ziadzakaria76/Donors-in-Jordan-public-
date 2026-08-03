@@ -16,7 +16,7 @@ it was not worked around.
 | | Status |
 |---|---|
 | **Verified against the live web** | **Nothing.** Zero portal domains were reachable. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **481 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, value/date/country parsers, filtering, scoring, deduplication, the email body, all five output formats, delivery fallback, `--capture`, scraper resilience, the portal registry, and the four REST modules' response parsing against synthetic payloads — **507 checks** |
 | **Verified in this environment (no portals)** | Dependency install, `pyflakes`, `--check-portals`, `--dry-run`, `--capture`, `--self-test` all run end to end and behave correctly under total portal failure |
 | **Not verified at all** | Every portal URL · every CSS selector · **whether the real APIs return the shapes assumed** · the UNGM POST payload · email delivery (no credentials were present) |
 
@@ -96,7 +96,7 @@ interview question it answers.
 | Report | Full detail, top 50 inline, the rest tabled |
 | Outputs | **Word and Excel**, written to `output/` |
 | Schedule | Weekdays 07:00, pinned to `Asia/Amman` |
-| Alerting | Portal health in the **filename** + a status page in both documents |
+| Alerting | Portal health in the **filename** + a status page in both documents, plus an optional ACTION NEEDED email on total failure |
 
 ### Two settings worth understanding
 
@@ -183,9 +183,30 @@ Inside, the Word pack opens with the run status in words, and the Excel file
 carries a **Run status** sheet listing every portal, its diagnosed failure
 reason, and the URL to check by hand.
 
-**The one state the monitor cannot report on itself is not running at all.** No
-new file on a weekday means the scheduled job did not fire — check the
-scheduler, not the portals.
+### The ACTION NEEDED alert
+
+Files cover every case but one: **a scheduler that stops firing produces no
+file**, and with no email arriving there is nothing to notice. That gap is what
+the alert closes.
+
+It fires only when a run could not read its sources — by default when *every*
+portal is unreachable. It is short, carries no attachments, names each failure
+with the URL to check by hand, and says what to run next. A healthy run sends
+nothing, so an alert in your inbox always means act.
+
+```bash
+python run.py --test-alert    # prove the path works before relying on it
+```
+
+Alerts need mail credentials in `.env`, which file-only output otherwise
+removes — read the `Mail.Send` scoping note under Security before granting it.
+Leave the credentials blank and everything still works; you just check the
+folder yourself. When alerting is enabled but cannot send, every run says so up
+front rather than letting you discover it at the moment it matters.
+
+Set `ALERT_ON_PARTIAL_BROKEN = 4` in `config.py` to also alert when four or
+more portals fail. The default is total-outage-only, because one flaky portal is
+already visible in the filename and does not need to interrupt anyone.
 
 ## Security
 
@@ -218,7 +239,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 481 checks, no network, no credentials
+python tests/run_all.py    # 507 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test
