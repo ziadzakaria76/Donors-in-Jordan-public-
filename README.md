@@ -70,6 +70,15 @@ over-broad guess like bare `article` would otherwise match a navigation menu and
 short-circuit the layer that works. Rows are scored for listing-likeness, with
 carrying a date weighted most heavily and gated outright.
 
+## Deploying
+
+Step-by-step setup for a Windows Server, including Azure app registration and
+Task Scheduler:
+**[`jordan_tender_monitor/DEPLOYMENT-WINDOWS.md`](jordan_tender_monitor/DEPLOYMENT-WINDOWS.md)**
+
+Note that nothing runs until it is deployed — this repository is source code,
+not a running service.
+
 ## Tests
 
 ```bash
