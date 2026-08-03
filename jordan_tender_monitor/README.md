@@ -17,7 +17,7 @@ environment blocked all 13 domains.
 | **Verified against the live web** | EBRD (4,004 notices scanned, 119 Jordan) and the World Bank API, both returning correct Jordan results. UK Find a Tender and IsDB read cleanly and currently have no open Jordan notices. |
 | **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **606 checks** |
 | **Diagnosed and reworked** | UNGM — both HTTP routes are dead ends (POST search: 395 bytes; GET listing: 141 KB of pure navigation, no notices). It now renders in a headless browser. GIZ — the English giz.de page carries no listing at all and has been dropped; the German portal reads cleanly at quality 1.00. |
-| **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) · GIZ deadline column mis-mapped |
+| **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
 | **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
 
@@ -29,6 +29,14 @@ module was the only one skipping `jordan_only()` — on the strength of a commen
 I wrote justifying the omission — so the first report led with a Caribbean
 education project and roughly 140 of 259 entries were not Jordan. Every module
 now filters client-side regardless, and a test enforces it structurally.
+
+**A high quality score is not a correct result.** GIZ's table won at quality
+1.00 with six cells found and the header mapped correctly onto
+posted / closing / title — and every deadline on the portal was still garbage,
+because one unclosed `<td>` nests the rest of the row inside the deadline cell.
+Scores measure whether something looks like a listing. They cannot see a single
+column being wrong, which is why `--capture` now prints the header-to-cell
+mapping and sample rows even when nothing wins.
 
 **A count alone cannot diagnose a portal.** Five portals reported `OK: 0` and
 the number could not distinguish "returned nothing" from "returned 500
