@@ -91,7 +91,12 @@ def test_worldbank_parses_documented_shape():
         records = worldbank.fetch_tenders()
     check_eq(len(records), 2, "worldbank: both notices parsed")
     r = records[0]
-    check_eq(r["title"], "Jordan Public Financial Management Reform", "worldbank: title")
+    # The title comes from the NOTICE with the project appended as context --
+    # see test_worldbank_titles_are_per_notice_not_per_project for why.
+    check("Consulting services for treasury modernisation" in r["title"],
+          "worldbank: title is the notice description")
+    check("Jordan Public Financial Management Reform" in r["title"],
+          "worldbank: with the project name as context")
     check_eq(r["posted_date"], date(2026, 6, 1), "worldbank: posted date")
     check_eq(r["closing_date"], date(2026, 9, 15), "worldbank: closing date")
     check_eq(r["estimated_value_usd"], 1_850_000.0, "worldbank: value in USD")
