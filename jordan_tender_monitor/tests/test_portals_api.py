@@ -372,8 +372,80 @@ def test_every_api_module_returns_the_standard_record():
                   f"schema: '{field_name}' present on every API record")
 
 
+def test_worldbank_filters_to_jordan_even_when_the_api_does_not():
+    """The API ignores countryshortname. Pinning the fix so it cannot regress.
+
+    The first live run proved this: the endpoint returned 200 worldwide
+    notices -- Pakistan, Laos, Bolivia, the Caribbean -- and because this module
+    trusted the parameter and skipped jordan_only(), the report led with a
+    Caribbean education project. Never trust a source's own country filter.
+    """
+    worldwide = {"procnotices": [
+        {"id": "1", "project_name": "Jordan Public Financial Management Reform",
+         "bid_description": "Consulting services in Amman.",
+         "noticedate": "2026-06-01T00:00:00Z"},
+        {"id": "2", "project_name": "Sindh Water and Agriculture Transformation",
+         "bid_description": "Irrigation works in Pakistan.",
+         "noticedate": "2026-06-01T00:00:00Z"},
+        {"id": "3", "project_name": "Lao PDR Climate Resilient Road Connectivity",
+         "bid_description": "Road works in Laos.",
+         "noticedate": "2026-06-01T00:00:00Z"},
+        {"id": "4", "project_name": "Windward Islands Sector Transformation",
+         "bid_description": "Education in the Caribbean.",
+         "noticedate": "2026-06-01T00:00:00Z"},
+    ]}
+    with _Stub(worldwide):
+        records = worldbank.fetch_tenders()
+
+    check_eq(len(records), 1,
+             "worldbank: only the Jordan notice survives a worldwide response")
+    check("Jordan" in records[0]["title"],
+          "worldbank: and it is the right one")
+    titles = " ".join(r["title"] for r in records)
+    for phantom in ("Sindh", "Lao PDR", "Windward"):
+        check(phantom not in titles,
+              f"worldbank: '{phantom}' is not reported as a Jordan opportunity")
+
+
+def test_every_api_module_applies_the_jordan_filter():
+    """No module may trust its source's country filter. Enforced structurally."""
+    import inspect
+    from jordan_tender_monitor.portals import fcdo, samgov, ted, worldbank as wb
+
+    for name, module in (("worldbank", wb), ("ted", ted),
+                         ("samgov", samgov), ("fcdo", fcdo)):
+        source = inspect.getsource(module)
+        check("jordan_only" in source,
+              f"schema: {name} filters to Jordan client-side, whatever the API claims")
+
+
+def test_scan_count_distinguishes_empty_from_filtered_out():
+    """'OK: 0' must not be ambiguous.
+
+    Returned nothing, or returned 500 worldwide notices of which none were
+    Jordan? Those need entirely different fixes, and the first live run cost
+    real time to diagnose because the number shown was post-filter only.
+    """
+    base.take_scanned()          # clear any residue
+    check_eq(base.take_scanned(), None, "scan-count: starts empty")
+
+    records = [base.build_record(portal="worldbank", title=t)
+               for t in ("Advisory Services, Jordan", "Road works in Laos",
+                         "Education in the Caribbean")]
+    kept = base.jordan_only(records)
+    check_eq(len(kept), 1, "scan-count: one Jordan record survives")
+    check_eq(base.take_scanned(), 3,
+             "scan-count: the pre-filter total is recorded")
+    check_eq(base.take_scanned(), None,
+             "scan-count: reading it clears it, so portals cannot inherit "
+             "each other's numbers")
+
+
 TESTS = [
     test_worldbank_parses_documented_shape,
+    test_worldbank_filters_to_jordan_even_when_the_api_does_not,
+    test_every_api_module_applies_the_jordan_filter,
+    test_scan_count_distinguishes_empty_from_filtered_out,
     test_worldbank_accepts_alternative_response_keys,
     test_worldbank_empty_response_is_diagnosed_not_silent,
     test_ted_parses_multilingual_fields,

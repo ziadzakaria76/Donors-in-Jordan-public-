@@ -81,7 +81,11 @@ def cmd_check_portals() -> int:
     broken = 0
     for h in health:
         if h.status == "ok":
-            mark, detail = "OK        ", f"{h.count} Jordan notice(s) via {h.layer or 'api'}"
+            detail = f"{h.count} Jordan notice(s)"
+            if h.scanned is not None and h.scanned != h.count:
+                detail += f" of {h.scanned} read"
+            detail += f" via {h.layer or 'api'}"
+            mark = "OK        "
         elif h.status == "unconfigured":
             mark, detail = "NOT SET UP", h.reason
         else:
@@ -221,7 +225,10 @@ def _print_summary(scrape_result, processed, reported: list[dict]) -> None:
     print("Portal status")
     for h in scrape_result.health:
         if h.status == "ok":
-            print(f"  OK          {h.name}: {h.count}")
+            extra = ""
+            if h.scanned is not None and h.scanned != h.count:
+                extra = f"  ({h.scanned} read, {h.scanned - h.count} not Jordan)"
+            print(f"  OK          {h.name}: {h.count}{extra}")
         elif h.status == "unconfigured":
             print(f"  NOT SET UP  {h.name}: {h.reason}")
         else:

@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
 from .. import config, portals
+from ..portals import base as base_module
 from ..portals.base import PortalError
 
 log = logging.getLogger(__name__)
@@ -27,6 +28,11 @@ class PortalHealth:
     tier: int
     status: str              # "ok" | "unavailable" | "unconfigured"
     count: int = 0
+    # Notices the portal returned BEFORE Jordan filtering. None when the portal
+    # is inherently Jordan-specific and never filters. "OK: 0" is ambiguous on
+    # its own -- returned nothing, or returned 500 worldwide notices of which
+    # none were Jordan? Those need entirely different fixes.
+    scanned: int | None = None
     reason: str = ""
     urls: list[str] = field(default_factory=list)
     layer: str = ""
@@ -95,6 +101,7 @@ def _run_one(key: str, module) -> PortalHealth:
         return health
 
     health.count = len(records)
+    health.scanned = base_module.take_scanned()
     if records:
         health.layer = records[0].get("_layer", "")
         health.quality = records[0].get("_quality", 0.0)
