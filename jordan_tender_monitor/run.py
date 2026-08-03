@@ -26,7 +26,7 @@ import sys
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -338,7 +338,19 @@ def cmd_schedule() -> int:
     """
     import time
 
-    tz = ZoneInfo(config.SCHEDULE_TIMEZONE)
+    try:
+        tz = ZoneInfo(config.SCHEDULE_TIMEZONE)
+    except ZoneInfoNotFoundError:
+        # Windows ships no system time zone database, so zoneinfo falls back to
+        # the tzdata package. Without it this raises on startup with a message
+        # that gives no hint what to install.
+        print(f"\nCannot load the time zone '{config.SCHEDULE_TIMEZONE}'.\n\n"
+              "This host has no IANA time zone database. On Windows that is "
+              "normal and the fix is:\n\n"
+              "    pip install tzdata\n\n"
+              "(It is already in requirements.txt for Windows; this means the "
+              "install was incomplete.)\n", file=sys.stderr)
+        return 2
     hour, minute = (int(p) for p in config.SCHEDULE_TIME.split(":"))
     print(f"Scheduler running. {config.SCHEDULE_MODE} at {config.SCHEDULE_TIME} "
           f"{config.SCHEDULE_TIMEZONE}.")

@@ -18,6 +18,15 @@ python-docx>=1.1.0     # Word bid-review pack
 python-dotenv>=1.0.0
 msal>=1.25.0           # Microsoft Graph authentication
 
+# The IANA time zone database.
+#
+# Required on Windows and NOT optional there. Linux and macOS ship a system tz
+# database that zoneinfo reads from /usr/share/zoneinfo; Windows ships none, so
+# ZoneInfo("Asia/Amman") raises ZoneInfoNotFoundError and --schedule dies on
+# startup. The schedule is pinned to Asia/Amman deliberately (Jordan is UTC+3
+# year-round), so this is load-bearing on a Windows host.
+tzdata>=2024.1; platform_system == "Windows"
+
 # Optional -- only needed for portals that turn out to be JavaScript-rendered.
 # Install with: pip install playwright && playwright install chromium
 # playwright>=1.40.0

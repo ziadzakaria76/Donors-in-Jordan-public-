@@ -52,6 +52,15 @@ python run.py --capture ungm    # confirm one portal's selectors
 python run.py --send            # build, save, and email
 ```
 
+## Deploying
+
+**[Windows Server deployment guide](DEPLOYMENT-WINDOWS.md)** — Python setup,
+Azure app registration with mailbox scoping, portal verification, and Task
+Scheduler including the Amman/UTC offset table.
+
+Nothing runs until it is deployed. This repository is source code, not a
+running service, and no email is sent until `--send` is scheduled.
+
 ## Commands
 
 | Command | What it does |
