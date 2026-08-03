@@ -446,29 +446,38 @@ _VALUE_LABELS = ("value", "budget", "amount", "estimated", "contract value",
 _DEAD_HREF_RE = re.compile(r"^\s*(?:javascript:|#|mailto:|tel:)", re.I)
 
 
-def _first_real_link(node):
-    """The first anchor that actually navigates somewhere.
+def _first_real_link(node, hint: str | None = None):
+    """The anchor that is actually the notice.
 
-    VERIFIED ON UNGM. Every row on the rendered listing begins with a save
-    button -- <a href="javascript:void(0);">Unsave this procurement
-    opportunity.</a> -- so taking the first anchor gave all fifteen notices the
-    same title, "Unsave this procurement opportunity.", and a URL of
-    "javascript:void(0);". The notice's own link sits further down the row.
+    VERIFIED ON UNGM, in two stages, because the obvious fix was not enough.
 
-    Bookmark, share and print controls are ordinary on a listing, and none of
-    them is ever the notice.
+    Every row on the rendered listing begins with a save button --
+    <a href="javascript:void(0);">Unsave this procurement opportunity.</a> --
+    so taking the first anchor gave all fifteen notices the same title and a
+    URL of "javascript:void(0);". Skipping non-navigating hrefs then landed on
+    the NEXT anchor, which is an advertisement: every row came back titled
+    "UNGM Pro" and linking to /Public/TenderAlertService. Worse than before,
+    because those rows carried dates and cleared the quality gate.
+
+    A portal that declares an anchor_hint has already said what its notice URLs
+    look like ("/Public/Notice/"), so prefer an anchor that matches it and fall
+    back to the first navigating link only when none does. Bookmark, share,
+    print and upsell links are ordinary on a listing; none of them is ever the
+    notice, and the hint is the only thing that reliably tells them apart.
     """
-    for a in node.find_all("a", href=True):
-        if _DEAD_HREF_RE.match(a["href"]):
-            continue
-        return a
-    return None
+    anchors = [a for a in node.find_all("a", href=True)
+               if not _DEAD_HREF_RE.match(a["href"])]
+    if hint:
+        for a in anchors:
+            if hint in a["href"]:
+                return a
+    return anchors[0] if anchors else None
 
 
-def _node_to_row(node, base_url: str) -> Row:
+def _node_to_row(node, base_url: str, anchor_hint: str | None = None) -> Row:
     text = clean(node.get_text(" "))
 
-    link = _first_real_link(node)
+    link = _first_real_link(node, anchor_hint)
     url = urljoin(base_url, link["href"]) if link else None
 
     heading = node.find(["h1", "h2", "h3", "h4", "h5"])
@@ -548,7 +557,8 @@ def _assign_labelled_fields(row: Row, text: str) -> None:
         row.value_text = text
 
 
-def extract_by_selectors(html: str, selectors: list[str], base_url: str = "") -> LayerResult:
+def extract_by_selectors(html: str, selectors: list[str], base_url: str = "",
+                         anchor_hint: str | None = None) -> LayerResult:
     """Try each selector in order; keep the best-scoring result.
 
     Every selector is scored rather than the first non-empty one being taken,
@@ -568,7 +578,7 @@ def extract_by_selectors(html: str, selectors: list[str], base_url: str = "") ->
             continue
         if not nodes:
             continue
-        rows = [_node_to_row(n, base_url) for n in nodes[:400]]
+        rows = [_node_to_row(n, base_url, anchor_hint) for n in nodes[:400]]
         rows = [r for r in rows if clean(r.title)]
         quality = score_rows(rows)
         if quality > best.quality:
@@ -721,7 +731,8 @@ def _signature(node) -> str:
     return f"{node.name}|{','.join(kids)}|{has_link}"
 
 
-def extract_structural(html: str, base_url: str = "") -> LayerResult:
+def extract_structural(html: str, base_url: str = "",
+                       anchor_hint: str | None = None) -> LayerResult:
     """Find the largest repeated sibling block and read it as a listing.
 
     NOTE: there is deliberately NO cap that rejects a container for having too
@@ -767,7 +778,8 @@ def extract_structural(html: str, base_url: str = "") -> LayerResult:
         for sig, members in groups.items():
             if len(members) < 3:
                 continue
-            rows = _drop_navish([_node_to_row(m, base_url) for m in members])
+            rows = _drop_navish([_node_to_row(m, base_url, anchor_hint)
+                                 for m in members])
             if not rows:
                 continue
             quality = score_rows(rows)
@@ -886,9 +898,9 @@ def run_layers(content: str, base_url: str = "",
     results = [
         extract_feed(content, base_url),
         extract_embedded_json(content, base_url),
-        extract_by_selectors(content, selectors or [], base_url),
+        extract_by_selectors(content, selectors or [], base_url, anchor_hint),
         extract_tables(content, base_url),
-        extract_structural(content, base_url),
+        extract_structural(content, base_url, anchor_hint),
         extract_anchor_pattern(content, base_url, anchor_hint),
     ]
     return results
@@ -910,9 +922,9 @@ def extract(content: str, base_url: str = "", selectors: list[str] | None = None
     builders = [
         lambda: extract_feed(content, base_url),
         lambda: extract_embedded_json(content, base_url),
-        lambda: extract_by_selectors(content, selectors or [], base_url),
+        lambda: extract_by_selectors(content, selectors or [], base_url, anchor_hint),
         lambda: extract_tables(content, base_url),
-        lambda: extract_structural(content, base_url),
+        lambda: extract_structural(content, base_url, anchor_hint),
         lambda: extract_anchor_pattern(content, base_url, anchor_hint),
     ]
 

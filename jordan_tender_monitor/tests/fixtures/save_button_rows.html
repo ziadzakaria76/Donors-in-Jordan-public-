@@ -14,6 +14,14 @@
   that format fine, but the extractor's date-span pattern wanted either digits
   for the month or whitespace around a named one, so it never saw them.
 
+  Skipping the save button is NOT sufficient. The next anchor in the row is an
+  advertisement -- <a href="/Public/TenderAlertService">UNGM Pro</a> -- so the
+  first fix moved every row from "Unsave this procurement opportunity." to a
+  title of "UNGM Pro" linking to the upsell page. That was worse: those rows
+  carried dates, so they cleared the quality gate and would have been reported
+  as tenders. The notice's own link is the LAST anchor in the row, and only the
+  portal's anchor_hint ("/Public/Notice/") reliably identifies it.
+
   The deadline carries NO label -- no "Deadline:", no <time> tag -- exactly as
   the live rows do. That is deliberate: adding a label here would make the
   fixture easier than the page it came from, and the suite would then claim
@@ -27,7 +35,9 @@
 
   <div class="dataRow notice-table">
     <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
-    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
     <div class="ungm-list-item">UNDP-JOR-00871</div>
     <div class="ungm-list-item">
       <a href="/Public/Notice/265432">Consultancy for water sector reform, Amman, Jordan</a>
@@ -37,7 +47,9 @@
 
   <div class="dataRow notice-table">
     <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
-    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
     <div class="ungm-list-item">UNICEF-JOR-00112</div>
     <div class="ungm-list-item">
       <a href="/Public/Notice/265433">Evaluation of education programming, Irbid, Jordan</a>
@@ -47,7 +59,9 @@
 
   <div class="dataRow notice-table">
     <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
-    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
     <div class="ungm-list-item">UNDP-ECU-00953</div>
     <div class="ungm-list-item">
       <a href="/Public/Notice/265434">Construcci&oacute;n de obras civiles en Esmeraldas</a>
@@ -57,7 +71,9 @@
 
   <div class="dataRow notice-table">
     <a href="javascript:void(0);" class="saveNotice">Unsave this procurement opportunity.</a>
-    <span class="info-tooltip__text">Subscribe to UNGM Pro to be able to save procurement opportunities.</span>
+    <span class="info-tooltip__text">Subscribe to
+      <a href="/Public/TenderAlertService">UNGM Pro</a>
+      to be able to save procurement opportunities.</span>
     <div class="ungm-list-item">WFP-SDN-00220</div>
     <div class="ungm-list-item">
       <a href="/Public/Notice/265435">Monitoring and Evaluation consultant</a>

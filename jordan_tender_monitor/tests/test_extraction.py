@@ -404,7 +404,8 @@ def test_a_save_button_does_not_become_the_notice():
     """
     result = H.extract(load("save_button_rows.html"),
                        "https://www.ungm.org/Public/Notice",
-                       ["div.dataRow.notice-table"])
+                       ["div.dataRow.notice-table"],
+                       anchor_hint="/Public/Notice/")
     check_eq(len(result.rows), 4, "save button: four notices found")
 
     titles = [row.title for row in result.rows]
@@ -420,6 +421,50 @@ def test_a_save_button_does_not_become_the_notice():
           "save button: no row links to javascript:void(0)", f"got {urls}")
     check(all("/Public/Notice/" in u for u in urls),
           "save button: every row links to a real notice")
+
+
+def test_an_advertisement_does_not_become_the_notice_either():
+    """The second half of the UNGM defect, and the more dangerous half.
+
+    Skipping the save button landed on the NEXT anchor, which is an upsell:
+    <a href="/Public/TenderAlertService">UNGM Pro</a>. Every row came back
+    titled "UNGM Pro" pointing at the advertising page -- and unlike the save
+    button, those rows carried dates, so they cleared the quality gate and
+    would have been reported as tenders. A silent failure became a confident
+    wrong answer.
+
+    A portal that declares an anchor_hint has already said what its notice URLs
+    look like. Nothing else in the row distinguishes an advert from a notice.
+    """
+    html = load("save_button_rows.html")
+
+    # Without the hint, the advert wins -- pinning the regression itself, so a
+    # future change cannot quietly reintroduce it.
+    unhinted = H.extract_by_selectors(html, ["div.dataRow.notice-table"],
+                                      "https://www.ungm.org/Public/Notice")
+    check(all(r.title == "UNGM Pro" for r in unhinted.rows),
+          "advert: without a hint the upsell link is what a row looks like")
+
+    hinted = H.extract_by_selectors(html, ["div.dataRow.notice-table"],
+                                    "https://www.ungm.org/Public/Notice",
+                                    anchor_hint="/Public/Notice/")
+    check_eq(len(hinted.rows), 4, "advert: four rows with the hint applied")
+    check(not any("UNGM Pro" == r.title for r in hinted.rows),
+          "advert: the hint keeps the upsell out of the titles")
+    check(not any("TenderAlertService" in (r.url or "") for r in hinted.rows),
+          "advert: and out of the URLs")
+    check(all("/Public/Notice/" in (r.url or "") for r in hinted.rows),
+          "advert: every row links to the notice the hint describes")
+
+    # The hint is a preference, not a requirement: a row with no matching
+    # anchor still gets its first real link rather than nothing.
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(
+        '<div><a href="javascript:void(0);">Save</a>'
+        '<a href="/other/9">Advisory Services, Amman</a></div>', "html.parser")
+    row = H._node_to_row(soup.find("div"), "https://e.org/", "/Public/Notice/")
+    check_eq(row.url, "https://e.org/other/9",
+             "advert: an unmatched hint falls back to the first real link")
 
 
 def test_dead_hrefs_are_never_a_rows_link():
@@ -549,6 +594,7 @@ TESTS = [
     test_an_unclosed_cell_does_not_swallow_the_rest_of_the_row,
     test_own_text_is_identical_on_well_formed_cells,
     test_a_save_button_does_not_become_the_notice,
+    test_an_advertisement_does_not_become_the_notice_either,
     test_dead_hrefs_are_never_a_rows_link,
     test_a_month_name_joined_by_hyphens_is_recognised,
 ]

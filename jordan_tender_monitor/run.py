@@ -267,8 +267,17 @@ def _describe_block(html: str, selectors: list[str]) -> list[str]:
 
     from bs4 import BeautifulSoup
 
-    from jordan_tender_monitor.portals.htmlkit import _own_text
     from jordan_tender_monitor.utils.text import clean, truncate
+
+    def own_text(element) -> str:
+        """Text belonging to this element and not to a nested one.
+
+        NOT htmlkit._own_text, which asks whether a string's nearest CELL
+        ancestor is the node -- outside a table that is None for everything, so
+        reusing it here reported every element as empty and the first anatomy
+        dump showed four blank anchors and nothing else.
+        """
+        return clean(" ".join(s for s in element.strings if s.parent is element))
 
     soup = BeautifulSoup(html, "html.parser")
 
@@ -304,7 +313,7 @@ def _describe_block(html: str, selectors: list[str]) -> list[str]:
     out = [f"\n    Anatomy of one {node.name}"
            f"{'.' + classes if classes else ''} row:"]
     for child in node.find_all(True):
-        text = _own_text(child) if child.name not in ("script", "style") else ""
+        text = own_text(child) if child.name not in ("script", "style") else ""
         href = child.get("href") if child.name == "a" else None
         if not text and not href:
             continue
@@ -312,7 +321,7 @@ def _describe_block(html: str, selectors: list[str]) -> list[str]:
         child_classes = child.get("class") or []
         if child_classes:
             label += "." + ".".join(child_classes[:2])
-        line = f"      {label:34} {truncate(clean(text), 60)!r}"
+        line = f"      {label:34} {truncate(text, 60)!r}"
         if href:
             line += f"  href={truncate(href, 50)!r}"
         out.append(line)
