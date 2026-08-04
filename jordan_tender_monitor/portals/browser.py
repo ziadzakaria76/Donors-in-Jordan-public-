@@ -54,7 +54,18 @@ def _scroll_until_settled(page, row_selector: str, max_scrolls: int,
     """
     seen = page.locator(row_selector).count()
     for attempt in range(max_scrolls):
-        page.mouse.wheel(0, 40_000)
+        # Scroll the LAST ROW into view rather than turning the mouse wheel.
+        #
+        # mouse.wheel scrolls whatever sits under the cursor, which starts at
+        # the top-left corner -- the site header, not the listing. On UNGM that
+        # loaded a few extra batches and then stalled at 44 rows out of
+        # thousands, which reads exactly like "the list has ended" and is not.
+        # Asking the last row to scroll itself into view works whatever element
+        # is the scroll container.
+        try:
+            page.locator(row_selector).last.scroll_into_view_if_needed(timeout=5_000)
+        except Exception:  # noqa: BLE001 - fall back rather than lose the run
+            page.mouse.wheel(0, 40_000)
         page.wait_for_timeout(wait_ms)
         now = page.locator(row_selector).count()
         if now <= seen:

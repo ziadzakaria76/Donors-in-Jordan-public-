@@ -51,6 +51,8 @@ class _FakePage:
         self.row_counts = list(row_counts or [0])
         self.counted = 0
         self.scrolls = 0
+        self.wheeled = 0
+        self.scroll_into_view_fails = False
 
     def row_count(self):
         value = self.row_counts[min(self.counted, len(self.row_counts) - 1)]
@@ -67,6 +69,7 @@ class _FakePage:
 
         def wheel(self, dx, dy):
             self.page.scrolls += 1
+            self.page.wheeled += 1
 
     @property
     def mouse(self):
@@ -97,6 +100,15 @@ class _FakeLocator:
 
     def count(self):
         return self.page.row_count()
+
+    @property
+    def last(self):
+        return self
+
+    def scroll_into_view_if_needed(self, timeout=None):
+        if self.page.scroll_into_view_fails:
+            raise RuntimeError("element is not attached to the DOM")
+        self.page.scrolls += 1
 
 
 class _FakeBrowser:
@@ -423,6 +435,41 @@ def test_scrolling_keeps_going_while_rows_keep_arriving():
              "scroll: rows are counted with the portal's own row selector")
 
 
+def test_scrolling_asks_the_last_row_to_come_into_view():
+    """VERIFIED LIVE: the mouse wheel stalled at 44 rows out of thousands.
+
+    mouse.wheel scrolls whatever is under the cursor, which starts at the
+    top-left corner -- the site header, not the listing. UNGM loaded a few
+    extra batches and then stopped, which reads exactly like "the list has
+    ended" and is not. Asking the last row to scroll itself into view works
+    whatever element happens to be the scroll container.
+    """
+    page = _FakePage("<html>x</html>", row_counts=[15, 30, 45, 45])
+    with _fake_playwright(page=page):
+        browser.render("https://www.ungm.org/Public/Notice", settle_ms=0,
+                       scroll_for="div.dataRow", max_scrolls=10, scroll_wait_ms=1)
+    check_eq(page.wheeled, 0,
+             "scroll: the mouse wheel is not the mechanism any more")
+    check(page.scrolls >= 3, "scroll: the last row was scrolled into view")
+
+
+def test_scrolling_falls_back_when_a_row_cannot_be_scrolled_to():
+    """A detached or hidden row must not end the run.
+
+    The fallback is the old wheel. It is worse, and it is better than losing
+    the portal because one element went stale mid-scroll.
+    """
+    page = _FakePage("<html>x</html>", row_counts=[15, 30, 30])
+    page.scroll_into_view_fails = True
+    with _fake_playwright(page=page):
+        html = browser.render("https://e.org/list", settle_ms=0,
+                              scroll_for="div.row", max_scrolls=5,
+                              scroll_wait_ms=1)
+    check_eq(html, "<html>x</html>", "scroll fallback: the DOM still comes back")
+    check(page.wheeled >= 1,
+          "scroll fallback: it falls back to the wheel rather than failing")
+
+
 def test_scrolling_stops_immediately_when_nothing_is_lazy():
     """A page that is not lazily loaded must cost one wait, not forty."""
     page = _FakePage("<html>done</html>", row_counts=[20, 20])
@@ -593,6 +640,8 @@ TESTS = [
     test_render_returns_the_rendered_dom_and_closes_the_browser,
     test_a_selector_that_never_appears_is_a_hint_not_a_failure,
     test_scrolling_keeps_going_while_rows_keep_arriving,
+    test_scrolling_asks_the_last_row_to_come_into_view,
+    test_scrolling_falls_back_when_a_row_cannot_be_scrolled_to,
     test_scrolling_stops_immediately_when_nothing_is_lazy,
     test_scrolling_is_off_unless_a_portal_asks_for_it,
     test_hitting_the_scroll_cap_is_logged_not_silent,
