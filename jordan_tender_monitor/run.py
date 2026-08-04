@@ -180,6 +180,8 @@ def cmd_capture(portal_key: str) -> int:
             print(f"      {line}")
         for line in _describe_block(html, spec_selectors):
             print(f"      {line}")
+        for line in _describe_pagination(html):
+            print(f"      {line}")
         print()
 
     if not any_saved:
@@ -341,6 +343,79 @@ def _describe_block(html: str, selectors: list[str]) -> list[str]:
             out.append("      ... (truncated)")
             break
     return out
+
+
+_PAGING_TEXT = {"next", "next page", ">", "»", "›", "last", "more",
+                "load more", "show more", "previous", "prev", "«", "‹"}
+
+
+def _describe_pagination(html: str, limit: int = 14) -> list[str]:
+    """Show how the page offers its OTHER pages.
+
+    A listing that reads perfectly and only ever returns page one is a portal
+    that looks healthy and is mostly blind -- UNGM has thousands of notices and
+    was contributing fifteen. Whether the next page is a link (follow the href),
+    a button (click it), or a query parameter (rewrite the URL) decides which
+    of three quite different implementations is correct, and that is not
+    something to guess at.
+
+    Reports every plausible control with the attributes needed to act on it.
+    """
+    from bs4 import BeautifulSoup
+
+    from jordan_tender_monitor.utils.text import clean, truncate
+
+    soup = BeautifulSoup(html, "html.parser")
+    seen: set[str] = set()
+    out: list[str] = []
+
+    for node in soup.find_all(["a", "button", "li", "select", "input", "nav", "span"]):
+        classes = " ".join(node.get("class") or [])
+        text = clean(node.get_text(" "))[:40]
+        aria = clean(node.get("aria-label") or "")
+        rel = " ".join(node.get("rel") or [])
+        data = {k: v for k, v in node.attrs.items()
+                if k.startswith("data-") and ("page" in k or "index" in k)}
+
+        looks_like_paging = (
+            rel.lower() in ("next", "prev", "previous")
+            or "pag" in classes.lower()
+            or "pag" in (node.get("id") or "").lower()
+            or "page" in aria.lower() or "next" in aria.lower()
+            or text.lower() in _PAGING_TEXT
+            or bool(data)
+            or (node.name in ("a", "button") and text.isdigit() and len(text) <= 3)
+        )
+        if not looks_like_paging:
+            continue
+
+        label = node.name
+        if classes:
+            label += "." + ".".join(classes.split()[:2])
+        href = node.get("href")
+        signature = f"{label}|{text}|{href}|{aria}"
+        if signature in seen:
+            continue
+        seen.add(signature)
+
+        line = f"      {label:34} {text!r}"
+        if href:
+            line += f"  href={truncate(href, 60)!r}"
+        if aria:
+            line += f"  aria={truncate(aria, 30)!r}"
+        if rel:
+            line += f"  rel={rel!r}"
+        if data:
+            line += f"  {data}"
+        out.append(line)
+        if len(out) >= limit:
+            out.append("      ... (more)")
+            break
+
+    if not out:
+        return ["\n    Pagination controls: NONE FOUND -- this page may show "
+                "everything it has, or page through by some other means"]
+    return ["\n    Pagination controls (how to reach page 2):"] + out
 
 
 def _run_pipeline(only: list[str] | None = None):
