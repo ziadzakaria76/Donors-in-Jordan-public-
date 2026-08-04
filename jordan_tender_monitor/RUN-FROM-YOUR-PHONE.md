@@ -54,7 +54,28 @@ what was found** — this is the point of the whole arrangement.
 
 **The Word and Excel files** are at the bottom of the run page under
 **Artifacts**, as a zip. Download it if you want to circulate the bid-review
-pack or work the pipeline in Excel. They are kept for 90 days.
+pack or work the pipeline in Excel. They are kept for 90 days, then deleted.
+
+To get there: **Actions** -> **Jordan tender monitor** -> tap the run -> scroll
+to the **bottom** -> **Artifacts** -> tap `jordan-tenders-<number>`.
+
+Three things that will waste your time on a phone if you do not know them:
+
+* **You have to be signed in to GitHub.** Artifact downloads require a login
+  even on a public repository. Signed out, the link bounces you to a sign-in
+  page rather than telling you why.
+
+* **Use a mobile browser, not the GitHub app.** The app's run view does not show
+  the Artifacts section at all, so the files look as though they were never
+  produced. Safari or Chrome on the handset works; try "Request desktop site"
+  if the section still does not appear.
+
+* **It is always a zip**, even though there are only two files inside. iOS and
+  Android both save it to Files or Downloads; tap it to expand before opening
+  in Word or Excel.
+
+None of that is needed to see what was found -- the summary above is the whole
+report. Downloading is for circulating it or working it in Excel.
 
 ---
 
@@ -79,7 +100,7 @@ days. If you have not seen a run in a while, open the Actions tab and check.
 
 ## The schedule
 
-Weekdays at **04:00 UTC = 07:00 in Amman**. Jordan is UTC+3 year-round, so this
+Weekdays at **04:17 UTC = 07:17 in Amman**. Jordan is UTC+3 year-round, so this
 never needs a seasonal adjustment. Scheduled runs report only what is new;
 manual runs default to the whole current pipeline.
 
@@ -88,6 +109,14 @@ cron is always UTC.
 
 Scheduled runs can start a few minutes late when GitHub is busy. That is normal
 and does not mean anything is wrong.
+
+**Why :17 and not :00.** GitHub delays scheduled runs under load and can drop
+them entirely, and the top of every hour is the busiest minute on the platform
+because that is where most people point their crons. This workflow was set to
+04:00 and fired zero times before the minute was moved. If a morning ever
+passes with no run, check the Actions tab -- and note that GitHub also disables
+scheduled workflows automatically in a repository with no activity for 60 days,
+which a monitor nobody commits to will eventually hit.
 
 ---
 

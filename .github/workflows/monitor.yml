@@ -31,9 +31,15 @@ on:
           - "produce the report"
           - "diagnose portals (--capture)"
   schedule:
-    # 04:00 UTC = 07:00 Asia/Amman. Jordan is UTC+3 year-round (DST abolished
+    # 04:17 UTC = 07:17 Asia/Amman. Jordan is UTC+3 year-round (DST abolished
     # in 2022), so this needs no seasonal adjustment. GitHub cron is always UTC.
-    - cron: "0 4 * * 1-5"
+    #
+    # NOT on the hour, deliberately. GitHub delays or drops scheduled runs under
+    # load, and the top of every hour is the most contended minute on the whole
+    # platform -- their own docs say to pick a different one. This workflow was
+    # set to "0 4" and had fired zero times; an odd minute is the cheapest way
+    # to stop competing with everyone else's midnight-and-on-the-hour crons.
+    - cron: "17 4 * * 1-5"
 
 # Never let two runs write the seen-tenders cache at once.
 concurrency:
