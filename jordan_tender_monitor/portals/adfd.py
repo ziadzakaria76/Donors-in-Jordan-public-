@@ -22,16 +22,38 @@ The news page is kept second, because tenders for ADFD-financed projects are
 genuinely often issued by the beneficiary government and announced as news
 rather than listed here -- a real secondary source, not a spare tyre.
 
+THE REBUILT SITE RENDERS ITS CONTENT IN JAVASCRIPT. --capture on the correct
+URL returned 28 KB that is nothing but the mega-menu -- "Who We Are", "What We
+Do", "Our Impact" -- and every class-independent layer found zero rows. That
+is the UNGM signature: the page loads, and the listing is not in it.
+
+So this portal renders too. Playwright stays optional; without it ADFD reports
+the install commands as its reason, exactly as UNGM does, and the other twelve
+portals are unaffected.
+
 A quiet run remains normal for this portal. What is no longer acceptable is a
-quiet run that was really a 404 in disguise.
+quiet run that was really a 404, or a shell, in disguise.
 """
 
 from __future__ import annotations
 
-from . import harvester
+from . import base, browser, harvester
 from .harvester import HtmlSpec
 
 KEY = "adfd"
+
+def _fetch_rendered(url: str) -> str:
+    """Render in a headless browser -- the markup alone carries no listing."""
+    if not browser.available():
+        raise base.PortalError(
+            f"ADFD renders its listing in JavaScript: {browser.INSTALL_HINT}", url)
+    return browser.render(url, wait_for=ROW_HINT)
+
+
+# A hint only, as on UNGM: if it never appears the DOM is still read after the
+# settle delay, so a renamed class degrades to a weak result the cascade can
+# diagnose rather than a hard failure.
+ROW_HINT = "div.tender-item, div.card, table tbody tr, article"
 
 SPEC = HtmlSpec(
     key=KEY,
@@ -59,6 +81,7 @@ SPEC = HtmlSpec(
     # be pinned to /News/ -- that was silently excluding every tender link from
     # the anchor layer.
     anchor_hint=None,
+    fetcher=_fetch_rendered,
     currency="AED",
     filter_to_jordan=True,
     notes="procurement tenders page plus news announcements",

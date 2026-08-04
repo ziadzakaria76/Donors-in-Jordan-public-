@@ -1,12 +1,12 @@
 """
-The headless-browser path, and the one portal that needs it.
+The headless-browser path, and the portals that need it.
 
-UNGM is the richest Jordan source and the only portal that cannot be read over
-plain HTTP -- its listing is assembled client-side, so a fetch returns 141 KB of
-navigation with not one notice in it. That makes Playwright load-bearing for
-UNGM and irrelevant to the other twelve, which is exactly the shape that goes
-wrong: an optional dependency that silently becomes mandatory, or a missing one
-that produces a traceback instead of an instruction.
+Two of the thirteen cannot be read over plain HTTP. UNGM returns 141 KB of
+navigation with not one notice in it; ADFD returns 28 KB of mega-menu. Both
+assemble their listings client-side. That makes Playwright load-bearing for
+those two and irrelevant to the other eleven, which is exactly the shape that
+goes wrong: an optional dependency that silently becomes mandatory, or a
+missing one that produces a traceback instead of an instruction.
 
 Nothing here launches a browser. Playwright is deliberately NOT installed in the
 test environment -- if these tests needed it, the "optional" claim would be
@@ -23,6 +23,7 @@ import types
 from contextlib import contextmanager
 from pathlib import Path
 
+from jordan_tender_monitor import portals
 from jordan_tender_monitor.portals import base, browser, giz, harvester, ungm
 from jordan_tender_monitor.portals.base import PortalError
 
@@ -182,15 +183,34 @@ def test_importing_the_portals_does_not_import_playwright():
           "browser: importing the portal registry does not pull in playwright")
 
 
-def test_only_ungm_depends_on_the_browser():
+def test_the_browser_dependency_stays_contained():
+    """Two portals need it now, and the containment property is what matters.
+
+    This test asserted "exactly one portal" until ADFD's capture showed 28 KB
+    of pure mega-menu and no listing -- the same client-rendered shape as UNGM.
+    The number was never the point; the point is that a portal needing a
+    browser says so, and that the majority still work without one. Pinning the
+    count would have meant editing the assertion every time reality moved,
+    which teaches nobody anything.
+    """
     import inspect
 
     from jordan_tender_monitor import portals as registry
 
     users = sorted(key for key, module in registry.MODULES.items()
                    if "browser." in inspect.getsource(module))
-    check_eq(users, ["ungm"],
-             "browser: exactly one portal takes the headless-browser dependency")
+    check_eq(users, ["adfd", "ungm"],
+             "browser: the portals that render are the ones that declare it")
+    check(len(users) * 2 < len(registry.MODULES),
+          "browser: and they stay a small minority of the thirteen",
+          f"{len(users)} of {len(registry.MODULES)}")
+
+    for key in users:
+        spec = registry.MODULES[key].SPEC
+        check(spec.fetcher is not None,
+              f"browser: {key} routes through a custom fetcher")
+        check(key in portals.html_portals(),
+              f"browser: {key} is still capturable for diagnosis")
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +458,7 @@ def test_giz_dropped_the_page_that_carried_no_listing():
 TESTS = [
     test_playwright_stays_out_of_the_main_requirements,
     test_importing_the_portals_does_not_import_playwright,
-    test_only_ungm_depends_on_the_browser,
+    test_the_browser_dependency_stays_contained,
     test_a_missing_browser_is_an_instruction_not_a_traceback,
     test_render_says_how_to_install_when_the_import_fails,
     test_an_uninstalled_chromium_is_diagnosed_separately_from_a_missing_package,
