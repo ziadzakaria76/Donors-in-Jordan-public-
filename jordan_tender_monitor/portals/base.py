@@ -129,12 +129,37 @@ def fetch_json(url: str, **kwargs):
         return response.json()
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "?"
-        raise PortalError(f"HTTP {status} from the API", url) from exc
+        raise PortalError(
+            f"HTTP {status} from the API{_error_detail(exc.response)}", url) from exc
     except requests.RequestException as exc:
         raise PortalError(f"transport error - {type(exc).__name__}: {exc}", url) from exc
     except ValueError as exc:
         raise PortalError(f"the API returned something that is not JSON ({exc})",
                           url) from exc
+
+
+def _error_detail(response, limit: int = 300) -> str:
+    """The body of a 4xx, which is where an API says what it disliked.
+
+    TED answered every run with a bare "HTTP 400 from the search endpoint" for
+    days. The endpoint had been explaining itself the whole time -- the body
+    names the offending parameter -- and the code was discarding it, so the
+    only way to make progress was to guess at the query grammar.
+
+    Bounded and stripped of newlines: this goes in a portal status line, and an
+    HTML error page must not turn one failure into a wall of markup. Never
+    include the request, which for other portals could carry an API key.
+    """
+    if response is None:
+        return ""
+    try:
+        body = response.text or ""
+    except Exception:  # noqa: BLE001 - diagnosing a failure must not fail
+        return ""
+    body = " ".join(body.split())
+    if not body:
+        return ""
+    return f" - the endpoint said: {body[:limit]}"
 
 
 def post_json(url: str, payload: dict, **kwargs):
@@ -144,7 +169,9 @@ def post_json(url: str, payload: dict, **kwargs):
         return response.json()
     except requests.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "?"
-        raise PortalError(f"HTTP {status} from the search endpoint", url) from exc
+        raise PortalError(
+            f"HTTP {status} from the search endpoint{_error_detail(exc.response)}",
+            url) from exc
     except requests.RequestException as exc:
         raise PortalError(f"transport error - {type(exc).__name__}: {exc}", url) from exc
     except ValueError as exc:

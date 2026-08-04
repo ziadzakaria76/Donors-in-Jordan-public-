@@ -269,6 +269,49 @@ def test_kfw_points_at_gtai_not_kfw_de():
     check("kfw.de" not in urls, "kfw: kfw.de is NOT used as a tender source")
 
 
+def test_jica_uses_the_restructured_url():
+    """The old URL returned HTTP 404 on every live run.
+
+    JICA moved country pages from /<country>/english/office/others/... to
+    /english/overseas/<country>/others/..., confirmed by the live Indonesia
+    procurement page and the live Jordan office index. Both spellings are kept
+    because the old scheme still answers for several country offices, and
+    harvest() tolerates one source failing when another works.
+    """
+    urls = portals.source_urls("jica")
+    check(any("/english/overseas/jordan/" in u for u in urls),
+          "jica: the restructured URL is a source", f"got {urls}")
+    check_eq(urls[0], "https://www.jica.go.jp/english/overseas/jordan/others/procurement.html",
+             "jica: and it is tried first")
+    check(any("/jordan/english/office/" in u for u in urls),
+          "jica: the pre-migration URL is kept as a second source")
+
+
+def test_adfd_points_at_the_tenders_page_not_only_the_news_page():
+    """The module used to assert ADFD had no procurement database. It has one.
+
+    That claim was a confident comment explaining away an empty result, and it
+    pointed the scraper at the news page, which reported 'layout change' on
+    every run -- a wrong URL wearing the costume of a scraper bug.
+    """
+    urls = portals.source_urls("adfd")
+    check(any("Procurementtenders.aspx" in u for u in urls),
+          "adfd: the procurement tenders page is a source", f"got {urls}")
+    check("Procurementtenders" in urls[0],
+          "adfd: and it is tried before the news page")
+    check(any("MediaCenter/News" in u for u in urls),
+          "adfd: news is kept as a genuine secondary source")
+
+    from jordan_tender_monitor.portals import adfd
+    check(adfd.SPEC.anchor_hint != "/News/",
+          "adfd: the anchor hint no longer excludes every tender link")
+
+    import inspect
+    source = inspect.getsource(adfd)
+    check("has NO procurement database" not in source,
+          "adfd: the claim that contradicted the live site is gone")
+
+
 def test_politeness_delay_is_enforced_per_host():
     """Two seconds between requests to the same host, and it must actually wait.
 
@@ -336,4 +379,6 @@ TESTS = [
     test_all_broken_is_detected_for_the_subject_line,
     test_portal_registry_is_complete,
     test_kfw_points_at_gtai_not_kfw_de,
+    test_jica_uses_the_restructured_url,
+    test_adfd_points_at_the_tenders_page_not_only_the_news_page,
 ]

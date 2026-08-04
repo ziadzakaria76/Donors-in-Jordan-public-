@@ -1,13 +1,23 @@
 """
-ADFD -- Abu Dhabi Fund for Development. Tier 3 -- announcements only.
+ADFD -- Abu Dhabi Fund for Development. Tier 3.
 
-ADFD has NO procurement database. It publishes project news, and tenders for
-ADFD-financed projects are issued by the beneficiary government rather than by
-ADFD itself. This portal is therefore expected to be quiet, and a quiet run
-here is normal rather than a failure -- the report labels it as
-announcement-only so the two cannot be confused.
+THE MODULE PREVIOUSLY ASSERTED THAT ADFD HAS NO PROCUREMENT DATABASE. That was
+wrong, and it was wrong in the way that costs most: a confident comment
+explaining away an empty result. It pointed at the news page instead, which
+reported "layout change - no layer found a listing" on every live run -- a
+failure that looked like a scraper problem and was really a wrong URL.
 
-VERIFICATION STATUS: never run against the live site; selectors unverified.
+ADFD publishes procurement tenders at
+
+    /english/Eservices/Tender/Pages/Procurementtenders.aspx
+
+That page is now the first source. The news page is kept second, because
+tenders for ADFD-financed projects are genuinely often issued by the
+beneficiary government and announced as news rather than listed here -- so it
+is a real secondary source, not a fallback for a broken primary.
+
+A quiet run remains normal for this portal. What is no longer acceptable is a
+quiet run that was really a 404 in disguise.
 """
 
 from __future__ import annotations
@@ -20,22 +30,30 @@ KEY = "adfd"
 SPEC = HtmlSpec(
     key=KEY,
     urls=[
+        "https://www.adfd.ae/english/Eservices/Tender/Pages/Procurementtenders.aspx",
         "https://www.adfd.ae/english/MediaCenter/News/Pages/default.aspx",
     ],
     # SELECTOR HINTS ONLY -- written without access to the live pages, which
     # were blocked from the build environment. If a hint is wrong the quality
     # gate rejects it and a class-independent layer takes over. Confirm with:
     #     python run.py --capture adfd
+    #
+    # This is a SharePoint site (.aspx, dfwp = Data Form Web Part), so the
+    # generated markup is the usual web-part soup and the class-independent
+    # layers are likely to do the real work here.
     selectors=[
-        "div.news-item",
+        "div.tender-item",
         "li.dfwp-item",
-        "article",
-        "table tbody tr",
+        "div.news-item",
+        "table.ms-listviewtable tbody tr",
     ],
-    anchor_hint="/News/",
+    # The tenders page is the primary source now, so the anchor hint must not
+    # be pinned to /News/ -- that was silently excluding every tender link from
+    # the anchor layer.
+    anchor_hint=None,
     currency="AED",
     filter_to_jordan=True,
-    notes="news announcements only; no procurement database exists",
+    notes="procurement tenders page plus news announcements",
 )
 
 

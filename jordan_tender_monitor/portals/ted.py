@@ -4,21 +4,33 @@ EU TED (Tenders Electronic Daily) -- REST API, Tier 1.
 TED covers EU-funded external action, which includes Jordan under the
 Neighbourhood instrument. The v3 search API takes an expert query string.
 
-VERIFICATION STATUS: never run against the live API. The v3 endpoint replaced
-v2 and the query grammar changed with it, so if this portal reports an HTTP 400
-the query below is the first thing to check.
+THE PREVIOUS REQUEST WAS REJECTED WITH HTTP 400 ON EVERY LIVE RUN. Two things
+in it were wrong against the documented v3 contract:
+
+  * limit was 250. The maximum accepted page size is 100.
+  * the country was written "JO". TED's expert search uses three-letter ISO
+    codes -- the documented example is buyer-country=DEU -- so Jordan is JOR.
+
+The query is deliberately built from documented constructs only (FT~ and a
+three-letter country code). place-of-performance was dropped from the query
+because its expert-search spelling could not be confirmed, and an unknown
+field name is itself a 400. It is still REQUESTED as a response field, where
+being absent costs nothing, and it is what _is_jordan() prefers when present.
 """
 
 from __future__ import annotations
 
+from ..utils import text as textutil
 from . import base
 
 API = "https://api.ted.europa.eu/v3/notices/search"
 KEY = "ted"
 
-# TED's expert query language. JO is the ISO country code for Jordan; the
-# free-text clause catches notices that name Jordan without coding it.
-QUERY = '(place-of-performance IN (JO)) OR (FT~"Jordan")'
+# Three-letter ISO, per the documented buyer-country=DEU example.
+QUERY = 'FT~"Jordan" OR buyer-country=JOR'
+
+# The documented maximum page size. 250 was a silent 400 on every run.
+PAGE_LIMIT = 100
 
 
 def _text(value) -> str | None:
@@ -37,6 +49,38 @@ def _text(value) -> str | None:
     return str(value)
 
 
+_COUNTRY_FIELDS = ("place-of-performance-country-lot", "place-of-performance-country",
+                   "buyer-country", "country")
+
+# TED writes countries as three-letter ISO codes in these fields.
+_JORDAN_CODES = {"jor", "jo"}
+
+
+def _country_verdict(item: dict) -> bool | None:
+    """True / False from a country FIELD; None when the notice carries none.
+
+    The same trap as the World Bank, and for the same reason: FT~"Jordan" is a
+    FULL-TEXT search, so every notice it returns contains the word somewhere,
+    and filtering the text afterwards cannot reject any of them. TED is
+    EU-wide, so that would mean the whole of European procurement arriving
+    labelled as Jordan opportunities.
+
+    Country codes are matched exactly rather than by substring. "JO" must not
+    match "JOR" by accident in one direction or "MNG"/"COD" style codes in the
+    other, and a country NAME still goes through the word-boundary matcher that
+    keeps Jordanstown out.
+    """
+    for name in _COUNTRY_FIELDS:
+        value = _text(item.get(name))
+        if not value:
+            continue
+        codes = {part.strip().lower() for part in value.replace(",", " ").split()}
+        if codes & _JORDAN_CODES:
+            return True
+        return textutil.mentions_jordan(value)
+    return None
+
+
 def fetch_tenders() -> list[dict]:
     payload = {
         "query": QUERY,
@@ -46,7 +90,7 @@ def fetch_tenders() -> list[dict]:
             "total-value", "buyer-name", "links", "description-lot",
             "place-of-performance-country-lot",
         ],
-        "limit": 250,
+        "limit": PAGE_LIMIT,
         "page": 1,
         "scope": "ACTIVE",
     }
@@ -66,10 +110,17 @@ def fetch_tenders() -> list[dict]:
             "the API responded but returned no notices -- check the v3 expert "
             "query grammar, which changed from v2", API)
 
-    records = []
+    confirmed: list[dict] = []
+    unconfirmed: list[dict] = []
     for item in items:
         if not isinstance(item, dict):
             continue
+
+        # The country FIELD decides where it exists -- see _country_verdict().
+        verdict = _country_verdict(item)
+        if verdict is False:
+            continue
+
         title = _text(item.get("notice-title") or item.get("title"))
         if not title:
             continue
@@ -86,7 +137,7 @@ def fetch_tenders() -> list[dict]:
         if not url and number:
             url = f"https://ted.europa.eu/en/notice/-/detail/{number}"
 
-        records.append(base.build_record(
+        record = base.build_record(
             portal=KEY,
             title=title,
             url=url,
@@ -99,8 +150,14 @@ def fetch_tenders() -> list[dict]:
             contact=_text(item.get("buyer-name")),
             reference=number,
             default_currency="EUR",
-        ))
+        )
+        (confirmed if verdict else unconfirmed).append(record)
 
-    # TED is EU-wide, so the country filter has to survive the query being
-    # loose. Word-boundary matching keeps Jordanstown out.
-    return base.jordan_only(records)
+    # TED is EU-wide, so a loose query has to be filtered. Text matching is
+    # applied only where no country field was returned -- running it over the
+    # confirmed ones adds no safety, only false negatives, and running it over
+    # everything is exactly the no-op that let Malawi into the World Bank
+    # report. Word-boundary matching keeps Jordanstown out.
+    kept = confirmed + base.jordan_only(unconfirmed)
+    base.note_scanned(len(items))
+    return kept

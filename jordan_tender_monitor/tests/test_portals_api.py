@@ -553,8 +553,146 @@ def test_worldbank_country_field_accepts_several_spellings():
               f"worldbank: and '{field_name}' selects the right notice")
 
 
+def test_a_4xx_body_is_reported_not_discarded():
+    """TED answered "HTTP 400" for days while explaining itself in the body.
+
+    A JSON API's 4xx body names the parameter it disliked. Discarding it turned
+    a one-line fix into guesswork about the query grammar.
+    """
+    import requests
+
+    class _Response:
+        status_code = 400
+        text = ('{\n  "message": "Invalid value for parameter limit: '
+                'maximum is 100"\n}')
+
+    detail = base._error_detail(_Response())
+    check("maximum is 100" in detail,
+          "4xx body: the endpoint's own explanation is carried through")
+    check("\n" not in detail,
+          "4xx body: newlines are stripped -- this goes in a status line")
+
+    long_html = type("R", (), {"status_code": 400, "text": "<html>" + "x" * 5000})()
+    check(len(base._error_detail(long_html)) < 400,
+          "4xx body: an HTML error page cannot flood the report")
+
+    check_eq(base._error_detail(None), "",
+             "4xx body: no response is not an error in itself")
+
+    class _Exploding:
+        status_code = 400
+
+        @property
+        def text(self):
+            raise RuntimeError("body could not be decoded")
+
+    check_eq(base._error_detail(_Exploding()), "",
+             "4xx body: diagnosing a failure must not itself fail")
+
+    # And it reaches the PortalError a portal actually raises.
+    original = base._request
+
+    def fake_request(method, url, **kwargs):
+        response = requests.Response()
+        response.status_code = 400
+        response._content = b'{"message":"unknown field: place-of-performance"}'
+        response.raise_for_status()
+
+    try:
+        base._request = fake_request
+        try:
+            base.post_json("https://api.example/search", {})
+            check(False, "4xx body: a 400 must raise")
+        except PortalError as exc:
+            check("unknown field" in exc.reason,
+                  "4xx body: the reason a portal reports names the bad field",
+                  f"got {exc.reason!r}")
+    finally:
+        base._request = original
+
+
+def test_ted_request_matches_the_documented_contract():
+    """Both defects that made every TED run a 400."""
+    check(ted.PAGE_LIMIT <= 100,
+          "ted: the page limit is within the documented maximum of 100",
+          f"got {ted.PAGE_LIMIT}")
+    check("JOR" in ted.QUERY,
+          "ted: the country is the three-letter ISO code",
+          f"got {ted.QUERY!r}")
+    check("(JO)" not in ted.QUERY,
+          "ted: and not the two-letter code that was rejected")
+
+    sent = {}
+    original = base.post_json
+    try:
+        base.post_json = lambda url, payload, **kw: sent.update(payload) or _TED
+        ted.fetch_tenders()
+    finally:
+        base.post_json = original
+    check(sent.get("limit", 999) <= 100,
+          "ted: the request actually sent respects the limit",
+          f"sent limit={sent.get('limit')}")
+
+
+def test_ted_country_field_beats_a_full_text_match():
+    """FT~"Jordan" is full-text, so text filtering alone cannot reject anything.
+
+    TED is EU-wide. Getting this wrong would put the whole of European
+    procurement in the report labelled as Jordan opportunities -- the World
+    Bank failure, at a much larger scale.
+    """
+    payload = {"notices": [
+        {"publication-number": "1-2026",
+         "notice-title": {"eng": ["Bridge maintenance, Bavaria"]},
+         "place-of-performance-country-lot": {"eng": ["DEU"]},
+         "description-lot": {"eng": ["Consultants with Jordan experience welcome."]},
+         "publication-date": "2026-06-01"},
+        {"publication-number": "2-2026",
+         "notice-title": {"eng": ["Technical assistance, package 4"]},
+         "place-of-performance-country-lot": {"eng": ["JOR"]},
+         "description-lot": {"eng": ["Support to public administration reform."]},
+         "publication-date": "2026-06-02"},
+        {"publication-number": "3-2026",
+         "notice-title": {"eng": ["Advisory Services, Amman, Jordan"]},
+         "description-lot": {"eng": ["No country coded on this notice."]},
+         "publication-date": "2026-06-03"},
+    ]}
+    with _Stub(payload):
+        records = ted.fetch_tenders()
+
+    titles = [r["title"] for r in records]
+    check(len(records) == 2, "ted: two of three notices survive", f"got {titles}")
+    check(not any("Bavaria" in t for t in titles),
+          "ted: a German notice is rejected despite the full-text hit")
+    check(any("package 4" in t for t in titles),
+          "ted: a JOR-coded notice is kept even though its text never says Jordan",
+          f"got {titles}")
+    check(any("Amman" in t for t in titles),
+          "ted: an uncoded notice still passes on its text")
+
+
+def test_ted_country_codes_are_matched_exactly():
+    """"JO" must not match by substring, in either direction."""
+    check_eq(ted._country_verdict({"buyer-country": "JOR"}), True,
+             "ted: JOR is Jordan")
+    check_eq(ted._country_verdict({"buyer-country": "DEU"}), False,
+             "ted: DEU is not")
+    check_eq(ted._country_verdict({"buyer-country": "COD"}), False,
+             "ted: a code merely containing the letters is not Jordan")
+    check_eq(ted._country_verdict({"buyer-country": "Jordan"}), True,
+             "ted: a country NAME is matched too")
+    check_eq(ted._country_verdict({"buyer-country": "Jordanstown"}), False,
+             "ted: and Jordanstown is still not Jordan")
+    check_eq(ted._country_verdict({}), None,
+             "ted: no country field yields no verdict, not a rejection")
+
+
 TESTS = [
     test_worldbank_parses_documented_shape,
+    test_a_4xx_body_is_reported_not_discarded,
+    test_ted_request_matches_the_documented_contract,
+    test_ted_country_field_beats_a_full_text_match,
+    test_ted_country_codes_are_matched_exactly,
     test_worldbank_country_field_beats_a_full_text_match,
     test_worldbank_country_field_accepts_several_spellings,
     test_worldbank_filters_to_jordan_even_when_the_api_does_not,
