@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import sys
 import tempfile
 from datetime import date, datetime
@@ -348,6 +349,9 @@ def _describe_block(html: str, selectors: list[str]) -> list[str]:
 _PAGING_TEXT = {"next", "next page", ">", "»", "›", "last", "more",
                 "load more", "show more", "previous", "prev", "«", "‹"}
 
+# jQuery UI and Bootstrap calendar widgets, which look exactly like pagination.
+_DATEPICKER_RE = re.compile(r"ui-datepicker|datepicker|ui-state-|calendar", re.I)
+
 
 def _describe_pagination(html: str, limit: int = 14) -> list[str]:
     """Show how the page offers its OTHER pages.
@@ -371,6 +375,17 @@ def _describe_pagination(html: str, limit: int = 14) -> list[str]:
 
     for node in soup.find_all(["a", "button", "li", "select", "input", "nav", "span"]):
         classes = " ".join(node.get("class") or [])
+
+        # A date picker is not pagination. UNGM's page carries a jQuery UI
+        # calendar whose month arrows say "Prev"/"Next" and whose day cells are
+        # <a> elements reading "1", "2", "3" -- which is every heuristic in
+        # this function at once. Reporting eight calendar controls as the way
+        # to reach page two is worse than reporting nothing, because it looks
+        # like an answer.
+        if node.find_parent(class_=_DATEPICKER_RE) is not None:
+            continue
+        if _DATEPICKER_RE.search(classes):
+            continue
         text = clean(node.get_text(" "))[:40]
         aria = clean(node.get("aria-label") or "")
         rel = " ".join(node.get("rel") or [])
