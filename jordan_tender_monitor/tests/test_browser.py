@@ -1,12 +1,12 @@
 """
-The headless-browser path, and the portals that need it.
+The headless-browser path, and the one portal that needs it.
 
-Two of the thirteen cannot be read over plain HTTP. UNGM returns 141 KB of
-navigation with not one notice in it; ADFD returns 28 KB of mega-menu. Both
-assemble their listings client-side. That makes Playwright load-bearing for
-those two and irrelevant to the other eleven, which is exactly the shape that
-goes wrong: an optional dependency that silently becomes mandatory, or a
-missing one that produces a traceback instead of an instruction.
+UNGM is the richest Jordan source and the only portal that cannot be read over
+plain HTTP -- its listing is assembled client-side, so a fetch returns 141 KB of
+navigation with not one notice in it. That makes Playwright load-bearing for
+UNGM and irrelevant to the other twelve, which is exactly the shape that goes
+wrong: an optional dependency that silently becomes mandatory, or a missing one
+that produces a traceback instead of an instruction.
 
 Nothing here launches a browser. Playwright is deliberately NOT installed in the
 test environment -- if these tests needed it, the "optional" claim would be
@@ -184,14 +184,16 @@ def test_importing_the_portals_does_not_import_playwright():
 
 
 def test_the_browser_dependency_stays_contained():
-    """Two portals need it now, and the containment property is what matters.
+    """One portal needs it, and a second was tried and rejected on evidence.
 
-    This test asserted "exactly one portal" until ADFD's capture showed 28 KB
-    of pure mega-menu and no listing -- the same client-rendered shape as UNGM.
-    The number was never the point; the point is that a portal needing a
-    browser says so, and that the majority still work without one. Pinning the
-    count would have meant editing the assertion every time reality moved,
-    which teaches nobody anything.
+    ADFD looked like the same client-rendered shape as UNGM, so it was wired
+    through the browser. The render worked -- the page grew and
+    section.aos-animate appeared, which only exists once Animate-On-Scroll
+    initialises in a real browser -- and every layer still found zero rows.
+    The listing was not hidden by JavaScript; it is not there. So the
+    dependency came back out. 400 MB that provably changes nothing is worse
+    than none, and a portal carrying an unnecessary dependency is a portal
+    that fails for a reason nobody can act on.
     """
     import inspect
 
@@ -199,10 +201,10 @@ def test_the_browser_dependency_stays_contained():
 
     users = sorted(key for key, module in registry.MODULES.items()
                    if "browser." in inspect.getsource(module))
-    check_eq(users, ["adfd", "ungm"],
-             "browser: the portals that render are the ones that declare it")
+    check_eq(users, ["ungm"],
+             "browser: only the portal that demonstrably needs it declares it")
     check(len(users) * 2 < len(registry.MODULES),
-          "browser: and they stay a small minority of the thirteen",
+          "browser: and it stays a small minority of the thirteen",
           f"{len(users)} of {len(registry.MODULES)}")
 
     for key in users:

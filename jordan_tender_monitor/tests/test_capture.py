@@ -351,6 +351,8 @@ def test_adfd_points_at_the_tenders_page_not_only_the_news_page():
           "adfd: the legacy .aspx paths are gone", f"got {urls}")
 
     from jordan_tender_monitor.portals import adfd
+    check(adfd.SPEC.fetcher is None,
+          "adfd: no headless browser -- rendering was tried and changed nothing")
     check(adfd.SPEC.anchor_hint != "/News/",
           "adfd: the anchor hint no longer excludes every tender link")
 
@@ -358,6 +360,36 @@ def test_adfd_points_at_the_tenders_page_not_only_the_news_page():
     source = inspect.getsource(adfd)
     check("has NO procurement database" not in source,
           "adfd: the claim that contradicted the live site is gone")
+
+
+def test_adfd_reports_no_listing_rather_than_failing():
+    """Four URLs, plain and rendered, all carry chrome and no listing.
+
+    That is a fact about ADFD -- it finances projects, and tenders for
+    ADFD-financed work are issued by the beneficiary government -- not a broken
+    scraper. A permanent red line in the status table teaches the reader to
+    stop looking at it.
+    """
+    from jordan_tender_monitor.portals import adfd
+
+    original = harvester.harvest
+    try:
+        def fail(spec):
+            raise PortalError("layout change - the page loaded but no layer "
+                              "found a listing", spec.urls[0])
+        harvester.harvest = fail
+        try:
+            adfd.fetch_tenders()
+            check(False, "adfd: a total failure must still raise")
+        except PortalError as exc:
+            check(exc.reason.startswith("no listing published"),
+                  "adfd: classified as no-listing, not as a failure",
+                  f"got {exc.reason!r}")
+            check("layout change" in exc.reason,
+                  "adfd: the underlying detail survives, so a genuine change "
+                  "is still visible")
+    finally:
+        harvester.harvest = original
 
 
 def test_politeness_delay_is_enforced_per_host():
@@ -430,4 +462,5 @@ TESTS = [
     test_jica_uses_the_restructured_url,
     test_jica_reports_no_listing_rather_than_failing,
     test_adfd_points_at_the_tenders_page_not_only_the_news_page,
+    test_adfd_reports_no_listing_rather_than_failing,
 ]
