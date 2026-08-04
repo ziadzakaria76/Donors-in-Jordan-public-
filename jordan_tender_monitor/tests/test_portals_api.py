@@ -533,6 +533,107 @@ def test_worldbank_country_field_beats_a_full_text_match():
              "just the slice the text filter saw")
 
 
+def _wb_page(count: int, offset: int = 0, total: int | None = None) -> dict:
+    """A World Bank page of `count` Jordan-coded notices."""
+    payload = {"procnotices": [
+        {"id": f"OP{offset + i:06d}",
+         "project_ctry_name": "Jordan",
+         "bid_description": f"Consultancy package {offset + i}",
+         "noticedate": "2026-06-01T00:00:00Z"}
+        for i in range(count)
+    ]}
+    if total is not None:
+        payload["total"] = str(total)
+    return payload
+
+
+def test_worldbank_pages_instead_of_reading_the_first_500():
+    """'500 read' was the row cap, not the result size.
+
+    Asking for 500 and getting exactly 500 is what a truncated read looks like
+    from outside: the number equals the request, so a complete result and a
+    capped one are indistinguishable. Jordan notices past the five-hundredth
+    were invisible and nothing said so.
+    """
+    offsets = []
+
+    def paged(url, **kwargs):
+        offset = kwargs.get("params", {}).get("os", 0)
+        offsets.append(offset)
+        # Two full pages, then a short one: 500, 500, 7.
+        if offset >= 1000:
+            return _wb_page(7, offset)
+        return _wb_page(worldbank.PAGE_SIZE, offset)
+
+    with _Stub(paged):
+        records = worldbank.fetch_tenders()
+
+    check_eq(offsets, [0, 500, 1000],
+             "worldbank: it pages by offset until a page comes back short")
+    check_eq(len(records), 1007,
+             "worldbank: and keeps every notice from every page")
+    check(len({r["id"] for r in records}) == 1007,
+          "worldbank: the pages are distinct, not the same page three times")
+
+
+def test_worldbank_stops_at_the_total_the_api_reports():
+    """A full last page must not cost an extra request when the total is known."""
+    calls = []
+
+    def paged(url, **kwargs):
+        offset = kwargs.get("params", {}).get("os", 0)
+        calls.append(offset)
+        return _wb_page(worldbank.PAGE_SIZE, offset, total=1000)
+
+    with _Stub(paged):
+        records = worldbank.fetch_tenders()
+
+    check_eq(calls, [0, 500],
+             "worldbank: two pages reach the reported total of 1000, and it stops")
+    check_eq(len(records), 1000, "worldbank: with every notice kept")
+
+
+def test_worldbank_says_so_when_the_page_cap_truncates():
+    """The whole point of the fix: a cap that is reached must not be silent."""
+    import logging
+
+    records_logged = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record):
+            records_logged.append(record)
+
+    handler = _Capture()
+    log = logging.getLogger("jordan_tender_monitor.portals.worldbank")
+    logging.disable(logging.NOTSET)      # the suite disables logging globally
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+    try:
+        def endless(url, **kwargs):
+            offset = kwargs.get("params", {}).get("os", 0)
+            # Always a full page, and the API says there are far more.
+            return _wb_page(worldbank.PAGE_SIZE, offset, total=99_000)
+
+        with _Stub(endless):
+            records = worldbank.fetch_tenders()
+
+        check_eq(len(records), worldbank.MAX_PAGES * worldbank.PAGE_SIZE,
+                 "worldbank: the cap bounds the read")
+        warnings = [r for r in records_logged if r.levelno >= logging.WARNING]
+        check(warnings, "worldbank: reaching the cap is reported, not swallowed")
+        if warnings:
+            message = warnings[0].getMessage()
+            check("99000" in message.replace(",", ""),
+                  "worldbank: the message names how many notices exist",
+                  f"got {message!r}")
+            check("NOT read" in message,
+                  "worldbank: and says plainly that the rest were not read",
+                  f"got {message!r}")
+    finally:
+        log.removeHandler(handler)
+        logging.disable(logging.CRITICAL)
+
+
 def test_worldbank_country_field_accepts_several_spellings():
     """The field name could not be confirmed, so several are read."""
     for field_name in ("project_ctry_name", "countryshortname", "country_name",
@@ -737,6 +838,9 @@ TESTS = [
     test_ted_title_prefix_rejects_another_country,
     test_ted_country_codes_are_matched_exactly,
     test_worldbank_country_field_beats_a_full_text_match,
+    test_worldbank_pages_instead_of_reading_the_first_500,
+    test_worldbank_stops_at_the_total_the_api_reports,
+    test_worldbank_says_so_when_the_page_cap_truncates,
     test_worldbank_country_field_accepts_several_spellings,
     test_worldbank_filters_to_jordan_even_when_the_api_does_not,
     test_worldbank_titles_are_per_notice_not_per_project,

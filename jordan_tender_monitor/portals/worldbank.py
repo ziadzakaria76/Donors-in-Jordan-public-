@@ -23,8 +23,12 @@ both layers read the same field.
 
 from __future__ import annotations
 
+import logging
+
 from ..utils import text as textutil
 from . import base
+
+log = logging.getLogger(__name__)
 
 API = "https://search.worldbank.org/api/v2/procnotices"
 KEY = "worldbank"
@@ -78,34 +82,105 @@ def _country_verdict(item: dict) -> bool | None:
     return None
 
 
-def fetch_tenders() -> list[dict]:
-    params = {
-        # Kept even though the API was observed to ignore it: harmless, and it
-        # may start working. jordan_only() below is what actually guarantees
-        # the result, so nothing depends on this.
-        "countryshortname": "Jordan",
-        # Free-text narrowing, because without it the response is worldwide and
-        # a 200-row page may contain no Jordan notices at all.
-        "qterm": "Jordan",
-        "format": "json",
-        "rows": 500,
-        "os": 0,
-    }
-    payload = base.fetch_json(API, params=params)
+PAGE_SIZE = 500
 
-    # The API has used both a flat list and a keyed dict over the years.
-    items = []
+# 20 pages of 500 is 10,000 notices, comfortably past the whole qterm=Jordan
+# result set. It exists to stop a runaway loop, not to bound the read, and
+# reaching it is logged rather than swallowed -- see _fetch_all_items().
+MAX_PAGES = 20
+
+
+def _items_from(payload) -> list:
+    """The notice list, whatever shape this response arrived in.
+
+    The API has used both a flat list and a keyed dict over the years.
+    """
+    if isinstance(payload, list):
+        return payload
     if isinstance(payload, dict):
         for key in ("procnotices", "notices", "documents", "results"):
             value = payload.get(key)
             if isinstance(value, list):
-                items = value
-                break
+                return value
             if isinstance(value, dict):
-                items = [v for v in value.values() if isinstance(v, dict)]
-                break
-    elif isinstance(payload, list):
-        items = payload
+                return [v for v in value.values() if isinstance(v, dict)]
+    return []
+
+
+def _reported_total(payload) -> int | None:
+    """What the API says the full result set is, if it says."""
+    if not isinstance(payload, dict):
+        return None
+    for key in ("total", "totalResults", "numFound", "count"):
+        value = payload.get(key)
+        if value in (None, "", [], {}):
+            continue
+        try:
+            return int(str(value).strip())
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _fetch_all_items() -> list:
+    """Page through the API instead of reading the first 500 and stopping.
+
+    THE PREVIOUS VERSION ASKED FOR 500 AND GOT EXACTLY 500, which is what a
+    truncated read looks like from the outside: the number equals the request,
+    so there is no way to tell a complete result from a capped one. Jordan
+    notices past the five-hundredth were invisible, and nothing said so.
+
+    Paging stops when a page comes back short, when the API's own total is
+    reached, or at MAX_PAGES -- and only the last of those is a cap. Hitting it
+    is logged with both numbers, because "read everything" and "read the first
+    N and stopped" must never produce the same output.
+    """
+    items: list = []
+    total: int | None = None
+
+    for page in range(MAX_PAGES):
+        params = {
+            # Kept even though the API was observed to ignore it: harmless, and
+            # it may start working. The country field check below is what
+            # actually guarantees the result, so nothing depends on this.
+            "countryshortname": "Jordan",
+            # Free-text narrowing, because without it the response is worldwide
+            # and a page may contain no Jordan notices at all.
+            "qterm": "Jordan",
+            "format": "json",
+            "rows": PAGE_SIZE,
+            "os": page * PAGE_SIZE,
+        }
+        payload = base.fetch_json(API, params=params)
+        batch = _items_from(payload)
+        if total is None:
+            total = _reported_total(payload)
+        if not batch:
+            break
+
+        items.extend(batch)
+
+        # A short page is the end of the data, and it is the ordinary exit.
+        if len(batch) < PAGE_SIZE:
+            return items
+        if total is not None and len(items) >= total:
+            return items
+
+    if total is not None and len(items) < total:
+        log.warning(
+            "worldbank: read %d of %d notices the API reports -- the "
+            "%d-page cap was reached and the rest were NOT read",
+            len(items), total, MAX_PAGES)
+    elif len(items) == MAX_PAGES * PAGE_SIZE:
+        log.warning(
+            "worldbank: read %d notices and every page was full, so there are "
+            "probably more; the %d-page cap was reached",
+            len(items), MAX_PAGES)
+    return items
+
+
+def fetch_tenders() -> list[dict]:
+    items = _fetch_all_items()
 
     if not items:
         raise base.PortalError(
