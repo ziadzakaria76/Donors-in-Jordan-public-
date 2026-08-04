@@ -186,6 +186,8 @@ def cmd_capture(portal_key: str) -> int:
             print(f"      {line}")
         for line in _describe_pagination(html):
             print(f"      {line}")
+        for line in _describe_selects(html):
+            print(line)
         print()
 
     # For a browser-rendered portal, the selectors are only half the question.
@@ -219,11 +221,43 @@ def _describe_network(module) -> list[str]:
              "(headers deliberately not recorded):"]
     # Size ranks them: the call carrying the listing is the fat one, and
     # telemetry/analytics chatter sorts itself to the bottom.
-    for call in sorted(calls, key=lambda c: -c["bytes"])[:12]:
+    ranked = sorted(calls, key=lambda c: -c["bytes"])
+    for index, call in enumerate(ranked[:12]):
         lines.append(f"      {call['method']:5} {call['status']} "
                      f"{call['bytes']:>8,}B  {call['url'][:110]}")
         if call["post_data"]:
-            lines.append(f"            body: {call['post_data'][:200]}")
+            # The top call is the one worth replaying, so print its body whole.
+            # Truncating a search filter mid-field makes it unusable, which is
+            # the failure this diagnostic exists to end.
+            limit = 4000 if index == 0 else 200
+            lines.append(f"            body: {call['post_data'][:limit]}")
+    return lines + [""]
+
+
+def _describe_selects(html: str, needle: str = "jordan") -> list[str]:
+    """Filter dropdowns and the option value the needle sits on.
+
+    A listing that supports a country filter is only useful if you know what
+    that country's id is, and the id lives in the page's own <select>, not in
+    any documentation. UNGM's search body carries "Countries":[] -- this is
+    what fills it in.
+    """
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(html, "html.parser")
+    selects = soup.find_all("select")
+    if not selects:
+        return []
+
+    lines = [f"    {len(selects)} filter dropdown(s):"]
+    for select in selects[:12]:
+        name = select.get("name") or select.get("id") or "(unnamed)"
+        options = select.find_all("option")
+        lines.append(f"      {name:34} {len(options):5} option(s)")
+        for option in options:
+            if needle in option.get_text(" ", strip=True).lower():
+                lines.append(f"        -> {option.get_text(' ', strip=True)!r} "
+                             f"value={option.get('value')!r}")
     return lines + [""]
 
 

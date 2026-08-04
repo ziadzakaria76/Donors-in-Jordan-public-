@@ -104,7 +104,10 @@ def _watch_network(page, sink: list) -> None:
         sink.append({
             "method": request.method,
             "url": request.url,
-            "post_data": (request.post_data or "")[:400],
+            # Generous: the point of capturing a body is to REPLAY it, and a
+            # search filter truncated mid-field cannot be replayed. 400 chars
+            # cut UNGM's off at "UNSPSC..." -- readable, useless.
+            "post_data": (request.post_data or "")[:4000],
             "status": response.status,
             "bytes": length,
         })
