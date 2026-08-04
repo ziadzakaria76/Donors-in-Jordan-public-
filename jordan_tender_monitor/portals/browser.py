@@ -79,11 +79,45 @@ def _scroll_until_settled(page, row_selector: str, max_scrolls: int,
     return seen
 
 
+def _watch_network(page, sink: list) -> None:
+    """Record the XHR/fetch calls the page makes, for --capture.
+
+    A rendered listing is a workaround, not an answer: the page is fetching its
+    rows from somewhere, and calling that endpoint directly would replace 40
+    scrolls with one paged request. Guessing the endpoint has already failed
+    once here -- POST /Public/Notice/Search returned 395 bytes -- so watch what
+    the UI itself asks for instead.
+
+    Headers are deliberately NOT recorded. They carry cookies and antiforgery
+    tokens, and a diagnostic that prints those into a CI log is a credential
+    leak wearing a debugging hat. Method, URL, body and response size are
+    enough to reconstruct a request by hand.
+    """
+    def on_response(response):
+        request = response.request
+        if request.resource_type not in ("xhr", "fetch"):
+            return
+        try:
+            length = len(response.body())
+        except Exception:  # noqa: BLE001 - a body may be gone by now
+            length = -1
+        sink.append({
+            "method": request.method,
+            "url": request.url,
+            "post_data": (request.post_data or "")[:400],
+            "status": response.status,
+            "bytes": length,
+        })
+
+    page.on("response", on_response)
+
+
 def render(url: str, wait_for: str | None = None,
            settle_ms: int = 2500,
            scroll_for: str | None = None,
            max_scrolls: int = 0,
-           scroll_wait_ms: int = 1500) -> str:
+           scroll_wait_ms: int = 1500,
+           network_log: list | None = None) -> str:
     """Load a page in a headless browser and return the rendered HTML.
 
     wait_for is a CSS selector to wait for before reading the DOM. It is a
@@ -115,6 +149,8 @@ def render(url: str, wait_for: str | None = None,
                     viewport={"width": 1440, "height": 2400},
                 )
                 page.set_default_timeout(config.REQUEST_TIMEOUT * 1000)
+                if network_log is not None:
+                    _watch_network(page, network_log)
                 page.goto(url, wait_until="domcontentloaded")
 
                 if wait_for:

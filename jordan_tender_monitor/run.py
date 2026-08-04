@@ -188,11 +188,43 @@ def cmd_capture(portal_key: str) -> int:
             print(f"      {line}")
         print()
 
+    # For a browser-rendered portal, the selectors are only half the question.
+    # The other half is where the page gets its rows, because an endpoint that
+    # takes a page number beats any number of scroll passes.
+    if hasattr(module, "capture_network"):
+        for line in _describe_network(module):
+            print(line)
+
     if not any_saved:
         print("Nothing was captured -- every source URL failed. The portal is "
               "unreachable from here, so its selectors cannot be verified.\n")
         return 1
     return 0
+
+
+def _describe_network(module) -> list[str]:
+    """The XHR/fetch calls a rendered portal makes, loudest-first."""
+    from jordan_tender_monitor.portals import base
+
+    try:
+        calls = module.capture_network()
+    except base.PortalError as exc:
+        return [f"    Network capture failed: {exc}\n"]
+
+    if not calls:
+        return ["    The page made no XHR/fetch calls -- its rows are in the "
+                "initial HTML or come from a websocket.\n"]
+
+    lines = [f"    {len(calls)} XHR/fetch call(s); biggest responses first "
+             "(headers deliberately not recorded):"]
+    # Size ranks them: the call carrying the listing is the fat one, and
+    # telemetry/analytics chatter sorts itself to the bottom.
+    for call in sorted(calls, key=lambda c: -c["bytes"])[:12]:
+        lines.append(f"      {call['method']:5} {call['status']} "
+                     f"{call['bytes']:>8,}B  {call['url'][:110]}")
+        if call["post_data"]:
+            lines.append(f"            body: {call['post_data'][:200]}")
+    return lines + [""]
 
 
 def _capture_api(portal_key: str, module) -> int:

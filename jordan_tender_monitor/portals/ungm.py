@@ -115,3 +115,32 @@ def fetch_tenders() -> list[dict]:
 
 def capture():
     return harvester.capture(SPEC)
+
+
+# How many scroll passes the diagnostic makes. Small on purpose: the question
+# it answers -- "what does the page ask for when it needs more rows?" -- is
+# answered by the first lazy-load call, not the four hundredth.
+CAPTURE_SCROLLS = 4
+
+
+def capture_network() -> list[dict]:
+    """The XHR/fetch calls the listing makes on load and while scrolling.
+
+    Scrolling is a workaround for not knowing the endpoint. 40 passes read 615
+    rows and the listing was still growing, so the cap was truncating a
+    worldwide list that we then filter down to a handful of Jordan notices --
+    reading thousands of rows to keep three. If the page fetches its rows from
+    an endpoint that takes a page number or a country, calling it directly
+    replaces the whole scroll loop.
+
+    Guessing that endpoint has already failed here once (POST
+    /Public/Notice/Search returned 395 bytes), so this reports what the UI
+    actually calls rather than what it plausibly might.
+    """
+    if not browser.available():
+        raise base.PortalError(
+            f"UNGM needs a headless browser: {browser.INSTALL_HINT}", LISTING)
+    log: list[dict] = []
+    browser.render(LISTING, wait_for=ROW_HINT, scroll_for=ROW_SELECTOR,
+                   max_scrolls=CAPTURE_SCROLLS, network_log=log)
+    return log
