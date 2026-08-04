@@ -555,11 +555,15 @@ def test_portal_field_selectors_map_unlabelled_columns():
               "field selectors: every deadline is later than its publication date",
               f"{row.title[:35]!r}: closing={closing} posted={posted}")
 
-    # "30-Sep-2026 19:00 (GMT +3.00)" -- the trailing timezone defeats the date
-    # parser outright, so a selector can find the right cell and still lose the
-    # deadline. Date fields are narrowed to their date span.
-    check_eq(parse_date("30-Sep-2026 19:00 (GMT +3.00)"), None,
-             "field selectors: the raw cell text genuinely does not parse")
+    # "30-Sep-2026 19:00 (GMT +3.00)" used to defeat the parser outright, and
+    # this test asserted that as expected behaviour. It parses now: the
+    # named-month path accepts a hyphen separator, so the timezone suffix no
+    # longer costs a deadline. Narrowing to the date span still happens and is
+    # still worth doing -- it is what keeps the field free of "19:00 (GMT
+    # +3.00)" noise -- but it is no longer the only thing standing between a
+    # legible deadline and "not published".
+    check_eq(parse_date("30-Sep-2026 19:00 (GMT +3.00)"), date(2026, 9, 30),
+             "dates: a hyphenated month name survives a timezone suffix")
 
 
 def test_a_stale_field_selector_degrades_rather_than_blanking():
@@ -962,4 +966,89 @@ TESTS += [
     test_a_field_selector_survives_an_optional_sibling_disappearing,
     test_a_non_date_match_never_lands_in_a_date_field,
     test_a_selector_matching_nothing_leaves_inference_alone,
+]
+
+
+# ---------------------------------------------------------------------------
+# parse_date says no
+# ---------------------------------------------------------------------------
+
+def test_a_countdown_is_not_a_date():
+    """"Expires in 48 days" parsed to 2048-08-04 for the life of this project.
+
+    dateutil's fuzzy mode takes the 48 as a year and fills month and day from
+    its default, which is today. The result is inside any sane plausibility
+    window and indistinguishable from a real date downstream.
+    """
+    for text in ("Expires in 48 days", "Expires within 24 hours",
+                 "Closes in 3 weeks", "in 2 months"):
+        check(parse_date(text) is None,
+              "dates: a countdown is not a date", repr(text))
+
+
+def test_a_reference_number_is_not_a_date():
+    """Real values out of one UNGM row, all of which dateutil will parse."""
+    for text in ("WFP-SDN-00220", "RFQW-3226000056 (HJ)",
+                 "2026/FLGUA/FLGUA/137689", "JO-MOE-510057-CS-INDV-2"):
+        check(parse_date(text) is None,
+              "dates: a reference number is not a date", repr(text))
+
+
+def test_an_ordinary_noun_phrase_is_not_a_date():
+    for text in ("Multiple destinations", "Jordan", "UNRWA", "Package 3",
+                 "Lot 12", "Phase 2"):
+        check(parse_date(text) is None,
+              "dates: a label with a number in it is not a date", repr(text))
+
+
+def test_the_two_guards_each_catch_what_the_other_misses():
+    """Neither check is redundant, and it is worth pinning down why.
+
+    "Expires in 48 days" would be 2048 -- a perfectly plausible year, so the
+    plausibility window waves it through; only completeness rejects it.
+    "WFP-SDN-00220" would be 0220-08-04 -- complete as far as dateutil is
+    concerned, since it found a year and defaulted the rest identically either
+    way; only plausibility rejects it.
+    """
+    from dateutil import parser as dateparser
+    from datetime import datetime
+
+    loose = dateparser.parse("Expires in 48 days", dayfirst=True, fuzzy=True,
+                             default=datetime(2001, 6, 15))
+    check_eq(loose.year, 2048,
+             "dates: the permissive parse really does yield a plausible year")
+    check(abs(2048 - date.today().year) <= 30,
+          "dates: and it sits inside the plausibility window, so that guard "
+          "alone would not have caught it")
+    check_eq(parse_date("Expires in 48 days"), None,
+             "dates: completeness catches it instead")
+
+
+def test_every_real_format_these_portals_publish_still_parses():
+    """The guards must not cost a single genuine date."""
+    cases = {
+        "2026-06-01T09:00:00Z": date(2026, 6, 1),
+        "03-Aug-2026": date(2026, 8, 3),
+        "30-Sep-2026 19:00 (GMT +3.00)": date(2026, 9, 30),
+        "04-Aug-2026 13:00 (GMT 3.00)": date(2026, 8, 4),
+        "31.12.2026": date(2026, 12, 31),
+        "15. Januar 2027": date(2027, 1, 15),
+        "15 October 2026": date(2026, 10, 15),
+        "October 15, 2026": date(2026, 10, 15),
+        "Deadline: 12/10/2026": date(2026, 10, 12),
+        "15 October 2026, Amman, Jordan": date(2026, 10, 15),
+        "١٥ تشرين الأول ٢٠٢٦": date(2026, 10, 15),
+    }
+    for text, want in cases.items():
+        check(parse_date(text) == want,
+              "dates: a real published format still parses",
+              f"{text!r} -> {parse_date(text)}, wanted {want}")
+
+
+TESTS += [
+    test_a_countdown_is_not_a_date,
+    test_a_reference_number_is_not_a_date,
+    test_an_ordinary_noun_phrase_is_not_a_date,
+    test_the_two_guards_each_catch_what_the_other_misses,
+    test_every_real_format_these_portals_publish_still_parses,
 ]
