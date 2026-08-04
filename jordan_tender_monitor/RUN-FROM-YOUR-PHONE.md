@@ -79,7 +79,7 @@ days. If you have not seen a run in a while, open the Actions tab and check.
 
 ## The schedule
 
-Weekdays at **04:00 UTC = 07:00 in Amman**. Jordan is UTC+3 year-round, so this
+Weekdays at **04:17 UTC = 07:17 in Amman**. Jordan is UTC+3 year-round, so this
 never needs a seasonal adjustment. Scheduled runs report only what is new;
 manual runs default to the whole current pipeline.
 
@@ -88,6 +88,14 @@ cron is always UTC.
 
 Scheduled runs can start a few minutes late when GitHub is busy. That is normal
 and does not mean anything is wrong.
+
+**Why :17 and not :00.** GitHub delays scheduled runs under load and can drop
+them entirely, and the top of every hour is the busiest minute on the platform
+because that is where most people point their crons. This workflow was set to
+04:00 and fired zero times before the minute was moved. If a morning ever
+passes with no run, check the Actions tab -- and note that GitHub also disables
+scheduled workflows automatically in a repository with no activity for 60 days,
+which a monitor nobody commits to will eventually hit.
 
 ---
 

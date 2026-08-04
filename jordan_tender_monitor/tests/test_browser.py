@@ -642,6 +642,31 @@ def test_the_workflow_installs_the_browser_only_for_diagnosis():
           "skips it entirely", install[-200:])
 
 
+def test_the_schedule_is_weekday_mornings_and_not_on_the_hour():
+    """A cron that never fires is worse than no cron -- it looks scheduled.
+
+    This workflow ran "0 4 * * 1-5" and had fired ZERO times. GitHub delays or
+    drops scheduled runs under load and the top of every hour is the most
+    contended minute on the platform; their docs say to pick another one. The
+    minute is therefore asserted to be non-zero, not merely present.
+    """
+    import re
+    workflow = io.open(ROOT.parent / ".github" / "workflows" / "monitor.yml",
+                       encoding="utf-8").read()
+    crons = re.findall(r'cron:\s*"([^"]+)"', workflow)
+    check(len(crons) == 1, "workflow: exactly one schedule", repr(crons))
+
+    minute, hour, dom, month, dow = crons[0].split()
+    check(minute != "0",
+          "workflow: not scheduled on the hour, where GitHub drops crons",
+          f"cron is {crons[0]!r}")
+    check(0 <= int(hour) <= 6,
+          "workflow: early UTC, so it lands in the Amman morning (UTC+3)",
+          f"hour={hour}")
+    check_eq(dow, "1-5", "workflow: Monday to Friday")
+    check_eq((dom, month), ("*", "*"), "workflow: every weekday, every month")
+
+
 def test_giz_dropped_the_page_that_carried_no_listing():
     """--capture showed giz.de/en/partner/contractor/tenders is an info page.
 
@@ -679,6 +704,7 @@ TESTS = [
     test_ungm_selectors_come_from_the_rendered_dom,
     test_ungm_declares_its_source_and_filters_to_jordan,
     test_the_workflow_installs_the_browser_only_for_diagnosis,
+    test_the_schedule_is_weekday_mornings_and_not_on_the_hour,
     test_giz_dropped_the_page_that_carried_no_listing,
 ]
 
