@@ -15,7 +15,7 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD — 4,012 notices scanned, 119 Jordan. UK Find a Tender (500 read), IsDB (144), GIZ (20) and KfW/GTAI (3) all read cleanly and had no open Jordan notices on the day. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **732 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **748 checks** |
 | **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
 | **Confirmed live** | UNGM — renders in a headless browser and reads its full listing at quality 1.00: real titles, working notice links, correct deadlines. Six defects fixed. It reads page 1 only (15 notices, worldwide), so it contributes Jordan notices only when some fall on that page — pagination or a country filter is the next step. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
@@ -104,7 +104,7 @@ interview question it answers.
 | Minimum value | $100k **on published values only**; unknown values kept and flagged |
 | Notice types | All; the type is shown as a label |
 | Lookback | None — everything currently open |
-| Deadlines | Closed excluded (today counts as open); undated kept and flagged |
+| Deadlines | Closed excluded (today counts as open); undated kept and flagged, but only while published within 90 days |
 | New-only | On, SQLite-backed |
 | Language | Arabic included in the original, flagged for manual review |
 | Eligibility | National-only flagged and penalised 25 points, never excluded |
@@ -116,6 +116,17 @@ interview question it answers.
 | Alerting | Portal health in the **filename** + a status page in both documents, plus an optional ACTION NEEDED email on total failure |
 
 ### Two settings worth understanding
+
+**Undated notices age out; dated ones do not.** A notice with a deadline
+leaves the report when it closes. An undated one never does, so undated notices
+accumulate for as long as the source has been publishing. That was invisible
+while the World Bank read was truncated at 500 notices; once it returned its
+real 1,625 it produced 1,036 reported opportunities from one portal, most years
+old. An undated notice is now kept only while its *publication* date is within
+`UNDATED_LOOKBACK_DAYS` (90). A dated notice is judged on its deadline however
+old it is, and a notice with **no dates at all** is kept — there is nothing to
+judge it on, and guessing would silently delete live tenders. Set
+`JTM_UNDATED_LOOKBACK_DAYS=0` to turn the window off.
 
 **Unknown values are kept.** Most donor notices publish no value at notice
 stage — UNGM, GIZ and EBRD almost never do. Dropping them against the $100k
@@ -256,7 +267,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 732 checks, no network, no credentials
+python tests/run_all.py    # 748 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

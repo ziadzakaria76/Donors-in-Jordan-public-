@@ -721,3 +721,98 @@ TESTS = [
     test_dead_hrefs_are_never_a_rows_link,
     test_a_month_name_joined_by_hyphens_is_recognised,
 ]
+
+
+# ---------------------------------------------------------------------------
+# HTML in fields that are supposed to be prose
+# ---------------------------------------------------------------------------
+
+
+def test_markup_is_converted_to_readable_text():
+    """The World Bank API returns notice_text as raw HTML; the report showed it.
+
+    Every World Bank description reached the Word and Excel files reading
+    "<p><u><strong>Job Title:</strong></u>&nbsp;..." -- all the text present,
+    in order, and unreadable. Nothing failed, so nothing complained.
+    """
+    out = textutil.strip_html(
+        "<p><u><strong>Job Title:</strong></u>&nbsp;Databases Administrator</p>"
+        "<p>Background<br />The Queen Rania Centre&rsquo;s team</p>")
+    check("<" not in out and "&nbsp;" not in out,
+          "strip_html: no tags or entities survive", out)
+    check_eq(out,
+             "Job Title: Databases Administrator Background "
+             "The Queen Rania Centre’s team",
+             "strip_html: the prose reads as prose")
+
+
+def test_block_tags_become_a_space_not_nothing():
+    """"<p>A</p><p>B</p>" is two paragraphs, so it must not read "AB"."""
+    check_eq(textutil.strip_html("<p>A</p><p>B</p>"), "A B",
+             "strip_html: paragraphs stay separate words")
+
+
+def test_plain_text_with_angle_brackets_is_left_alone():
+    """A blanket tag-stripper would delete words out of a real description.
+
+    Procurement prose contains "<placeholder>", "<TBD>" and "value < 100,000".
+    Silently removing those is worse than leaving one stray bracket: the reader
+    cannot tell that anything went missing.
+    """
+    for plain in ("Contract value < 100,000 and > 50,000",
+                  "Provide <placeholder> and <TBD> details",
+                  "Plain description, no markup at all."):
+        check_eq(textutil.strip_html(plain), plain,
+                 "strip_html: text that is not HTML passes through unchanged")
+    check(not textutil.looks_like_html("value < 100,000"),
+          "looks_like_html: a bare angle bracket is not markup")
+    check(textutil.looks_like_html("<p>x</p>"),
+          "looks_like_html: a named tag is markup")
+
+
+def test_escaped_markup_is_preserved_rather_than_stripped():
+    """Tags are removed BEFORE entities resolve, so &lt;p&gt; is not eaten.
+
+    The other order turns a source's deliberately escaped markup into a real
+    tag and then deletes it -- losing text the author took care to show.
+    """
+    check_eq(textutil.strip_html("Escaped on purpose: &lt;p&gt; and &amp; here"),
+             "Escaped on purpose: &lt;p&gt; and &amp; here",
+             "strip_html: nothing to strip means nothing is unescaped either")
+    check_eq(textutil.strip_html("<p>Escaped on purpose: &lt;p&gt;</p>"),
+             "Escaped on purpose: <p>",
+             "strip_html: escaped markup survives as literal text, not as a tag")
+
+
+def test_arabic_survives_markup_removal():
+    check_eq(textutil.strip_html("<p>خدمات استشارية في الأردن</p>"),
+             "خدمات استشارية في الأردن",
+             "strip_html: Arabic is untouched")
+
+
+def test_records_never_carry_markup_into_the_report():
+    """Applied in build_record, so a portal sending HTML cannot leak it.
+
+    Done there rather than in worldbank.py because nothing in the record schema
+    promises a portal sends plain text, and the next one to send markup should
+    not need its own fix.
+    """
+    from jordan_tender_monitor.portals import base
+    record = base.build_record(
+        portal="worldbank",
+        title="<p>Consulting <strong>services</strong></p>",
+        description="<p><u>Job Title:</u>&nbsp;DBA in Amman, Jordan</p>")
+    check_eq(record["title"], "Consulting services",
+             "build_record: the title is plain text")
+    check_eq(record["description"], "Job Title: DBA in Amman, Jordan",
+             "build_record: the description is plain text")
+
+
+TESTS += [
+    test_markup_is_converted_to_readable_text,
+    test_block_tags_become_a_space_not_nothing,
+    test_plain_text_with_angle_brackets_is_left_alone,
+    test_escaped_markup_is_preserved_rather_than_stripped,
+    test_arabic_survives_markup_removal,
+    test_records_never_carry_markup_into_the_report,
+]

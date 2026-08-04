@@ -71,6 +71,51 @@ def clean(text: str | None) -> str:
     return _WS_RE.sub(" ", text).strip()
 
 
+# Named tags only, deliberately. A blanket </?[a-z][^>]*> would also eat
+# "<placeholder>", "<your name here>" and "<TBD>" out of prose written by a
+# procurement officer, and silently deleting words from a description is a
+# worse failure than leaving one stray angle bracket in.
+_HTML_TAG_RE = re.compile(
+    r"</?(?:p|br|div|span|strong|em|b|i|u|ul|ol|li|dl|dt|dd|table|thead|tbody"
+    r"|tr|td|th|h[1-6]|a|font|img|hr|sub|sup|blockquote|pre|code|section"
+    r"|article|small|figure|figcaption)\b[^>]*/?>", re.I)
+
+
+def looks_like_html(text: str | None) -> bool:
+    """True when the string carries real HTML markup, not just an angle bracket."""
+    return bool(text) and _HTML_TAG_RE.search(str(text)) is not None
+
+
+def strip_html(text: str | None) -> str:
+    """Plain text out of a field that may be HTML; clean() otherwise.
+
+    The World Bank API returns notice_text as raw markup, and this module fed
+    it straight into the record description. Every World Bank row in the Word
+    and Excel reports therefore read:
+
+        <p><u><strong>Job Title:</strong></u>&nbsp;Databases Administrator</p>
+
+    Nothing failed. The text was all present, in source order, and simply
+    unreadable -- and because description also feeds the Jordan matcher and the
+    sector guesser, the tags were being scored as if they were words.
+
+    Markup is converted rather than deleted: block tags become spaces, so
+    "<p>A</p><p>B</p>" reads "A B" and not "AB", and entities are resolved by
+    the parser, so &nbsp; and &rsquo; arrive as the characters they name.
+
+    Tags are stripped BEFORE entities are resolved. The other order would turn
+    a source's deliberately escaped "&lt;p&gt;" into a real tag and then delete
+    it -- losing text the author took care to show.
+    """
+    if not text:
+        return ""
+    if not looks_like_html(text):
+        return clean(text)
+
+    from bs4 import BeautifulSoup
+    return clean(BeautifulSoup(str(text), "html.parser").get_text(" "))
+
+
 def truncate(text: str, limit: int) -> str:
     """Trim to `limit` characters on a word boundary, with an ellipsis."""
     text = clean(text)

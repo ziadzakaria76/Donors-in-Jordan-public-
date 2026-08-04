@@ -103,6 +103,66 @@ def test_deadline_boundary_today_is_kept():
     check_eq(result["dropped"].get("closed"), 1, "boundary: the drop is counted")
 
 
+def test_stale_undated_notices_age_out_but_dated_ones_do_not():
+    """A dated notice expires. An undated one never does, so it must age out.
+
+    Undated notices are kept by design -- most donor notices publish no
+    deadline. The consequence only became visible once the World Bank read
+    stopped truncating at 500 and returned its real 1,625 notices: 1,036
+    reported opportunities from one portal, most of them years old.
+
+    Three cases, and only the first is filtered.
+    """
+    old = TODAY - timedelta(days=400)
+    recent = TODAY - timedelta(days=10)
+
+    stale_undated = _record(closing=None, posted=old, url="https://e.org/stale")
+    fresh_undated = _record(closing=None, posted=recent, url="https://e.org/fresh")
+    # Published long ago, still open. The deadline is what matters, not the age.
+    old_but_open = _record(closing=TODAY + timedelta(days=30), posted=old,
+                           url="https://e.org/open")
+    # Nothing to judge it on at all.
+    no_dates = _record(closing=None, posted=None, url="https://e.org/nodates")
+
+    result = filters.process(
+        [stale_undated, fresh_undated, old_but_open, no_dates], TODAY)
+    urls = {t["url"] for t in result["tenders"]}
+
+    check("https://e.org/stale" not in urls,
+          "undated window: an undated notice published 400 days ago is dropped")
+    check("https://e.org/fresh" in urls,
+          "undated window: a recently published undated notice is kept")
+    check("https://e.org/open" in urls,
+          "undated window: a DATED notice is judged on its deadline, not its age",
+          "otherwise a long-running tender would vanish while still open")
+    check("https://e.org/nodates" in urls,
+          "undated window: a notice with no dates at all is kept -- there is "
+          "nothing to judge it on, and guessing would delete live tenders")
+
+    reasons = [r for r in result["dropped"] if "undated" in r]
+    check(reasons, "undated window: the drop has its own named reason",
+          f"got {list(result['dropped'])}")
+    if reasons:
+        check(str(config.UNDATED_LOOKBACK_DAYS) in reasons[0],
+              "undated window: and the reason states the window in days",
+              f"got {reasons[0]!r}")
+
+
+def test_the_undated_window_can_be_turned_off():
+    """It is a default, not a law. Setting it to None restores the old behaviour."""
+    old = TODAY - timedelta(days=4000)
+    stale = _record(closing=None, posted=old, url="https://e.org/ancient")
+
+    original = config.UNDATED_LOOKBACK_DAYS
+    try:
+        config.UNDATED_LOOKBACK_DAYS = None
+        result = filters.process([stale], TODAY)
+        check_eq(len(result["tenders"]), 1,
+                 "undated window: disabled means every undated notice is kept")
+    finally:
+        config.UNDATED_LOOKBACK_DAYS = original
+
+
 def test_unknown_value_is_kept_and_flagged():
     unknown = _record(value_text=None, url="https://e.org/unknown")
     small = _record(value_text="USD 40,000", url="https://e.org/small")
@@ -864,6 +924,8 @@ TESTS = [
     test_every_optional_field_none,
     test_zero_keyword_matches_division_guard,
     test_deadline_boundary_today_is_kept,
+    test_stale_undated_notices_age_out_but_dated_ones_do_not,
+    test_the_undated_window_can_be_turned_off,
     test_unknown_value_is_kept_and_flagged,
     test_unknown_value_scores_mid_band,
     test_national_only_is_flagged_and_penalised,

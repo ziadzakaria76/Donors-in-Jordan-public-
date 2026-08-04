@@ -106,6 +106,87 @@ def test_worldbank_parses_documented_shape():
              "worldbank: an unpublished value stays None rather than becoming 0")
 
 
+def test_worldbank_builds_a_link_when_the_api_sends_no_url_field():
+    """Every World Bank row reached the report unlinked, and nothing said so.
+
+    The fixture above carries a "url" key, which is what let four wrong guesses
+    in _pick() pass their tests for months: the fixture was written to the
+    shape the module hoped for, not the shape the API sends. The live response
+    has no URL field at all, so 20 of 27 opportunities in a clean run were
+    unclickable. This is the same response WITHOUT that key.
+    """
+    payload = {"procnotices": [
+        {"id": "OP00291234",
+         "project_name": "Jordan Public Financial Management Reform",
+         "bid_description": "Consulting services for treasury modernisation.",
+         "project_id": "P175447"},
+    ]}
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+    check_eq(len(records), 1, "worldbank: the notice still parses without a url")
+    check_eq(records[0]["url"],
+             "https://projects.worldbank.org/en/projects-operations/"
+             "procurement-detail/OP00291234",
+             "worldbank: the link is built from the notice id")
+
+
+def test_worldbank_prefers_the_apis_own_url_over_a_built_one():
+    """If the response ever does carry a link, that is the authoritative one."""
+    payload = {"procnotices": [
+        {"id": "OP00291234",
+         "bid_description": "Consulting services, Amman, Jordan.",
+         "notice_url": "https://projects.worldbank.org/somewhere/else"},
+    ]}
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+    check_eq(records[0]["url"], "https://projects.worldbank.org/somewhere/else",
+             "worldbank: a real URL field wins over the constructed one")
+
+
+def test_worldbank_will_not_invent_a_link_from_a_project_id():
+    """A dead link is worse than no link: absent is visibly missing, dead reads as checked.
+
+    Project ids (P175447) and notice ids (OP00291234) sit in the same response
+    and both look like identifiers. Rendering a project id into the notice-page
+    template produces a URL that resolves to nothing.
+    """
+    payload = {"procnotices": [
+        {"project_id": "P175447",
+         "notice_no": "RFP-2026-014",
+         "bid_description": "Consulting services, Amman, Jordan."},
+    ]}
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+    check_eq(len(records), 1, "worldbank: the notice is still reported")
+    check_eq(records[0]["url"], None,
+             "worldbank: no link rather than a fabricated one")
+
+
+def test_field_anatomy_reports_what_a_response_carries():
+    """The diagnostic that would have caught the missing URL field in one run."""
+    items = [
+        {"id": "OP001", "title": "A", "notice_url": "https://example.org/1"},
+        {"id": "OP002", "title": "B"},
+        {"id": "OP003", "title": "C", "empty": ""},
+    ]
+    lines = "\n".join(base.field_anatomy(items))
+    check("3 notices" in lines, "field_anatomy: counts the notices")
+    check("id" in lines and "3/3" in lines,
+          "field_anatomy: reports a field present on every notice")
+    check("1/3" in lines,
+          "field_anatomy: fill rate distinguishes a rare field from a common one")
+    check("URL-ish" in lines, "field_anatomy: flags the field a link could come from")
+    check("empty" not in lines,
+          "field_anatomy: a key whose only value is empty does not count as populated")
+
+
+def test_every_api_portal_diagnostic_is_reachable_from_the_cli():
+    """--capture covered the HTML portals only, which is how this bug survived."""
+    from jordan_tender_monitor import portals
+    check("worldbank" in portals.api_portals(),
+          "capture: the World Bank API can be inspected from the command line")
+
+
 def test_worldbank_accepts_alternative_response_keys():
     """The API has used both a keyed dict and a flat list over the years."""
     with _Stub({"notices": _WB["procnotices"]}):
@@ -533,6 +614,107 @@ def test_worldbank_country_field_beats_a_full_text_match():
              "just the slice the text filter saw")
 
 
+def _wb_page(count: int, offset: int = 0, total: int | None = None) -> dict:
+    """A World Bank page of `count` Jordan-coded notices."""
+    payload = {"procnotices": [
+        {"id": f"OP{offset + i:06d}",
+         "project_ctry_name": "Jordan",
+         "bid_description": f"Consultancy package {offset + i}",
+         "noticedate": "2026-06-01T00:00:00Z"}
+        for i in range(count)
+    ]}
+    if total is not None:
+        payload["total"] = str(total)
+    return payload
+
+
+def test_worldbank_pages_instead_of_reading_the_first_500():
+    """'500 read' was the row cap, not the result size.
+
+    Asking for 500 and getting exactly 500 is what a truncated read looks like
+    from outside: the number equals the request, so a complete result and a
+    capped one are indistinguishable. Jordan notices past the five-hundredth
+    were invisible and nothing said so.
+    """
+    offsets = []
+
+    def paged(url, **kwargs):
+        offset = kwargs.get("params", {}).get("os", 0)
+        offsets.append(offset)
+        # Two full pages, then a short one: 500, 500, 7.
+        if offset >= 1000:
+            return _wb_page(7, offset)
+        return _wb_page(worldbank.PAGE_SIZE, offset)
+
+    with _Stub(paged):
+        records = worldbank.fetch_tenders()
+
+    check_eq(offsets, [0, 500, 1000],
+             "worldbank: it pages by offset until a page comes back short")
+    check_eq(len(records), 1007,
+             "worldbank: and keeps every notice from every page")
+    check(len({r["id"] for r in records}) == 1007,
+          "worldbank: the pages are distinct, not the same page three times")
+
+
+def test_worldbank_stops_at_the_total_the_api_reports():
+    """A full last page must not cost an extra request when the total is known."""
+    calls = []
+
+    def paged(url, **kwargs):
+        offset = kwargs.get("params", {}).get("os", 0)
+        calls.append(offset)
+        return _wb_page(worldbank.PAGE_SIZE, offset, total=1000)
+
+    with _Stub(paged):
+        records = worldbank.fetch_tenders()
+
+    check_eq(calls, [0, 500],
+             "worldbank: two pages reach the reported total of 1000, and it stops")
+    check_eq(len(records), 1000, "worldbank: with every notice kept")
+
+
+def test_worldbank_says_so_when_the_page_cap_truncates():
+    """The whole point of the fix: a cap that is reached must not be silent."""
+    import logging
+
+    records_logged = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record):
+            records_logged.append(record)
+
+    handler = _Capture()
+    log = logging.getLogger("jordan_tender_monitor.portals.worldbank")
+    logging.disable(logging.NOTSET)      # the suite disables logging globally
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+    try:
+        def endless(url, **kwargs):
+            offset = kwargs.get("params", {}).get("os", 0)
+            # Always a full page, and the API says there are far more.
+            return _wb_page(worldbank.PAGE_SIZE, offset, total=99_000)
+
+        with _Stub(endless):
+            records = worldbank.fetch_tenders()
+
+        check_eq(len(records), worldbank.MAX_PAGES * worldbank.PAGE_SIZE,
+                 "worldbank: the cap bounds the read")
+        warnings = [r for r in records_logged if r.levelno >= logging.WARNING]
+        check(warnings, "worldbank: reaching the cap is reported, not swallowed")
+        if warnings:
+            message = warnings[0].getMessage()
+            check("99000" in message.replace(",", ""),
+                  "worldbank: the message names how many notices exist",
+                  f"got {message!r}")
+            check("NOT read" in message,
+                  "worldbank: and says plainly that the rest were not read",
+                  f"got {message!r}")
+    finally:
+        log.removeHandler(handler)
+        logging.disable(logging.CRITICAL)
+
+
 def test_worldbank_country_field_accepts_several_spellings():
     """The field name could not be confirmed, so several are read."""
     for field_name in ("project_ctry_name", "countryshortname", "country_name",
@@ -737,6 +919,9 @@ TESTS = [
     test_ted_title_prefix_rejects_another_country,
     test_ted_country_codes_are_matched_exactly,
     test_worldbank_country_field_beats_a_full_text_match,
+    test_worldbank_pages_instead_of_reading_the_first_500,
+    test_worldbank_stops_at_the_total_the_api_reports,
+    test_worldbank_says_so_when_the_page_cap_truncates,
     test_worldbank_country_field_accepts_several_spellings,
     test_worldbank_filters_to_jordan_even_when_the_api_does_not,
     test_worldbank_titles_are_per_notice_not_per_project,
@@ -744,6 +929,11 @@ TESTS = [
     test_scan_count_distinguishes_empty_from_filtered_out,
     test_worldbank_accepts_alternative_response_keys,
     test_worldbank_empty_response_is_diagnosed_not_silent,
+    test_worldbank_builds_a_link_when_the_api_sends_no_url_field,
+    test_worldbank_prefers_the_apis_own_url_over_a_built_one,
+    test_worldbank_will_not_invent_a_link_from_a_project_id,
+    test_field_anatomy_reports_what_a_response_carries,
+    test_every_api_portal_diagnostic_is_reachable_from_the_cli,
     test_ted_parses_multilingual_fields,
     test_ted_builds_a_url_when_links_are_missing,
     test_ted_empty_response_is_diagnosed,
