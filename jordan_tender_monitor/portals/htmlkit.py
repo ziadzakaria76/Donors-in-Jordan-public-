@@ -28,7 +28,6 @@ can see beats a silent zero.
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 import re
 from dataclasses import dataclass, field
@@ -525,30 +524,6 @@ def _node_to_row(node, base_url: str, anchor_hint: str | None = None,
     return row
 
 
-# How far from today a procurement date can credibly sit. Wide on purpose --
-# this is a nonsense filter, not a business rule.
-_DATE_PLAUSIBILITY_YEARS = 30
-
-
-def _plausible_notice_date(value) -> bool:
-    """Reject a parse that succeeded on something that was not a date.
-
-    parse_date is permissive by design, and permissive parsers say yes to
-    things a human never would. Both of these are real strings out of one UNGM
-    row, and both parse:
-
-        "Expires in 48 days" -> 2048-08-04   (the 48 read as a year)
-        "WFP-SDN-00220"      -> 0220-08-04   (a reference number)
-
-    A field selector that scans a row's siblings will meet both. "Did it parse"
-    cannot tell them from a date; "is it within a human lifetime of today" can.
-    """
-    if value is None:
-        return False
-    today = _dt.date.today()
-    return abs(value.year - today.year) <= _DATE_PLAUSIBILITY_YEARS
-
-
 _FIELD_ATTRS = {
     "title": "title",
     "closing": "closing_text",
@@ -624,23 +599,20 @@ def _apply_field_selectors(row: Row, node, field_selectors: dict | None) -> None
                 # and the trailing timezone defeats the parser outright -- the
                 # selector found the right cell and the deadline was still lost.
                 #
-                # Then reject countdowns, and only then require it to parse.
-                # Both guards are load-bearing and neither is enough alone:
+                # Then require it to PARSE. _first_date_text() NARROWS but
+                # does not validate -- it hands back "Expires in 48 days"
+                # unchanged -- so a non-empty return is not evidence of a date.
                 #
-                #   _first_date_text() NARROWS but does not validate -- it
-                #   returns "Expires in 48 days" unchanged.
-                #
-                #   parse_date() then ACCEPTS that string, reading the 48 as
-                #   the year 2048 and filling in today for the rest. So a
-                #   "does it parse" check passes it too, and a countdown lands
-                #   in the publication date as 2048-08-04.
-                #
-                # Caught by the deadline-after-publication invariant, which is
-                # the only reason it is not sitting in a report right now.
+                # parse_date carries the rest. This guard used to repeat the
+                # countdown and plausibility checks here, because the parser
+                # accepted both "Expires in 48 days" (as 2048) and
+                # "WFP-SDN-00220" (as year 220). Those checks now live in the
+                # parser, where every caller gets them. Keeping copies here
+                # would be two statements of one rule reading one value, which
+                # is the shape that made the World Bank's country filter look
+                # like two checks and behave like none.
                 narrowed = _first_date_text(value)
-                if not narrowed or _RELATIVE_DURATION_RE.search(narrowed):
-                    continue
-                if not _plausible_notice_date(parse_date(narrowed)):
+                if not narrowed or parse_date(narrowed) is None:
                     continue
                 value = narrowed
             setattr(row, attr, value)
