@@ -59,11 +59,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r jordan_tender_monitor/requirements.txt
 
-      # UNGM only. Its listing is assembled client-side -- the page arrives as
-      # navigation with no notices in it -- so it needs a real browser. Kept
-      # out of requirements.txt so a Windows deployment is not forced to pull
-      # ~400 MB; every other portal works over plain HTTP.
-      - name: Install the headless browser (UNGM)
+      # DIAGNOSIS ONLY. No portal needs a browser to produce the report any
+      # more -- UNGM reads its Jordan listing from a JSON search endpoint over
+      # plain HTTP. This installs ~400 MB and takes ~30s, so it runs only for
+      # --capture, where a real browser earns it: capture_network() records
+      # what the page requests, which is how that endpoint was found.
+      - name: Install the headless browser (diagnosis only)
+        if: github.event.inputs.mode == 'diagnose portals (--capture)'
         run: |
           pip install -r jordan_tender_monitor/requirements-browser.txt
           playwright install --with-deps chromium

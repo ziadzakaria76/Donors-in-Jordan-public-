@@ -85,19 +85,24 @@ If `Activate.ps1` is blocked by execution policy:
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 ```
 
-**Optional: the headless browser, for UNGM only.** UNGM is the richest Jordan
-source — UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA all publish there — and it
-is the one portal that cannot be read over plain HTTP: its listing is assembled
-in the browser after the page loads, so a fetch returns navigation and nothing
-else. Reading it needs a real browser, which is about 400 MB:
+**Optional: the headless browser, for diagnosing a portal.** No portal needs
+one to produce a report. UNGM is the richest Jordan source — UNDP, UNICEF, WFP,
+UNOPS, UNHCR and UNRWA all publish there — and its listing genuinely is
+assembled in the browser after the page loads, so a plain fetch of the page
+returns navigation and nothing else. It is read instead from the JSON search
+endpoint that page calls, over ordinary HTTP.
+
+A browser is what lets `--capture` record the calls a page makes, which is how
+that endpoint was found. About 400 MB, and only for that:
 
 ```powershell
 pip install -r jordan_tender_monitor\requirements-browser.txt
 playwright install chromium
 ```
 
-Skip this and nothing breaks: UNGM reports `unavailable` with those two
-commands as its stated reason, and the other twelve portals run normally.
+Skip this and nothing breaks: every portal, UNGM included, produces its report
+normally. Only the network trace in `--capture ungm` is unavailable, and it
+says so with those two commands as its reason.
 
 **Confirm the time zone database installed.** Windows ships no IANA time zone
 database, so the schedule — pinned to `Asia/Amman` — depends on the `tzdata`
@@ -116,7 +121,7 @@ Now prove the code itself is sound before touching credentials:
 python jordan_tender_monitor\tests\run_all.py
 ```
 
-Expect **All 748 checks passed**. This needs no network and no credentials, so
+Expect **All 839 checks passed**. This needs no network and no credentials, so
 a failure here is an install problem, not a configuration one.
 
 ---

@@ -1,13 +1,20 @@
-# Optional: headless browser rendering.
+# Optional: headless browser rendering. NOT needed to produce a report.
 #
-# Needed ONLY by UNGM, whose listing is assembled client-side -- its page
-# arrives as 141 KB of navigation with no notices in it, and its search
-# endpoint returns 395 bytes to a plain POST. Every other portal works over
-# plain HTTP.
+# No portal requires this any more. UNGM was the one that did -- its page
+# arrives as 141 KB of navigation with no notices in it, because the listing is
+# assembled client-side -- and it now reads the JSON search endpoint that page
+# calls, filtered to Jordan, over ordinary HTTP.
 #
-# Kept out of requirements.txt so a Windows deployment does not pull ~400 MB it
-# may not want. Without it, UNGM reports a clear instruction and the other
-# twelve portals are unaffected.
+# An earlier version of this file said that endpoint "returns 395 bytes to a
+# plain POST". That was wrong, and it is why the browser was here at all: the
+# request BODY was wrong, not the endpoint. Corrected rather than deleted,
+# because the wrong version of this note is what stopped anyone retrying it.
+#
+# What a browser is still for: --capture drives a real page and records the
+# XHR/fetch calls it makes, which is how UNGM's endpoint and its filter shape
+# were found. When a portal next changes, that trace says what it changed to.
+# Worth ~400 MB while diagnosing; worth nothing on a scheduled run, which is
+# why the workflow installs it only for --capture.
 #
 #   pip install -r requirements-browser.txt
 #   playwright install chromium

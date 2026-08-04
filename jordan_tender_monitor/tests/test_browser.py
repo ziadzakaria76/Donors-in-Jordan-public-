@@ -267,11 +267,17 @@ def test_the_browser_dependency_stays_contained():
 # ---------------------------------------------------------------------------
 
 def test_a_missing_browser_is_an_instruction_not_a_traceback():
+    """The browser is a diagnostic now, so this is what asks for one.
+
+    Nothing in the report path needs Playwright any more. capture_network()
+    still does -- it drives a real page to record what it requests -- so a
+    missing browser has to say how to install it rather than traceback.
+    """
     original = browser.available
     try:
         browser.available = lambda: False
         try:
-            ungm._fetch_rendered(ungm.LISTING)
+            ungm.capture_network()
             check(False, "browser: a missing browser must raise PortalError")
         except PortalError as exc:
             check("pip install -r requirements-browser.txt" in exc.reason,
@@ -337,11 +343,13 @@ def _endpoint_down(url, payload, **kwargs):
 
 
 def test_ungm_failing_leaves_the_other_portals_alone():
-    """The whole point of keeping this optional: one portal's dependency.
+    """One portal's source breaking must not take the run down with it.
 
-    Both paths have to be gone before this bites -- the search endpoint AND the
-    browser. When that happens UNGM must report unavailable with an install
-    instruction, and the other twelve must report normally.
+    This used to be about an optional dependency; the browser is gone from the
+    report path, so it is now about the search endpoint. Same property, and it
+    matters more: there is no second path to hide a failure behind, which is
+    the point -- a portal that fails loudly beats one that quietly degrades to
+    reading a fraction of the wrong list.
     """
     from jordan_tender_monitor import config
     from jordan_tender_monitor import portals as registry
@@ -356,13 +364,9 @@ def test_ungm_failing_leaves_the_other_portals_alone():
 
     original_modules = dict(registry.MODULES)
     original_enabled = dict(config.ENABLED_PORTALS)
-    original_available = browser.available
     original_post = base.post_text
     original_warm = base.warm_session
     try:
-        browser.available = lambda: False
-        # No network in the offline suite, and the endpoint is the fast path
-        # now -- so it has to be stubbed, not merely unreachable.
         base.warm_session = lambda url: None
         base.post_text = _endpoint_down
         registry.MODULES.clear()
@@ -371,7 +375,6 @@ def test_ungm_failing_leaves_the_other_portals_alone():
         config.ENABLED_PORTALS.update({"ungm": True, "worldbank": True})
         result = scraper.scrape()
     finally:
-        browser.available = original_available
         base.post_text = original_post
         base.warm_session = original_warm
         registry.MODULES.clear()
@@ -381,17 +384,15 @@ def test_ungm_failing_leaves_the_other_portals_alone():
 
     by_key = {h.key: h for h in result.health}
     check_eq(by_key["ungm"].status, "unavailable",
-             "browser: UNGM reports unavailable, not a crash")
-    check("requirements-browser.txt" in by_key["ungm"].reason,
-          "browser: and the report tells you how to fix it",
-          f"got {by_key['ungm'].reason!r}")
+             "ungm: reports unavailable, not a crash")
+    check("search endpoint" in by_key["ungm"].reason,
+          "ungm: and the reason names the thing that actually broke",
+          by_key["ungm"].reason)
+    check_eq(by_key["worldbank"].status, "ok",
+             "the other portals are unaffected")
     check_eq(len(result.records), 1,
-             "browser: the other portal's records are unaffected")
+             "and their tenders still reach the report")
 
-
-# ---------------------------------------------------------------------------
-# Rendering, when it is present
-# ---------------------------------------------------------------------------
 
 def test_render_returns_the_rendered_dom_and_closes_the_browser():
     html = io.open(FIXTURES / "drupal_views.html", encoding="utf-8").read()
@@ -542,12 +543,18 @@ def test_hitting_the_scroll_cap_is_logged_not_silent():
         logging.disable(logging.CRITICAL)
 
 
-def test_ungm_declares_scrolling_because_it_has_no_pagination():
-    check(ungm.SPEC.fetcher is ungm._fetch,
-          "ungm: fetched through the search endpoint, browser as fallback")
-    check(ungm.MAX_SCROLLS >= 10,
-          "ungm: enough passes to read the open pipeline, not a sample",
-          f"got {ungm.MAX_SCROLLS}")
+def test_ungm_reads_the_endpoint_directly_with_no_browser_in_the_way():
+    """The report path must not touch Playwright at all.
+
+    Kept as an explicit assertion rather than left implicit: a fallback is easy
+    to reintroduce by accident, and this one cost ~400 MB and ~30s per run to
+    buy a path that only ran once the endpoint was already broken -- and that,
+    when it ran, scrolled a WORLDWIDE listing and stopped at a cap.
+    """
+    check(ungm.SPEC.fetcher is ungm._fetch_search,
+          "ungm: fetched straight from the search endpoint")
+    check(not hasattr(ungm, "_fetch_rendered"),
+          "ungm: the rendered fallback is gone, not merely unused")
     check(ungm.ROW_SELECTOR in ungm.SPEC.selectors,
           "ungm: the row selector used for counting is the one that extracts",
           f"{ungm.ROW_SELECTOR!r} not in {ungm.SPEC.selectors}")
@@ -596,35 +603,43 @@ def test_ungm_selectors_come_from_the_rendered_dom():
           f"got {ungm.SPEC.selectors}")
 
 
-def test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan():
-    check(ungm.SPEC.fetcher is ungm._fetch,
-          "ungm: the spec uses the endpoint-first fetcher")
+def test_ungm_declares_its_source_and_filters_to_jordan():
+    check(ungm.SPEC.fetcher is ungm._fetch_search,
+          "ungm: the spec uses the search endpoint")
     check_eq(ungm.SPEC.urls, [ungm.LISTING],
              "ungm: the listing page is still the portal's public address")
     check(not ungm.SPEC.filter_to_jordan,
           "ungm: the generic text filter is off; _is_jordan() replaces it "
           "because the country cell cannot express a multi-country notice")
-    check("browser" in ungm.SPEC.notes.lower(),
-          "ungm: the fallback's extra dependency stays visible in the notes")
+    check("browser" not in ungm.SPEC.notes.lower()
+          and "playwright" not in ungm.SPEC.notes.lower(),
+          "ungm: the notes no longer advertise a dependency it does not have",
+          ungm.SPEC.notes)
 
 
 # ---------------------------------------------------------------------------
 # The environment this actually runs in
 # ---------------------------------------------------------------------------
 
-def test_the_workflow_installs_the_browser():
-    """UNGM runs from a phone via GitHub Actions, or it does not run at all.
+def test_the_workflow_installs_the_browser_only_for_diagnosis():
+    """The scheduled run must not pay for a browser it does not use.
 
-    Without this step the richest Jordan source reports 'unavailable' forever
-    in the only environment the system is actually used from -- and it would
-    look like a site problem, not a missing install line.
+    ~400 MB and ~30s on every weekday run, for a dependency no portal needs to
+    produce the report. It stays installed for --capture, where a real browser
+    is the only way to record what a page requests.
     """
     workflow = io.open(ROOT.parent / ".github" / "workflows" / "monitor.yml",
                        encoding="utf-8").read()
     check("requirements-browser.txt" in workflow,
-          "workflow: the optional browser requirements are installed")
+          "workflow: the optional browser requirements are still installable")
     check("playwright install" in workflow,
-          "workflow: and chromium itself is downloaded")
+          "workflow: and chromium itself can still be downloaded")
+
+    install = workflow[workflow.index("requirements-browser.txt") - 800:
+                       workflow.index("requirements-browser.txt")]
+    check("diagnose portals (--capture)" in install,
+          "workflow: the install is gated on diagnosis mode, so a report run "
+          "skips it entirely", install[-200:])
 
 
 def test_giz_dropped_the_page_that_carried_no_listing():
@@ -659,11 +674,11 @@ TESTS = [
     test_scrolling_stops_immediately_when_nothing_is_lazy,
     test_scrolling_is_off_unless_a_portal_asks_for_it,
     test_hitting_the_scroll_cap_is_logged_not_silent,
-    test_ungm_declares_scrolling_because_it_has_no_pagination,
+    test_ungm_reads_the_endpoint_directly_with_no_browser_in_the_way,
     test_ungm_routes_its_rendered_html_through_the_cascade,
     test_ungm_selectors_come_from_the_rendered_dom,
-    test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan,
-    test_the_workflow_installs_the_browser,
+    test_ungm_declares_its_source_and_filters_to_jordan,
+    test_the_workflow_installs_the_browser_only_for_diagnosis,
     test_giz_dropped_the_page_that_carried_no_listing,
 ]
 
@@ -767,34 +782,29 @@ def test_an_empty_result_is_diagnosed_rather_than_reported_as_no_tenders():
               "ungm: and it says which command shows what changed")
 
 
-def test_the_endpoint_failing_falls_back_to_the_browser():
-    original_available, original_rendered = browser.available, ungm._fetch_rendered
-    used = []
-    try:
-        browser.available = lambda: True
-        ungm._fetch_rendered = lambda url: used.append(url) or "<html></html>"
-        with _endpoint([]):
-            ungm._fetch(ungm.LISTING)
-        check_eq(used, [ungm.LISTING],
-                 "ungm: a broken endpoint does not take the portal down with it")
-    finally:
-        browser.available = original_available
-        ungm._fetch_rendered = original_rendered
+def test_a_broken_endpoint_fails_loudly_instead_of_degrading():
+    """There is deliberately no second path.
 
-
-def test_losing_both_paths_names_both():
-    """Either error alone points at the wrong problem."""
+    The browser fallback was dropped because a portal that fails loudly beats
+    one that quietly reads a fraction of the wrong list: the fallback scrolled
+    UNGM's WORLDWIDE listing and stopped at a cap, so a "successful" fallback
+    run would have reported a handful of notices and looked healthy.
+    """
     original_available = browser.available
     try:
-        browser.available = lambda: False
+        # Even WITH a browser available, there is nothing to fall back to.
+        browser.available = lambda: True
         with _endpoint([]):
-            ungm._fetch(ungm.LISTING)
-        check(False, "ungm: losing both paths must raise")
+            ungm.fetch_tenders()
+        check(False, "ungm: a broken endpoint must raise")
     except PortalError as exc:
         check("search endpoint" in exc.reason,
-              "ungm: the endpoint failure is named -- it is the thing to fix")
-        check("requirements-browser.txt" in exc.reason,
-              "ungm: and the install hint, which would have rescued the run")
+              "ungm: the reason names what broke", exc.reason)
+        check("--capture ungm" in exc.reason,
+              "ungm: and the command that shows what it sends now", exc.reason)
+        check("playwright" not in exc.reason.lower(),
+              "ungm: no browser install hint -- that would send you after the "
+              "wrong problem", exc.reason)
     finally:
         browser.available = original_available
 
@@ -805,8 +815,7 @@ TESTS += [
     test_a_capped_page_size_does_not_read_as_the_end_of_the_listing,
     test_one_full_page_then_nothing_terminates,
     test_an_empty_result_is_diagnosed_rather_than_reported_as_no_tenders,
-    test_the_endpoint_failing_falls_back_to_the_browser,
-    test_losing_both_paths_names_both,
+    test_a_broken_endpoint_fails_loudly_instead_of_degrading,
 ]
 
 
