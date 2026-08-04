@@ -5,26 +5,28 @@ Procurement is published per country office rather than centrally, so the
 Jordan office page is the source. Some JICA calls are restricted to Japanese
 firms; those are flagged by the eligibility detector (Q9).
 
-THE OLD URL RETURNED HTTP 404 ON EVERY LIVE RUN. JICA restructured its site:
-country pages moved from
+JICA'S JORDAN OFFICE PUBLISHES NO PROCUREMENT PAGE. This was chased down
+properly rather than guessed at:
 
-    /<country>/english/office/others/procurement.html
-to
-    /english/overseas/<country>/others/procurement.html
+  * The original URL 404s. JICA did restructure, moving country pages from
+    /<country>/english/office/others/ to /english/overseas/<country>/others/.
+  * Bangladesh and Indonesia answer on BOTH schemes, so the new spelling is
+    right and the old one still works where a page exists.
+  * Jordan 404s on BOTH. Repeated searches surface procurement pages for
+    Bangladesh, Indonesia, Cote d'Ivoire and the Balkan office, and never one
+    for Jordan.
 
-confirmed by the live Indonesia page at
-/english/overseas/indonesia/others/procurement.html and the live Jordan office
-at /english/overseas/jordan/office/index.html.
-
-Both spellings are listed. The old scheme still answers for some countries
-(cotedivoire, bangladesh), so JICA is evidently mid-migration, and harvest()
-tolerates one source URL failing as long as another works -- which is exactly
-the situation a half-finished migration creates.
+So this is not a broken scraper and no URL will fix it. The office index does
+exist and is read, because it is where the office would put a notice if it had
+one; when it carries no listing the portal reports "no listing published",
+which the run classifies apart from a failure. A source with nothing to read
+must not put a permanent red line in every report -- that is how a reader
+learns to ignore the status table, and the status table is the alarm.
 """
 
 from __future__ import annotations
 
-from . import harvester
+from . import base, harvester
 from .harvester import HtmlSpec
 
 KEY = "jica"
@@ -32,11 +34,14 @@ KEY = "jica"
 SPEC = HtmlSpec(
     key=KEY,
     urls=[
-        # The restructured scheme first -- this is the one the live site uses.
+        # Both procurement spellings are kept ahead of the office index: they
+        # 404 today, and if JICA Jordan ever publishes one it will be at one of
+        # these, at which point this portal starts working with no code change.
         "https://www.jica.go.jp/english/overseas/jordan/others/procurement.html",
-        # The pre-migration URL, kept because JICA still answers it for several
-        # country offices and it costs one request to find out.
         "https://www.jica.go.jp/jordan/english/office/others/procurement.html",
+        # The office index, which does exist and is the only page that could
+        # carry a notice today.
+        "https://www.jica.go.jp/english/overseas/jordan/office/index.html",
     ],
     # SELECTOR HINTS ONLY -- written without access to the live pages, which
     # were blocked from the build environment. If a hint is wrong the quality
@@ -56,7 +61,18 @@ SPEC = HtmlSpec(
 
 
 def fetch_tenders() -> list[dict]:
-    return harvester.harvest(SPEC)
+    try:
+        return harvester.harvest(SPEC)
+    except base.PortalError as exc:
+        # Every source failing here means the same thing every time, and it is
+        # not a scraper fault -- see the module docstring. The original reason
+        # is kept so a genuine change (a bot wall, a transport error) is still
+        # visible and still distinguishable from "there is nothing here".
+        raise base.PortalError(
+            "no listing published - JICA's Jordan office has no procurement "
+            "page; its notices, when there are any, appear on the office index "
+            f"or via the Ministry of Planning. Detail: {exc.reason}",
+            exc.url) from exc
 
 
 def capture():

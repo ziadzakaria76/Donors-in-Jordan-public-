@@ -56,6 +56,34 @@ _COUNTRY_FIELDS = ("place-of-performance-country-lot", "place-of-performance-cou
 _JORDAN_CODES = {"jor", "jo"}
 
 
+import re as _re
+
+# "Austria – License management software development services – Provision ..."
+# TED's own convention: the country, an en dash, then the subject. Deliberately
+# strict -- a real country name, no digits, nothing long enough to be a
+# sentence -- because this rule is allowed to REJECT notices.
+_TITLE_COUNTRY_RE = _re.compile(r"^\s*([^\d–—|/]{3,28}?)\s*[–—]\s")
+
+
+def _country_from_title(title: str | None) -> bool | None:
+    """False when TED's own title prefix names a country that is not Jordan.
+
+    Never returns True. A prefix reading "Jordan" is good evidence, but this
+    function exists to catch what the full-text query drags in, and admitting
+    notices on a title prefix would re-open the same hole from the other side.
+    Anything not clearly another country falls through to the text check.
+    """
+    if not title:
+        return None
+    match = _TITLE_COUNTRY_RE.match(title)
+    if not match:
+        return None
+    prefix = match.group(1).strip()
+    if not prefix or textutil.mentions_jordan(prefix):
+        return None
+    return False
+
+
 def _country_verdict(item: dict) -> bool | None:
     """True / False from a country FIELD; None when the notice carries none.
 
@@ -78,7 +106,14 @@ def _country_verdict(item: dict) -> bool | None:
         if codes & _JORDAN_CODES:
             return True
         return textutil.mentions_jordan(value)
-    return None
+
+    # No country field came back. TED prefixes a notice title with its country
+    # -- "Austria – License management software development services – ..." --
+    # and on the first live run that Austrian notice reached the report on a
+    # full-text hit alone. The prefix is used ONLY to reject: a leading segment
+    # naming some other country is TED saying so itself. A title with no such
+    # prefix yields no verdict and still gets the text check.
+    return _country_from_title(_text(item.get("notice-title")))
 
 
 def fetch_tenders() -> list[dict]:

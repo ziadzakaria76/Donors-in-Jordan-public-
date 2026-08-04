@@ -671,6 +671,48 @@ def test_ted_country_field_beats_a_full_text_match():
           "ted: an uncoded notice still passes on its text")
 
 
+def test_ted_title_prefix_rejects_another_country():
+    """VERIFIED LIVE: an Austrian notice reached the report on a full-text hit.
+
+    TED returned no country field for it, so the text check was the only thing
+    left and "Jordan" appeared somewhere in the body. TED does state the
+    country in its own title prefix -- "Austria – License management software
+    development services – ..." -- so that prefix is used to REJECT.
+
+    It never admits. A prefix reading "Jordan" is good evidence, but admitting
+    on it would re-open the same hole from the other side.
+    """
+    check_eq(ted._country_from_title(
+        "Austria – License management software development services – DB"), False,
+        "ted title: an Austrian prefix rejects the notice")
+    check_eq(ted._country_from_title("Germany – Road works"), False,
+             "ted title: so does a German one")
+    check_eq(ted._country_from_title("Jordan – Technical assistance"), None,
+             "ted title: a Jordan prefix does NOT admit -- it defers")
+    check_eq(ted._country_from_title("Technical Assistance for Reform, Jordan"), None,
+             "ted title: no prefix means no verdict")
+    check_eq(ted._country_from_title("Supply of 12 – 15 laptops"), None,
+             "ted title: a dash that is not a country prefix is ignored")
+    check_eq(ted._country_from_title(None), None, "ted title: no title, no verdict")
+
+    payload = {"notices": [
+        {"publication-number": "9-2026",
+         "notice-title": {"eng": ["Austria – License management – Provision of DB "
+                                  "hardware"]},
+         "description-lot": {"eng": ["Bidders with Jordan experience welcome."]},
+         "publication-date": "2026-06-01"},
+        {"publication-number": "10-2026",
+         "notice-title": {"eng": ["Advisory Services, Amman, Jordan"]},
+         "description-lot": {"eng": ["Public administration reform."]},
+         "publication-date": "2026-06-02"},
+    ]}
+    with _Stub(payload):
+        records = ted.fetch_tenders()
+    titles = [r["title"] for r in records]
+    check_eq(len(records), 1, "ted title: the Austrian notice is kept out")
+    check("Amman" in titles[0], "ted title: and the Jordan one is kept")
+
+
 def test_ted_country_codes_are_matched_exactly():
     """"JO" must not match by substring, in either direction."""
     check_eq(ted._country_verdict({"buyer-country": "JOR"}), True,
@@ -692,6 +734,7 @@ TESTS = [
     test_a_4xx_body_is_reported_not_discarded,
     test_ted_request_matches_the_documented_contract,
     test_ted_country_field_beats_a_full_text_match,
+    test_ted_title_prefix_rejects_another_country,
     test_ted_country_codes_are_matched_exactly,
     test_worldbank_country_field_beats_a_full_text_match,
     test_worldbank_country_field_accepts_several_spellings,
