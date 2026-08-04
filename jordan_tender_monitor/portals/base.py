@@ -179,6 +179,44 @@ def post_json(url: str, payload: dict, **kwargs):
         raise PortalError(f"the search endpoint returned non-JSON ({exc})", url) from exc
 
 
+def post_text(url: str, payload: dict, **kwargs) -> str:
+    """POST JSON and return the response BODY as text.
+
+    Sibling of post_json, for the common case of a search endpoint that takes
+    JSON and answers with an HTML fragment. UNGM does exactly this, and reading
+    its answer with post_json would fail on the parse rather than on anything
+    real -- which is a good way to conclude an endpoint is broken when it is
+    not.
+    """
+    try:
+        response = _request("POST", url, json=payload, **kwargs)
+    except requests.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "?"
+        raise PortalError(
+            f"HTTP {status} from the search endpoint{_error_detail(exc.response)}",
+            url) from exc
+    except requests.RequestException as exc:
+        raise PortalError(f"transport error - {type(exc).__name__}: {exc}", url) from exc
+
+    response.encoding = response.encoding or response.apparent_encoding
+    return response.text
+
+
+def warm_session(url: str) -> None:
+    """GET a page purely for the cookies it sets.
+
+    A search endpoint behind a UI often refuses a POST that arrives with no
+    session. This is what a browser does before its first XHR, minus the
+    browser.
+    """
+    try:
+        _request("GET", url)
+    except requests.RequestException:
+        # Not fatal: the POST may not need a session at all, and if it does,
+        # its own failure is the more accurate error to report.
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Record construction
 # ---------------------------------------------------------------------------

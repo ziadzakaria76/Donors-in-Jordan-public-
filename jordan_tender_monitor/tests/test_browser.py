@@ -332,11 +332,16 @@ def test_an_unexpected_render_failure_names_its_exception_type():
                   "browser: along with the message")
 
 
+def _endpoint_down(url, payload, **kwargs):
+    raise PortalError("HTTP 503 from the search endpoint", url)
+
+
 def test_ungm_failing_leaves_the_other_portals_alone():
     """The whole point of keeping this optional: one portal's dependency.
 
-    A run on a machine without Playwright must report UNGM as unavailable with
-    an install instruction, and report the other twelve normally.
+    Both paths have to be gone before this bites -- the search endpoint AND the
+    browser. When that happens UNGM must report unavailable with an install
+    instruction, and the other twelve must report normally.
     """
     from jordan_tender_monitor import config
     from jordan_tender_monitor import portals as registry
@@ -352,8 +357,14 @@ def test_ungm_failing_leaves_the_other_portals_alone():
     original_modules = dict(registry.MODULES)
     original_enabled = dict(config.ENABLED_PORTALS)
     original_available = browser.available
+    original_post = base.post_text
+    original_warm = base.warm_session
     try:
         browser.available = lambda: False
+        # No network in the offline suite, and the endpoint is the fast path
+        # now -- so it has to be stubbed, not merely unreachable.
+        base.warm_session = lambda url: None
+        base.post_text = _endpoint_down
         registry.MODULES.clear()
         registry.MODULES.update({"ungm": ungm, "worldbank": _Good})
         config.ENABLED_PORTALS.clear()
@@ -361,6 +372,8 @@ def test_ungm_failing_leaves_the_other_portals_alone():
         result = scraper.scrape()
     finally:
         browser.available = original_available
+        base.post_text = original_post
+        base.warm_session = original_warm
         registry.MODULES.clear()
         registry.MODULES.update(original_modules)
         config.ENABLED_PORTALS.clear()
@@ -530,8 +543,8 @@ def test_hitting_the_scroll_cap_is_logged_not_silent():
 
 
 def test_ungm_declares_scrolling_because_it_has_no_pagination():
-    check(ungm.SPEC.fetcher is ungm._fetch_rendered,
-          "ungm: still fetched through the browser")
+    check(ungm.SPEC.fetcher is ungm._fetch,
+          "ungm: fetched through the search endpoint, browser as fallback")
     check(ungm.MAX_SCROLLS >= 10,
           "ungm: enough passes to read the open pipeline, not a sample",
           f"got {ungm.MAX_SCROLLS}")
@@ -584,14 +597,15 @@ def test_ungm_selectors_come_from_the_rendered_dom():
 
 
 def test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan():
-    check(ungm.SPEC.fetcher is ungm._fetch_rendered,
-          "ungm: the spec uses the rendered fetcher")
+    check(ungm.SPEC.fetcher is ungm._fetch,
+          "ungm: the spec uses the endpoint-first fetcher")
     check_eq(ungm.SPEC.urls, [ungm.LISTING],
-             "ungm: the dead POST search endpoint is no longer a source")
+             "ungm: the listing page is still the portal's public address")
     check(ungm.SPEC.filter_to_jordan,
-          "ungm: the rendered listing is worldwide, so it must be filtered")
-    check("playwright" in ungm.SPEC.notes.lower() or "browser" in ungm.SPEC.notes.lower(),
-          "ungm: the extra dependency is visible in the portal's notes")
+          "ungm: filtered downstream too -- a source's own country filter is a "
+          "hint, never a guarantee, and this one is now load-bearing")
+    check("browser" in ungm.SPEC.notes.lower(),
+          "ungm: the fallback's extra dependency stays visible in the notes")
 
 
 # ---------------------------------------------------------------------------
@@ -651,4 +665,146 @@ TESTS = [
     test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan,
     test_the_workflow_installs_the_browser,
     test_giz_dropped_the_page_that_carried_no_listing,
+]
+
+
+# ---------------------------------------------------------------------------
+# The search endpoint that replaced the scroll loop
+# ---------------------------------------------------------------------------
+
+def _rows(count: int, start: int = 0) -> str:
+    """A search-response fragment carrying `count` notice rows."""
+    return "".join(
+        f'<div class="dataRow notice-table">'
+        f'<span class="ungm-title">Notice {start + i}</span>'
+        f'<a href="/Public/Notice/{start + i}"></a>'
+        f'</div>'
+        for i in range(count))
+
+
+@contextmanager
+def _endpoint(pages):
+    """Serve `pages` (row counts) from the search endpoint, offline."""
+    calls = []
+    original_post, original_warm = base.post_text, base.warm_session
+
+    def post_text(url, payload, **kwargs):
+        calls.append(payload)
+        index = payload["PageIndex"]
+        count = pages[index] if index < len(pages) else 0
+        return _rows(count, start=index * 100)
+
+    try:
+        base.post_text = post_text
+        base.warm_session = lambda url: None
+        yield calls
+    finally:
+        base.post_text = original_post
+        base.warm_session = original_warm
+
+
+def test_the_search_body_asks_for_jordan_and_matches_the_captured_shape():
+    """Copied from a live network trace, not reconstructed.
+
+    Reconstructing this request is what produced "395 bytes -- the endpoint
+    moved or needs a token", which was wrong and cost the portal a headless
+    browser and a scroll loop.
+    """
+    body = ungm._search_body(3, 15)
+    check_eq(body["Countries"], [ungm.JORDAN_COUNTRY_ID],
+             "ungm: the country filter is what makes the listing small")
+    check_eq(ungm.JORDAN_COUNTRY_ID, "2395",
+             "ungm: Jordan's id comes from the page's own selNoticeCountry")
+    check_eq(body["PageIndex"], 3, "ungm: the page index is what pages")
+    for field in ("PageSize", "SortField", "SortAscending", "IsActive",
+                  "NoticeSearchTotalLabelId", "TypeOfCompetitions",
+                  "UNSPSCs", "NoticeTypes", "Agencies", "isPicker"):
+        check(field in body, f"ungm: the captured body's {field!r} is sent too",
+              "a field the UI sends and this omits is a difference the server "
+              "may act on")
+
+
+def test_the_endpoint_is_paged_until_a_short_page():
+    with _endpoint([15, 15, 7]) as calls:
+        html = ungm._fetch_search(ungm.LISTING)
+    check_eq([c["PageIndex"] for c in calls], [0, 1, 2],
+             "ungm: pages until the listing runs out")
+    check_eq(html.count('class="dataRow notice-table"'), 37,
+             "ungm: every page's rows survive into one document")
+
+
+def test_a_capped_page_size_does_not_read_as_the_end_of_the_listing():
+    """The trap in measuring the stride wrong.
+
+    If the server caps PageSize at 15 while we ask for 100, EVERY page is
+    "short" -- and short-page is the signal for "the listing ended". Assuming
+    the requested size would stop after page one and report it as complete,
+    which is the silent truncation this whole change exists to remove.
+    """
+    with _endpoint([15, 15, 15, 4]) as calls:
+        html = ungm._fetch_search(ungm.LISTING)
+    check_eq(len(calls), 4,
+             "ungm: the stride comes from what page one returned, not what was asked")
+    check_eq(html.count('class="dataRow notice-table"'), 49,
+             "ungm: nothing was dropped by mis-measuring the page size")
+
+
+def test_one_full_page_then_nothing_terminates():
+    """A listing that is an exact multiple of the page size still ends."""
+    with _endpoint([15]) as calls:
+        ungm._fetch_search(ungm.LISTING)
+    check_eq(len(calls), 2,
+             "ungm: asks once more, gets nothing, stops")
+
+
+def test_an_empty_result_is_diagnosed_rather_than_reported_as_no_tenders():
+    try:
+        with _endpoint([0]):
+            ungm._fetch_search(ungm.LISTING)
+        check(False, "ungm: an empty search must raise, not return zero rows")
+    except PortalError as exc:
+        check("--capture ungm" in exc.reason,
+              "ungm: and it says which command shows what changed")
+
+
+def test_the_endpoint_failing_falls_back_to_the_browser():
+    original_available, original_rendered = browser.available, ungm._fetch_rendered
+    used = []
+    try:
+        browser.available = lambda: True
+        ungm._fetch_rendered = lambda url: used.append(url) or "<html></html>"
+        with _endpoint([]):
+            ungm._fetch(ungm.LISTING)
+        check_eq(used, [ungm.LISTING],
+                 "ungm: a broken endpoint does not take the portal down with it")
+    finally:
+        browser.available = original_available
+        ungm._fetch_rendered = original_rendered
+
+
+def test_losing_both_paths_names_both():
+    """Either error alone points at the wrong problem."""
+    original_available = browser.available
+    try:
+        browser.available = lambda: False
+        with _endpoint([]):
+            ungm._fetch(ungm.LISTING)
+        check(False, "ungm: losing both paths must raise")
+    except PortalError as exc:
+        check("search endpoint" in exc.reason,
+              "ungm: the endpoint failure is named -- it is the thing to fix")
+        check("requirements-browser.txt" in exc.reason,
+              "ungm: and the install hint, which would have rescued the run")
+    finally:
+        browser.available = original_available
+
+
+TESTS += [
+    test_the_search_body_asks_for_jordan_and_matches_the_captured_shape,
+    test_the_endpoint_is_paged_until_a_short_page,
+    test_a_capped_page_size_does_not_read_as_the_end_of_the_listing,
+    test_one_full_page_then_nothing_terminates,
+    test_an_empty_result_is_diagnosed_rather_than_reported_as_no_tenders,
+    test_the_endpoint_failing_falls_back_to_the_browser,
+    test_losing_both_paths_names_both,
 ]
