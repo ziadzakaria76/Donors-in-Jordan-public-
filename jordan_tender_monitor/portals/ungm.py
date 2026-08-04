@@ -29,6 +29,19 @@ LISTING = "https://www.ungm.org/Public/Notice"
 ROW_HINT = "div.tableRow, table tbody tr, li.notice"
 
 
+# The listing lazily loads as you scroll. VERIFIED: --capture found NO
+# pagination control anywhere in the rendered DOM -- the only candidates were a
+# jQuery datepicker's month arrows and its day cells, which read as "Prev",
+# "Next", "1", "2", "3". There is no page two to follow; there is more list.
+#
+# 40 passes at 15 rows a page is roughly 600 notices, which is the whole open
+# pipeline rather than a sample. The cap is logged when it is reached, because
+# "read everything" and "read the first N" must not look alike.
+MAX_SCROLLS = 40
+
+ROW_SELECTOR = "div.dataRow.notice-table"
+
+
 def _fetch_rendered(url: str) -> str:
     """Render the listing in a headless browser and return the DOM.
 
@@ -39,7 +52,8 @@ def _fetch_rendered(url: str) -> str:
     if not browser.available():
         raise base.PortalError(
             f"UNGM needs a headless browser: {browser.INSTALL_HINT}", url)
-    return browser.render(url, wait_for=ROW_HINT)
+    return browser.render(url, wait_for=ROW_HINT,
+                          scroll_for=ROW_SELECTOR, max_scrolls=MAX_SCROLLS)
 
 
 SPEC = HtmlSpec(

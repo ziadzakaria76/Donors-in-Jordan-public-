@@ -40,14 +40,65 @@ def available() -> bool:
         return False
 
 
+def _scroll_until_settled(page, row_selector: str, max_scrolls: int,
+                          wait_ms: int, url: str) -> int:
+    """Scroll to the bottom until the row count stops growing.
+
+    Returns the final row count. Stops on the first pass that adds nothing, so
+    a page that does not lazily load costs one wait rather than max_scrolls.
+
+    THE CAP IS LOGGED WHEN IT IS HIT. A silent cap turns "we read everything"
+    and "we read the first N and stopped" into the same output, and this
+    project has already been bitten by a count that could not distinguish an
+    empty portal from a filtered one.
+    """
+    seen = page.locator(row_selector).count()
+    for attempt in range(max_scrolls):
+        # Scroll the LAST ROW into view rather than turning the mouse wheel.
+        #
+        # mouse.wheel scrolls whatever sits under the cursor, which starts at
+        # the top-left corner -- the site header, not the listing. On UNGM that
+        # loaded a few extra batches and then stalled at 44 rows out of
+        # thousands, which reads exactly like "the list has ended" and is not.
+        # Asking the last row to scroll itself into view works whatever element
+        # is the scroll container.
+        try:
+            page.locator(row_selector).last.scroll_into_view_if_needed(timeout=5_000)
+        except Exception:  # noqa: BLE001 - fall back rather than lose the run
+            page.mouse.wheel(0, 40_000)
+        page.wait_for_timeout(wait_ms)
+        now = page.locator(row_selector).count()
+        if now <= seen:
+            log.info("browser: %s settled at %d rows after %d scroll(s)",
+                     url, now, attempt + 1)
+            return now
+        seen = now
+    log.warning("browser: %s still growing at %d rows when the %d-scroll cap "
+                "was reached -- the listing is longer than this run read",
+                url, seen, max_scrolls)
+    return seen
+
+
 def render(url: str, wait_for: str | None = None,
-           settle_ms: int = 2500) -> str:
+           settle_ms: int = 2500,
+           scroll_for: str | None = None,
+           max_scrolls: int = 0,
+           scroll_wait_ms: int = 1500) -> str:
     """Load a page in a headless browser and return the rendered HTML.
 
     wait_for is a CSS selector to wait for before reading the DOM. It is a
     hint, not a requirement: if it never appears the page is still read after
     the settle delay, because a changed class name should degrade to a weak
     result the cascade can diagnose, not to a hard failure.
+
+    scroll_for + max_scrolls handle a listing that lazily loads as you scroll.
+    UNGM has thousands of notices, shows fifteen, and carries NO pagination
+    control anywhere in its DOM -- the only things --capture found were a
+    jQuery datepicker's month arrows and day cells. There is no next page to
+    follow; there is more list, once you ask for it.
+
+    Scrolling stops as soon as a pass adds no rows, so a page that is not
+    lazily loaded costs one extra wait rather than max_scrolls of them.
     """
     try:
         from playwright.sync_api import sync_playwright
@@ -76,6 +127,10 @@ def render(url: str, wait_for: str | None = None,
                 # Let client-side rendering finish even when the hint selector
                 # was wrong or the page loads its rows in stages.
                 page.wait_for_timeout(settle_ms)
+
+                if scroll_for and max_scrolls > 0:
+                    _scroll_until_settled(page, scroll_for, max_scrolls,
+                                          scroll_wait_ms, url)
                 return page.content()
             finally:
                 browser.close()

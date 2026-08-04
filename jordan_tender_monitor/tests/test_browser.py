@@ -38,13 +38,42 @@ ROOT = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 
 class _FakePage:
-    def __init__(self, html: str, selector_appears: bool = True):
+    def __init__(self, html: str, selector_appears: bool = True,
+                 row_counts: list[int] | None = None):
         self.html = html
         self.selector_appears = selector_appears
         self.waited_for: list[str] = []
         self.settled_ms = 0
         self.goto_url: str | None = None
         self.timeout_ms: int | None = None
+        # Successive row counts, one per count() call, simulating a listing
+        # that loads more as it is scrolled. The last value repeats forever.
+        self.row_counts = list(row_counts or [0])
+        self.counted = 0
+        self.scrolls = 0
+        self.wheeled = 0
+        self.scroll_into_view_fails = False
+
+    def row_count(self):
+        value = self.row_counts[min(self.counted, len(self.row_counts) - 1)]
+        self.counted += 1
+        return value
+
+    def locator(self, selector):
+        self.locator_selector = selector
+        return _FakeLocator(self, selector)
+
+    class _Mouse:
+        def __init__(self, page):
+            self.page = page
+
+        def wheel(self, dx, dy):
+            self.page.scrolls += 1
+            self.page.wheeled += 1
+
+    @property
+    def mouse(self):
+        return _FakePage._Mouse(self)
 
     def set_default_timeout(self, ms):
         self.timeout_ms = ms
@@ -62,6 +91,24 @@ class _FakePage:
 
     def content(self):
         return self.html
+
+
+class _FakeLocator:
+    def __init__(self, page, selector):
+        self.page = page
+        self.selector = selector
+
+    def count(self):
+        return self.page.row_count()
+
+    @property
+    def last(self):
+        return self
+
+    def scroll_into_view_if_needed(self, timeout=None):
+        if self.page.scroll_into_view_fails:
+            raise RuntimeError("element is not attached to the DOM")
+        self.page.scrolls += 1
 
 
 class _FakeBrowser:
@@ -369,6 +416,130 @@ def test_a_selector_that_never_appears_is_a_hint_not_a_failure():
     check_eq(page.settled_ms, 100, "browser: the settle delay still ran")
 
 
+def test_scrolling_keeps_going_while_rows_keep_arriving():
+    """UNGM shows fifteen of thousands and has NO pagination control.
+
+    --capture found nothing but a jQuery datepicker's month arrows and day
+    cells, which read as "Prev", "Next", "1", "2", "3". There is no page two to
+    follow; the list grows when you scroll it.
+    """
+    # 15 rows, then 30, 45, 60, then no more.
+    page = _FakePage("<html>done</html>", row_counts=[15, 30, 45, 60, 60])
+    with _fake_playwright(page=page):
+        browser.render("https://www.ungm.org/Public/Notice",
+                       settle_ms=0, scroll_for="div.dataRow", max_scrolls=40,
+                       scroll_wait_ms=1)
+    check_eq(page.scrolls, 4,
+             "scroll: it keeps scrolling while the count grows, then stops")
+    check_eq(page.locator_selector, "div.dataRow",
+             "scroll: rows are counted with the portal's own row selector")
+
+
+def test_scrolling_asks_the_last_row_to_come_into_view():
+    """VERIFIED LIVE: the mouse wheel stalled at 44 rows out of thousands.
+
+    mouse.wheel scrolls whatever is under the cursor, which starts at the
+    top-left corner -- the site header, not the listing. UNGM loaded a few
+    extra batches and then stopped, which reads exactly like "the list has
+    ended" and is not. Asking the last row to scroll itself into view works
+    whatever element happens to be the scroll container.
+    """
+    page = _FakePage("<html>x</html>", row_counts=[15, 30, 45, 45])
+    with _fake_playwright(page=page):
+        browser.render("https://www.ungm.org/Public/Notice", settle_ms=0,
+                       scroll_for="div.dataRow", max_scrolls=10, scroll_wait_ms=1)
+    check_eq(page.wheeled, 0,
+             "scroll: the mouse wheel is not the mechanism any more")
+    check(page.scrolls >= 3, "scroll: the last row was scrolled into view")
+
+
+def test_scrolling_falls_back_when_a_row_cannot_be_scrolled_to():
+    """A detached or hidden row must not end the run.
+
+    The fallback is the old wheel. It is worse, and it is better than losing
+    the portal because one element went stale mid-scroll.
+    """
+    page = _FakePage("<html>x</html>", row_counts=[15, 30, 30])
+    page.scroll_into_view_fails = True
+    with _fake_playwright(page=page):
+        html = browser.render("https://e.org/list", settle_ms=0,
+                              scroll_for="div.row", max_scrolls=5,
+                              scroll_wait_ms=1)
+    check_eq(html, "<html>x</html>", "scroll fallback: the DOM still comes back")
+    check(page.wheeled >= 1,
+          "scroll fallback: it falls back to the wheel rather than failing")
+
+
+def test_scrolling_stops_immediately_when_nothing_is_lazy():
+    """A page that is not lazily loaded must cost one wait, not forty."""
+    page = _FakePage("<html>done</html>", row_counts=[20, 20])
+    with _fake_playwright(page=page):
+        browser.render("https://e.org/list", settle_ms=0,
+                       scroll_for="div.row", max_scrolls=40, scroll_wait_ms=1)
+    check_eq(page.scrolls, 1,
+             "scroll: one pass proves there is nothing more, and it stops")
+
+
+def test_scrolling_is_off_unless_a_portal_asks_for_it():
+    page = _FakePage("<html>done</html>", row_counts=[10, 20, 30])
+    with _fake_playwright(page=page):
+        browser.render("https://e.org/list", settle_ms=0)
+    check_eq(page.scrolls, 0,
+             "scroll: a portal that declares no scroll selector never scrolls")
+
+
+def test_hitting_the_scroll_cap_is_logged_not_silent():
+    """A silent cap makes 'read everything' and 'read the first N' identical.
+
+    This project has already been bitten once by a count that could not
+    distinguish an empty portal from a filtered one.
+    """
+    import logging
+
+    records = []
+
+    class _Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    handler = _Capture()
+    log = logging.getLogger("jordan_tender_monitor.portals.browser")
+    previous = log.level
+    logging.disable(logging.NOTSET)      # the suite disables logging globally
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+    try:
+        # Always growing: the cap is the only thing that can stop it.
+        page = _FakePage("<html>x</html>", row_counts=list(range(15, 500, 15)))
+        with _fake_playwright(page=page):
+            browser.render("https://www.ungm.org/Public/Notice", settle_ms=0,
+                           scroll_for="div.dataRow", max_scrolls=3,
+                           scroll_wait_ms=1)
+        check_eq(page.scrolls, 3, "scroll cap: it stops at the cap")
+        warnings = [r for r in records if r.levelno >= logging.WARNING]
+        check(warnings, "scroll cap: reaching the cap is reported, not silent")
+        if warnings:
+            message = warnings[0].getMessage()
+            check("cap" in message and "longer than this run read" in message,
+                  "scroll cap: and the message says the listing was truncated",
+                  f"got {message!r}")
+    finally:
+        log.removeHandler(handler)
+        log.setLevel(previous)
+        logging.disable(logging.CRITICAL)
+
+
+def test_ungm_declares_scrolling_because_it_has_no_pagination():
+    check(ungm.SPEC.fetcher is ungm._fetch_rendered,
+          "ungm: still fetched through the browser")
+    check(ungm.MAX_SCROLLS >= 10,
+          "ungm: enough passes to read the open pipeline, not a sample",
+          f"got {ungm.MAX_SCROLLS}")
+    check(ungm.ROW_SELECTOR in ungm.SPEC.selectors,
+          "ungm: the row selector used for counting is the one that extracts",
+          f"{ungm.ROW_SELECTOR!r} not in {ungm.SPEC.selectors}")
+
+
 def test_ungm_routes_its_rendered_html_through_the_cascade():
     """Rendering is a fetch strategy, not a parallel pipeline.
 
@@ -468,6 +639,13 @@ TESTS = [
     test_ungm_failing_leaves_the_other_portals_alone,
     test_render_returns_the_rendered_dom_and_closes_the_browser,
     test_a_selector_that_never_appears_is_a_hint_not_a_failure,
+    test_scrolling_keeps_going_while_rows_keep_arriving,
+    test_scrolling_asks_the_last_row_to_come_into_view,
+    test_scrolling_falls_back_when_a_row_cannot_be_scrolled_to,
+    test_scrolling_stops_immediately_when_nothing_is_lazy,
+    test_scrolling_is_off_unless_a_portal_asks_for_it,
+    test_hitting_the_scroll_cap_is_logged_not_silent,
+    test_ungm_declares_scrolling_because_it_has_no_pagination,
     test_ungm_routes_its_rendered_html_through_the_cascade,
     test_ungm_selectors_come_from_the_rendered_dom,
     test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan,
