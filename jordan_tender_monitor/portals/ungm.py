@@ -16,12 +16,22 @@ running 0,1,2,3,4 -- one per scroll pass. Forty passes read 615 rows of a
 WORLDWIDE listing and were still growing, to keep the three that were Jordan.
 
 The endpoint takes Countries, so the listing we read is Jordan's, and paging it
-properly ends the cap rather than raising it. The browser remains as a fallback
-and is no longer on the fast path.
+properly ends the cap rather than raising it.
+
+NO BROWSER ON THE REPORT PATH. The rendered listing was kept for a while as a
+fallback, and it was not worth what it cost: ~400 MB of Chromium and ~30s of
+install on every scheduled run, to buy a path that only runs when the endpoint
+is already broken -- and which, when it does run, scrolls a WORLDWIDE listing
+and stops at a cap. A portal that fails loudly is better than one that quietly
+degrades to reading a fraction of the wrong list. If the endpoint breaks, UNGM
+reports unavailable with the reason and the URL to check.
+
+Playwright stays an optional dependency for --capture: capture_network() drives
+a real browser to record what the page requests, which is how this endpoint was
+found in the first place. Diagnosing is exactly where 400 MB earns its keep.
 
     GET /Public/Notice returns 141 KB of pure navigation -- the rows are not in
-    the initial HTML. That part of the old note was correct, and it is why the
-    fallback still needs a browser.
+    the initial HTML. Still true, still why the diagnostic needs a browser.
 """
 
 from __future__ import annotations
@@ -53,16 +63,6 @@ JORDAN_COUNTRY_ID = "2395"
 # degrades to a weak result the cascade can diagnose rather than a hard failure.
 ROW_HINT = "div.tableRow, table tbody tr, li.notice"
 
-
-# The listing lazily loads as you scroll. VERIFIED: --capture found NO
-# pagination control anywhere in the rendered DOM -- the only candidates were a
-# jQuery datepicker's month arrows and its day cells, which read as "Prev",
-# "Next", "1", "2", "3". There is no page two to follow; there is more list.
-#
-# 40 passes at 15 rows a page is roughly 600 notices, which is the whole open
-# pipeline rather than a sample. The cap is logged when it is reached, because
-# "read everything" and "read the first N" must not look alike.
-MAX_SCROLLS = 40
 
 # What the UI itself asks for. See _fetch_search(): the value that actually
 # governs paging is the one page one returns, not this one.
@@ -182,41 +182,6 @@ def _fetch_search(url: str) -> str:
     return "<html><body>" + "".join(pages) + "</body></html>"
 
 
-def _fetch_rendered(url: str) -> str:
-    """Fallback: render the listing in a headless browser and scroll it.
-
-    Kept because the search endpoint is undocumented and could change shape
-    without notice, and a portal that goes dark is worse than a slow one. It is
-    genuinely worse than the endpoint, though -- it scrolls a WORLDWIDE listing
-    and stops at a cap -- so which path ran is logged rather than left to be
-    inferred from timing.
-    """
-    if not browser.available():
-        raise base.PortalError(
-            f"UNGM needs a headless browser: {browser.INSTALL_HINT}", url)
-    return browser.render(url, wait_for=ROW_HINT,
-                          scroll_for=ROW_SELECTOR, max_scrolls=MAX_SCROLLS)
-
-
-def _fetch(url: str) -> str:
-    """The search endpoint, falling back to the browser if it ever stops working."""
-    try:
-        return _fetch_search(url)
-    except base.PortalError as exc:
-        if browser.available():
-            log.warning("ungm: the search endpoint failed (%s); falling back "
-                        "to scrolling the rendered listing, which reads the "
-                        "WORLDWIDE list and stops at a cap", exc.reason)
-            return _fetch_rendered(url)
-        # Both paths gone. Name BOTH, because either one alone sends you after
-        # the wrong problem: the endpoint error alone hides that a browser
-        # would have rescued the run, and the install hint alone hides that the
-        # endpoint -- the thing worth fixing -- has broken.
-        raise base.PortalError(
-            f"the search endpoint failed ({exc.reason}) and the browser "
-            f"fallback is unavailable: {browser.INSTALL_HINT}", url) from exc
-
-
 SPEC = HtmlSpec(
     key=KEY,
     urls=[LISTING],
@@ -269,8 +234,8 @@ SPEC = HtmlSpec(
     # the country cell, and for UNGM the majority of Jordan notices print
     # "Multiple destinations" there rather than a country name.
     filter_to_jordan=False,
-    fetcher=_fetch,
-    notes="Jordan-filtered search endpoint; browser fallback",
+    fetcher=_fetch_search,
+    notes="Jordan-filtered search endpoint",
 )
 
 
@@ -337,20 +302,21 @@ CAPTURE_SCROLLS = 4
 def capture_network() -> list[dict]:
     """The XHR/fetch calls the listing makes on load and while scrolling.
 
-    Scrolling is a workaround for not knowing the endpoint. 40 passes read 615
-    rows and the listing was still growing, so the cap was truncating a
-    worldwide list that we then filter down to a handful of Jordan notices --
-    reading thousands of rows to keep three. If the page fetches its rows from
-    an endpoint that takes a page number or a country, calling it directly
-    replaces the whole scroll loop.
+    THE ONLY THING A BROWSER IS STILL FOR HERE. Nothing in the report path
+    needs one; this drives a real page purely to watch what it requests, which
+    is how _fetch_search's endpoint and filter shape were found. Guessing them
+    had already failed once -- POST /Public/Notice/Search "returned 395 bytes"
+    went into this module's docstring as proof the endpoint was dead, and it
+    was proof of a wrong request body.
 
-    Guessing that endpoint has already failed here once (POST
-    /Public/Notice/Search returned 395 bytes), so this reports what the UI
-    actually calls rather than what it plausibly might.
+    So when the endpoint next changes shape, this is the tool that says what it
+    changed to, rather than leaving the next person to guess again. Playwright
+    is optional and only needed to run this.
     """
     if not browser.available():
         raise base.PortalError(
-            f"UNGM needs a headless browser: {browser.INSTALL_HINT}", LISTING)
+            f"the UNGM network diagnostic needs a headless browser (the report "
+            f"path does not): {browser.INSTALL_HINT}", LISTING)
     log: list[dict] = []
     browser.render(LISTING, wait_for=ROW_HINT, scroll_for=ROW_SELECTOR,
                    max_scrolls=CAPTURE_SCROLLS, network_log=log)

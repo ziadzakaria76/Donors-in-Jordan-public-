@@ -15,9 +15,9 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD — 4,012 notices scanned, 119 Jordan. UK Find a Tender (500 read), IsDB (144), GIZ (20) and KfW/GTAI (3) all read cleanly and had no open Jordan notices on the day. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **748 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **839 checks** |
 | **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
-| **Confirmed live** | UNGM — renders in a headless browser and reads its full listing at quality 1.00: real titles, working notice links, correct deadlines. Six defects fixed. It reads page 1 only (15 notices, worldwide), so it contributes Jordan notices only when some fall on that page — pagination or a country filter is the next step. |
+| **Confirmed live** | UNGM — reads its Jordan-filtered listing from the site's own JSON search endpoint, paged to the end: 69 notices in ~12s, no browser. Was 3 notices from 388 rows of a worldwide list in ~5 minutes. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
 | **Blocked by the site** | EIB and KfW/GTAI return bot walls from a data-centre IP; Saudi Fund times out |
 | **Still unverified** | The CSS selectors for every portal that has not yet returned a clean listing |
@@ -51,7 +51,6 @@ in a single run.
 
 ```bash
 pip install -r requirements.txt
-pip install -r requirements-browser.txt && playwright install chromium  # UNGM only
 cp .env.example .env        # then fill it in
 python run.py --check-portals   # can this machine see the portals at all?
 python run.py --dry-run         # scrape, filter, print — change no state
@@ -59,11 +58,18 @@ python run.py --capture ungm    # confirm one portal's selectors
 python run.py --run             # the real run: write the files into output/
 ```
 
-The second line is optional and needed by exactly one portal. UNGM builds its
-listing in JavaScript, so no HTTP fetch can read it. Skip it and UNGM reports
-`unavailable` with those two commands as its reason; the other twelve portals
-are unaffected. It costs roughly 400 MB of browser, which is why it is not in
-`requirements.txt`.
+No browser is needed to produce a report. UNGM builds its listing in
+JavaScript and used to need a headless one; it now reads the JSON search
+endpoint that page calls, filtered to Jordan, over plain HTTP.
+
+A browser is still worth installing to *diagnose* a portal — `capture_network()`
+drives a real page and records what it requests, which is how UNGM's endpoint
+was found. About 400 MB, and only for that:
+
+```bash
+pip install -r requirements-browser.txt && playwright install chromium
+python run.py --capture ungm    # now also traces the page's XHR/fetch calls
+```
 
 ## Deploying
 
@@ -267,7 +273,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 748 checks, no network, no credentials
+python tests/run_all.py    # 839 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test
