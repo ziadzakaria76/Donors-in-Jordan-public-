@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
+from collections import Counter
 
 from bs4 import BeautifulSoup
 
@@ -108,6 +109,13 @@ def _row_count(fragment: str) -> int:
     return len(BeautifulSoup(fragment, "html.parser").select(ROW_SELECTOR))
 
 
+# What the last completed search displayed in each row's country cell.
+# A log line was the obvious home for this and the wrong one: it is emitted at
+# fetch time, which in --capture output lands a hundred lines above anything
+# you are reading. A diagnostic you have to go hunting for does not get read.
+LAST_COUNTRY_TALLY: Counter = Counter()
+
+
 def _country_cells(fragment: str) -> list[str]:
     """The country each row DISPLAYS -- the last span, per the live row anatomy.
 
@@ -166,12 +174,8 @@ def _fetch_search(url: str) -> str:
             "--capture ungm to see what it sends now", SEARCH)
 
     log.info("ungm: %d notices over %d page(s) of %d", total, len(pages), stride)
-    if countries:
-        from collections import Counter
-        tally = Counter(countries)
-        log.info("ungm: countries displayed by a Jordan-filtered search: %s",
-                 ", ".join(f"{name or '(blank)'}={count}"
-                           for name, count in tally.most_common(12)))
+    LAST_COUNTRY_TALLY.clear()
+    LAST_COUNTRY_TALLY.update(countries)
     # One document, so the extraction cascade sees every row at once.
     return "<html><body>" + "".join(pages) + "</body></html>"
 

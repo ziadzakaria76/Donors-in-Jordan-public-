@@ -193,6 +193,16 @@ def cmd_capture(portal_key: str) -> int:
     # For a browser-rendered portal, the selectors are only half the question.
     # The other half is where the page gets its rows, because an endpoint that
     # takes a page number beats any number of scroll passes.
+    tally = getattr(module, "LAST_COUNTRY_TALLY", None)
+    if tally:
+        total = sum(tally.values())
+        print(f"    Country each row DISPLAYS, across {total} fetched rows:")
+        for name, count in tally.most_common(15):
+            print(f"      {name or '(blank)':30} {count:5}")
+        print("      (the source was asked for one country; anything else here "
+              "is the source's filter\n       disagreeing with its own column, "
+              "and decides whether dropping those rows is right)\n")
+
     if hasattr(module, "capture_network"):
         for line in _describe_network(module):
             print(line)
