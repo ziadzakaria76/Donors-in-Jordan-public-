@@ -211,8 +211,14 @@ def build_record(
     default_currency: str | None = None,
 ) -> dict:
     """Normalise anything a portal produced into the standard record."""
-    title = textutil.clean(title)
-    description = textutil.clean(description) or None
+    # strip_html, not clean: a portal that hands over HTML must not put tags in
+    # the report. The World Bank API returns notice_text as raw markup, and
+    # every World Bank description reached the Word and Excel files reading
+    # "<p><u><strong>Job Title:</strong></u>&nbsp;...". Done here rather than in
+    # worldbank.py because nothing about the record schema promises a portal
+    # sends plain text, and the next one to send markup should not need a fix.
+    title = textutil.strip_html(title)
+    description = textutil.strip_html(description) or None
 
     if value_usd is None and value_text:
         value_usd = money.parse_value_usd(value_text, default_currency)
