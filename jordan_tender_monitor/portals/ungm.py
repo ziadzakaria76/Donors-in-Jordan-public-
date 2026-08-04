@@ -28,10 +28,12 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
+import re as _re
 from collections import Counter
 
 from bs4 import BeautifulSoup
 
+from ..utils import text as textutil
 from . import base, browser, harvester
 from .harvester import HtmlSpec
 
@@ -260,16 +262,63 @@ SPEC = HtmlSpec(
     },
     anchor_hint="/Public/Notice/",
     currency="USD",
-    # The rendered listing is worldwide -- no country filter is applied before
-    # it arrives, so this one is doing real work rather than defence in depth.
-    filter_to_jordan=True,
+    # Filtering happens in _is_jordan() instead: the generic text filter reads
+    # the country cell, and for UNGM the majority of Jordan notices print
+    # "Multiple destinations" there rather than a country name.
+    filter_to_jordan=False,
     fetcher=_fetch,
     notes="Jordan-filtered search endpoint; browser fallback",
 )
 
 
+# What UNGM puts in the country cell when a notice covers more than one
+# country. It is a label, not a country, and it is the majority of a
+# Jordan-filtered result set -- 51 of 70 on the run that found it.
+_MULTI_COUNTRY_RE = _re.compile(r"multiple\s+destinations", _re.I)
+
+
+def _is_jordan(record: dict) -> bool:
+    """Tri-state, and the middle state is the whole point.
+
+    THE TEXT FILTER WAS DROPPING 51 OF 70 NOTICES. We ask UNGM for
+    Countries=[Jordan], it answers with 70 rows, and only 19 of them print
+    "Jordan" in the country cell. The other 51 print "Multiple destinations" --
+    they ARE Jordan notices, they just cover several countries and the column
+    has no room to say so. Running the standard text filter over them threw
+    away three quarters of the portal's Jordan work, and the count went UP at
+    the same time (3 to 19), so it read as a win.
+
+      - the row names Jordan          -> keep. The strongest evidence there is.
+      - the row says "Multiple
+        destinations"                 -> keep. The column CANNOT express the
+                                         answer, so it is not evidence of
+                                         anything; the query we sent is.
+      - the row names another country -> drop. Here the column can express the
+                                         answer and disagrees, so believe it.
+
+    This is not a retreat from "never trust a source's own country filter". The
+    World Bank earned that rule by IGNORING countryshortname and returning
+    worldwide notices -- its filter did nothing. UNGM's demonstrably works: it
+    turns thousands of worldwide notices into 70, and every row it labels with
+    a single country labels it Jordan. The rule is about not letting a source's
+    filter be the only check, and the single-country rows still get checked.
+    What changed is that a blank answer is no longer read as a "no".
+    """
+    blob = " ".join(str(record.get(f) or "")
+                    for f in ("title", "description", "url"))
+    if textutil.mentions_jordan(record.get("title"), record.get("description"),
+                                url=record.get("url")):
+        return True
+    return bool(_MULTI_COUNTRY_RE.search(blob))
+
+
 def fetch_tenders() -> list[dict]:
-    return harvester.harvest(SPEC)
+    records = harvester.harvest(SPEC)
+    kept = [r for r in records if _is_jordan(r)]
+    # harvest() no longer filters for us, so the pre-filter total has to be
+    # recorded here or the status line would read "19 (19 read)".
+    base.note_scanned(len(records))
+    return kept
 
 
 def capture():

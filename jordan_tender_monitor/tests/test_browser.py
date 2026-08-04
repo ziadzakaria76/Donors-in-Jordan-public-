@@ -601,9 +601,9 @@ def test_ungm_declares_the_rendered_fetcher_and_filters_to_jordan():
           "ungm: the spec uses the endpoint-first fetcher")
     check_eq(ungm.SPEC.urls, [ungm.LISTING],
              "ungm: the listing page is still the portal's public address")
-    check(ungm.SPEC.filter_to_jordan,
-          "ungm: filtered downstream too -- a source's own country filter is a "
-          "hint, never a guarantee, and this one is now load-bearing")
+    check(not ungm.SPEC.filter_to_jordan,
+          "ungm: the generic text filter is off; _is_jordan() replaces it "
+          "because the country cell cannot express a multi-country notice")
     check("browser" in ungm.SPEC.notes.lower(),
           "ungm: the fallback's extra dependency stays visible in the notes")
 
@@ -807,4 +807,75 @@ TESTS += [
     test_an_empty_result_is_diagnosed_rather_than_reported_as_no_tenders,
     test_the_endpoint_failing_falls_back_to_the_browser,
     test_losing_both_paths_names_both,
+]
+
+
+# ---------------------------------------------------------------------------
+# "Multiple destinations" -- the row shape that broke the country filter
+# ---------------------------------------------------------------------------
+
+def _ungm_row(title: str, country: str) -> str:
+    return (f'<div class="tableRow dataRow notice-table">'
+            f'<div class="resultTitle tableCell">'
+            f'<span class="ungm-title">{title}</span>'
+            f'<a href="/Public/Notice/1" title="Open in a new window"></a></div>'
+            f'<span>04-Aug-2026 13:00 (GMT 3.00)</span>'
+            f'<span class="remainingDaysToDeadline">0.31</span>'
+            f'<span>27-Jul-2026</span><span>UNICEF</span><label>RFQ</label>'
+            f'<span>REF-1</span><span>{country}</span></div>')
+
+
+def _ungm_record(title: str, country: str) -> dict:
+    from jordan_tender_monitor.portals import htmlkit
+    html = "<html><body>" + _ungm_row(title, country) + "</body></html>"
+    rows = htmlkit.extract(html, ungm.LISTING, ["div.dataRow.notice-table"],
+                           "/Public/Notice/").rows
+    return base.row_to_record("ungm", rows[0])
+
+
+def test_a_multi_country_notice_is_not_discarded_as_not_jordan():
+    """51 of 70 notices were being thrown away, while the count went UP.
+
+    We ask UNGM for Countries=[Jordan] and it answers with 70 rows. Only 19
+    print "Jordan" in the country cell; the other 51 print "Multiple
+    destinations" -- Jordan notices that also cover other countries, with a
+    column too narrow to say so. The generic text filter read that as "not
+    Jordan" and dropped three quarters of the portal, and because the endpoint
+    change had taken the count from 3 to 19 at the same time, the loss was
+    invisible behind an improvement.
+    """
+    record = _ungm_record("Cash assistance monitoring", "Multiple destinations")
+    check(ungm._is_jordan(record),
+          "ungm: a multi-destination notice from a Jordan query is kept")
+
+
+def test_a_row_that_names_jordan_is_kept():
+    check(ungm._is_jordan(_ungm_record("Surgical light installation", "Jordan")),
+          "ungm: the strongest evidence still works")
+
+
+def test_a_row_naming_another_country_is_still_dropped():
+    """The middle state is a fallback, not an amnesty.
+
+    Where the column CAN express the answer and says something else, believe
+    it. Only a column that cannot answer defers to the query.
+    """
+    check(not ungm._is_jordan(_ungm_record("School rehabilitation", "Mongolia")),
+          "ungm: a single-country row that is not Jordan is rejected")
+
+
+def test_the_scan_count_survives_the_custom_filter():
+    """"19 (19 read)" would hide exactly the ratio that exposed this bug."""
+    import inspect
+    source = inspect.getsource(ungm.fetch_tenders)
+    check("note_scanned" in source,
+          "ungm: the pre-filter total is still recorded now that harvest() "
+          "no longer filters")
+
+
+TESTS += [
+    test_a_multi_country_notice_is_not_discarded_as_not_jordan,
+    test_a_row_that_names_jordan_is_kept,
+    test_a_row_naming_another_country_is_still_dropped,
+    test_the_scan_count_survives_the_custom_filter,
 ]
