@@ -398,7 +398,7 @@ function resultBody(item: QueueItem): string {
          <div class="max-h-[60vh] overflow-auto px-4 pb-4">
            ${
              item.view === 'raw'
-               ? `<pre class="text-xs leading-relaxed whitespace-pre-wrap break-words">${escape(item.markdown)}</pre>`
+               ? `<pre class="md-source text-xs leading-relaxed whitespace-pre-wrap break-words">${escape(item.markdown)}</pre>`
                : `<div class="md-preview">${renderMarkdown(item.markdown)}</div>`
            }
          </div>

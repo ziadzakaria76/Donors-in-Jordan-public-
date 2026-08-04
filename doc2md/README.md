@@ -4,9 +4,9 @@ Convert PDF, Word and Excel files into clean, token-efficient Markdown for
 feeding to an LLM. Mobile-first, installable, and **entirely client-side** —
 no backend, no upload, no analytics. Files never leave the device.
 
-> **Status: phase 1 of 6.** The app shell, PWA plumbing and file pipeline are
-> built and tested; the three converters are stubs that report which phase
-> implements them. See [Build status](#build-status).
+> **Status: phase 2 of 6.** The app shell and the spreadsheet pipeline
+> (XLSX / XLSM / CSV) are built and tested. DOCX and PDF are stubs that report
+> which phase implements them. See [Build status](#build-status).
 
 ## Quick start
 
@@ -130,6 +130,37 @@ The workflow at `.github/workflows/doc2md-pages.yml` does this for you. It is
 1. Repo **Settings → Pages → Source: GitHub Actions** (one-time).
 2. **Actions → doc2md-pages → Run workflow**.
 
+## Spreadsheets
+
+What the XLSX/CSV converter does beyond dumping cells:
+
+- **Finds the real header row.** Files open with a title, a date stamp and a
+  spacer row before the header. Taking row 1 on faith gives you a table headed
+  "Q3 Budget Review". The header is scored on fill, how much it reads like
+  labels rather than data, distinctness, and whether well-filled rows follow.
+  Everything above it is kept, in order, as text ahead of the table.
+- **Formula results, not formulas.** `=B2*C2` becomes `37.5`. Error cells show
+  as `#DIV/0!` rather than silently blank — the author can see it is wrong and
+  so should the reader.
+- **Formats as displayed.** A date is `2026-01-15`, not serial `46037`; a
+  percentage is `12.5%`, not `0.125`.
+- **Merged cells are repeated** down their range, so every data row is
+  self-describing instead of trailing off into blanks.
+- **Trims fully-empty rows and columns**, but keeps leading indentation inside
+  a cell — in a spreadsheet that indentation is often the outline nesting.
+- **Truncates past 500 rows** to the first 100 plus
+  `<!-- truncated: N rows total -->`, unless the *Full export* toggle is on.
+- **CSV is parsed directly**, not through SheetJS: for a delimited file the
+  text *is* the displayed value, so `007` stays `007` and `1.250,00` is not
+  reinterpreted. The delimiter (`,` `;` tab `|`) is sniffed, and BOMs, quoted
+  fields, doubled quotes and embedded newlines are handled.
+- **Arabic and other RTL text** passes through in logical order, untouched.
+  Rendered cells carry `dir="auto"` so the preview isolates each one; the
+  raw-source view uses `unicode-bidi: plaintext`. A raw line that mixes an
+  Arabic run with Latin text and digits can still *look* reordered — that is
+  the browser's bidi layout of a plain-text line, not the data. The rendered
+  preview shows the true column order.
+
 ## Testing
 
 ```bash
@@ -154,7 +185,7 @@ npm run smoke
 | Phase | Scope | State |
 | --- | --- | --- |
 | 1 | Scaffold, PWA, share target, UI shell, batch queue, zip export | **done** |
-| 2 | XLSX / XLSM / CSV pipeline | stub |
+| 2 | XLSX / XLSM / CSV pipeline | **done** |
 | 3 | DOCX pipeline (style mapping + turndown) | stub |
 | 4 | PDF pipeline (layout reconstruction) | stub |
 | 5 | Token-efficiency post-processor + YAML front-matter | passthrough |
@@ -168,11 +199,11 @@ error naming the phase — the batch keeps running and other files still convert
 
 - **`xlsx` version.** SheetJS stopped publishing to npm at 0.18.5 and moved to
   its own CDN, which this environment cannot reach, so the pinned version
-  carries two open advisories. Both are reachable only through parsing paths
-  Doc2MD does not use: the spreadsheet converter reads cells as arrays
-  (`header: 1`) rather than building objects from cell values, which is the
-  prototype-pollution vector. If you can reach `cdn.sheetjs.com`, installing
-  `xlsx` from there is strictly better.
+  carries two open advisories. The prototype-pollution one is reachable through
+  `sheet_to_json`, which builds objects keyed by cell values; the converter
+  never calls it, walking the cell grid directly instead (it needs the exact
+  origin for merge alignment anyway). If you can reach `cdn.sheetjs.com`,
+  installing `xlsx` from there is still strictly better.
 - **No runtime network calls.** The service worker precaches everything at
   install; after that the app makes no requests at all. There is no telemetry
   and no login.

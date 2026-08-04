@@ -40,7 +40,7 @@ function renderBlocks(lines: string[], from: number, to: number): string {
 
   const flush = (): void => {
     if (paragraph.length === 0) return;
-    out.push(`<p>${inline(paragraph.join(' '))}</p>`);
+    out.push(`<p dir="auto">${inline(paragraph.join(' '))}</p>`);
     paragraph = [];
   };
 
@@ -87,7 +87,7 @@ function renderBlocks(lines: string[], from: number, to: number): string {
     if (heading) {
       flush();
       const level = heading[1]!.length;
-      out.push(`<h${level}>${inline(heading[2]!.replace(/\s+#+$/, ''))}</h${level}>`);
+      out.push(`<h${level} dir="auto">${inline(heading[2]!.replace(/\s+#+$/, ''))}</h${level}>`);
       i++;
       continue;
     }
@@ -209,7 +209,7 @@ function renderList(
       body.push(cont.trim());
       i++;
     }
-    items.push(`<li>${inline(body.join(' '))}`);
+    items.push(`<li dir="auto">${inline(body.join(' '))}`);
   }
 
   const startAttr = first.ordered && first.start !== 1 ? ` start="${first.start}"` : '';
@@ -242,14 +242,14 @@ function alignOf(spec: string): string {
 
 function renderTable(header: string[], aligns: string[], rows: string[][]): string {
   const th = header
-    .map((cell, n) => `<th${aligns[n] ?? ''}>${inline(cell)}</th>`)
+    .map((cell, n) => `<th dir="auto"${aligns[n] ?? ''}>${inline(cell)}</th>`)
     .join('');
   const body = rows
     .map((row) => {
       // Pad or clip so a ragged row cannot break the table layout.
       const cells = Array.from(
         { length: header.length },
-        (_, n) => `<td${aligns[n] ?? ''}>${inline(row[n] ?? '')}</td>`,
+        (_, n) => `<td dir="auto"${aligns[n] ?? ''}>${inline(row[n] ?? '')}</td>`,
       );
       return `<tr>${cells.join('')}</tr>`;
     })

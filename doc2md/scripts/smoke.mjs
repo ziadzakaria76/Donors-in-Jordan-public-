@@ -140,6 +140,88 @@ check(
 );
 check('claim ticket stripped from the URL', new URL(page.url()).search, '');
 
+// --- a real conversion, end to end -----------------------------------------
+/**
+ * The app opens the output automatically when a file is the only one in the
+ * queue, so clicking unconditionally would close it again.
+ */
+const openOutput = async (card) => {
+  const toggle = card.locator('[data-action="toggle-open"]');
+  await toggle.waitFor({ timeout: 15_000 });
+  if ((await toggle.innerText()).trim() === 'Show output') await toggle.click();
+};
+
+// The share-target file above is a CSV, so it has already converted by now.
+const shared = page.locator('[data-item]:has-text("shared-report.csv")');
+await openOutput(shared);
+check(
+  'CSV converted and previews as a real table',
+  await shared.locator('.md-preview table td').count(),
+  2,
+);
+check(
+  'token estimate shown',
+  /~\d+ tokens/.test(await shared.innerText()),
+  true,
+);
+
+// A real workbook exercises the lazy SheetJS chunk, merges and truncation.
+const XLSX = await import('xlsx');
+const sheet = XLSX.utils.aoa_to_sheet([
+  ['Annual Report 2026', null, null],
+  [null, null, null],
+  ['Donor', 'Sector', 'Value'],
+  ['World Bank', 'Water', 250000],
+  ['البنك الإسلامي', 'التعليم', 130000],
+]);
+sheet['!merges'] = [{ s: { r: 3, c: 0 }, e: { r: 4, c: 0 } }];
+const workbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(workbook, sheet, 'Donors');
+
+await page.setInputFiles('#file-input', {
+  name: 'donors.xlsx',
+  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  buffer: Buffer.from(XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })),
+});
+const workbookCard = page.locator('[data-item]:has-text("donors.xlsx")');
+await openOutput(workbookCard);
+
+check(
+  'workbook converted, header row found under the title',
+  (await workbookCard.locator('.md-preview th').allInnerTexts()).join(','),
+  'Donor,Sector,Value',
+);
+// The mixed LTR/RTL row is where a converter most easily scrambles columns.
+// Assert the whole row in order, not just that the Arabic is present somewhere.
+check(
+  'RTL row keeps its column order',
+  await workbookCard
+    .locator('.md-preview tbody tr')
+    .nth(1)
+    .locator('td')
+    .allInnerTexts(),
+  ['World Bank', 'التعليم', '130000'],
+);
+check(
+  'rendered cells are bidi-isolated',
+  await workbookCard.locator('.md-preview td[dir="auto"]').count(),
+  6,
+);
+await workbookCard.locator('[data-action="view-raw"]').click();
+const raw = await workbookCard.locator('pre').innerText();
+check('raw view shows a GFM table', raw.includes('| Donor | Sector | Value |'), true);
+check('title kept above the table', raw.includes('Annual Report 2026'), true);
+check('merged cell repeated down its range', raw.split('World Bank').length - 1, 2);
+
+// Two finished files should offer the batch zip.
+check(
+  'batch bar appears with two results',
+  await page.locator('#batch-bar:not(.hidden)').count(),
+  1,
+);
+
+await page.screenshot({ path: process.env.SHOT2 ?? '/tmp/doc2md-phase2.png', fullPage: true });
+
 console.log(
   errors.length ? `FAIL  console errors: ${errors.join(' | ')}` : 'PASS  no console errors',
 );

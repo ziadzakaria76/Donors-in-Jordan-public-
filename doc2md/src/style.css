@@ -117,3 +117,12 @@
 }
 .md-preview th { @apply bg-slate-100 font-semibold dark:bg-white/5; }
 .md-preview .table-scroll { @apply overflow-x-auto; }
+
+/* The raw-source view holds Markdown that mixes LTR structure with RTL text.
+   `plaintext` lays each line out by its own first strong character instead of
+   forcing the whole block LTR, which is the closest a plain-text view can get
+   to showing an Arabic document the right way round. Cells in the rendered
+   view carry dir="auto" and are isolated properly. */
+.md-source {
+  unicode-bidi: plaintext;
+}
