@@ -816,3 +816,150 @@ TESTS += [
     test_arabic_survives_markup_removal,
     test_records_never_carry_markup_into_the_report,
 ]
+
+
+# ---------------------------------------------------------------------------
+# Field selectors against a row shape that varies
+# ---------------------------------------------------------------------------
+
+def _ungm_shaped_row(with_remaining_days: bool) -> str:
+    """UNGM's row, with and without the optional .remainingDays span.
+
+    The browser-rendered listing carries it; the search endpoint that replaced
+    the scroll loop does not. Same portal, same columns, one optional sibling.
+    """
+    extra = ('<span class="remainingDays">Expires within 24 hours</span>'
+             if with_remaining_days else '')
+    return ('<div class="dataRow notice-table">'
+            '<span class="ungm-title">Cash assistance monitoring</span>'
+            '<a href="/Public/Notice/1"></a>'
+            '<span>04-Aug-2026 13:00 (GMT 3.00)</span>'
+            '<span class="remainingDaysToDeadline">0.31</span>' + extra +
+            '<span>27-Jul-2026</span><span>UNRWA</span>'
+            '<span>RFQW-3226000056 (HJ)</span><span>Jordan</span></div>')
+
+
+_UNGM_FIELDS = {
+    "title": "span.ungm-title",
+    "closing": "span:has(+ span.remainingDaysToDeadline)",
+    "posted": "span.remainingDaysToDeadline ~ span",
+}
+
+
+def _extract_one(html: str):
+    return H.extract("<html><body>" + html + "</body></html>",
+                     "https://www.ungm.org/Public/Notice",
+                     ["div.dataRow.notice-table"], "/Public/Notice/",
+                     field_selectors=_UNGM_FIELDS).rows[0]
+
+
+def test_a_field_selector_survives_an_optional_sibling_disappearing():
+    """Anchoring to an optional element breaks silently when it goes away.
+
+    UNGM's publication date was read as "the span after .remainingDays". The
+    search endpoint omits .remainingDays, so the selector matched nothing and
+    every publication date became None -- no error, no warning, just an empty
+    column. Anchoring to .remainingDaysToDeadline, which every row has, reads
+    both shapes.
+    """
+    for present in (True, False):
+        row = _extract_one(_ungm_shaped_row(present))
+        check(parse_date(row.date_text) == date(2026, 7, 27),
+              "field selectors: publication date read whether or not the "
+              "optional sibling is present",
+              f".remainingDays present={present}, got {row.date_text!r}")
+        check_eq(parse_date(row.closing_text), date(2026, 8, 4),
+                 "field selectors: and the deadline is unaffected")
+
+
+def test_a_non_date_match_never_lands_in_a_date_field():
+    """A wrong field is worse than a missing one -- the pipeline can see missing.
+
+    "span.remainingDaysToDeadline ~ span" matches the counter's every following
+    sibling: the date, then 'Expires within 24 hours', 'UNRWA', 'Jordan'.
+    Taking the first match and keeping it when it will not parse wrote
+    'Expires within 24 hours' into the publication date.
+    """
+    row = _extract_one(_ungm_shaped_row(True))
+    check("Expires" not in (row.date_text or ""),
+          "field selectors: a non-date sibling is skipped, not stored",
+          repr(row.date_text))
+    check("UNRWA" not in (row.date_text or "") and "Jordan" not in (row.date_text or ""),
+          "field selectors: nor is any later non-date sibling", repr(row.date_text))
+
+
+def test_a_selector_matching_nothing_leaves_inference_alone():
+    """Still a hint, not a contract.
+
+    Stated as an equality rather than as "the date is set": on a row whose
+    hints all miss, the result must be IDENTICAL to extracting with no hints at
+    all. That is the property worth guaranteeing -- a stale selector costs the
+    portal nothing, rather than costing it the fields inference had found.
+    """
+    html = ('<div class="dataRow notice-table">'
+            '<span class="ungm-title">Cash assistance monitoring</span>'
+            '<a href="/Public/Notice/1"></a>'
+            '<span>Deadline: 27-Jul-2026</span></div>')
+    page = "<html><body>" + html + "</body></html>"
+    args = (page, "https://www.ungm.org/Public/Notice",
+            ["div.dataRow.notice-table"], "/Public/Notice/")
+    # Hints that cannot match: this row has no .remainingDaysToDeadline.
+    hinted = H.extract(*args, field_selectors=_UNGM_FIELDS).rows[0]
+    plain = H.extract(*args).rows[0]
+
+    check_eq(hinted.date_text, plain.date_text,
+             "field selectors: a hint that misses does not change the "
+             "inferred publication date")
+    check_eq(hinted.closing_text, plain.closing_text,
+             "field selectors: nor the inferred deadline")
+    check_eq(hinted.title, "Cash assistance monitoring",
+             "field selectors: while a hint that DOES match still applies")
+
+
+def test_a_countdown_is_never_stored_as_a_publication_date():
+    """"Expires in 48 days" parses. It parses to the year 2048.
+
+    parse_date reads the 48 as a year and fills today in for the rest, so a
+    "did it parse" guard passes it and a 30-year plausibility window passes it
+    too. Only recognising it as a countdown rejects it -- which is why both
+    guards exist and neither is redundant.
+    """
+    html = ('<div class="dataRow notice-table">'
+            '<span class="ungm-title">Monitoring and Evaluation consultant</span>'
+            '<a href="/Public/Notice/1"></a>'
+            '<span>21-Sep-2026 12:00 (GMT +2.00)</span>'
+            '<span class="remainingDaysToDeadline">48.5</span>'
+            '<span class="remainingDays">Expires in 48 days</span>'
+            '<span>19-Jul-2026</span></div>')
+    row = _extract_one(html)
+    check(parse_date(row.date_text) == date(2026, 7, 19),
+          "field selectors: the real publication date wins over the countdown",
+          repr(row.date_text))
+
+
+def test_a_reference_number_is_never_stored_as_a_date():
+    """"WFP-SDN-00220" parses too -- to the year 220.
+
+    The publication span is missing here, so the selector walks on to the
+    reference. A permissive parser says yes; a plausibility window says no.
+    """
+    html = ('<div class="dataRow notice-table">'
+            '<span class="ungm-title">Monitoring and Evaluation consultant</span>'
+            '<a href="/Public/Notice/1"></a>'
+            '<span>21-Sep-2026 12:00 (GMT +2.00)</span>'
+            '<span class="remainingDaysToDeadline">48.5</span>'
+            '<span>WFP</span><span>WFP-SDN-00220</span>'
+            '<span>Sudan</span></div>')
+    row = _extract_one(html)
+    check(parse_date(row.date_text) is None or row.date_text is None,
+          "field selectors: a reference number does not become a date",
+          f"date_text={row.date_text!r} -> {parse_date(row.date_text)}")
+
+
+TESTS += [
+    test_a_countdown_is_never_stored_as_a_publication_date,
+    test_a_reference_number_is_never_stored_as_a_date,
+    test_a_field_selector_survives_an_optional_sibling_disappearing,
+    test_a_non_date_match_never_lands_in_a_date_field,
+    test_a_selector_matching_nothing_leaves_inference_alone,
+]

@@ -251,14 +251,17 @@ SPEC = HtmlSpec(
     field_selectors={
         "title": "span.ungm-title",
         "closing": "span:has(+ span.remainingDaysToDeadline)",
-        # "~" rather than "+": the adjacent-sibling form worked on the fixture
-        # and matched nothing on the live page, so the publication date came
-        # back empty while the deadline read correctly. The published span is
-        # the first span AFTER the counter, but not necessarily the very next
-        # node. The deadline uses ":has(+ ...)" and does work live, which is
-        # what matters most -- a missing publication date costs ranking
-        # precision; a missing deadline would drop the notice.
-        "posted": "span.remainingDays ~ span",
+        # Anchored to .remainingDaysToDeadline, which every row has, NOT to
+        # .remainingDays, which only the browser-rendered rows have. Pinning it
+        # to the optional sibling worked until the search endpoint replaced the
+        # scroll loop, at which point every publication date silently became
+        # None -- the selector still matched nothing and nothing complained.
+        #
+        # This matches several spans (the counter is followed by the date, the
+        # agency, the reference and the country). _apply_field_selectors takes
+        # the first that parses as a date, so it reads correctly whether or not
+        # .remainingDays is present.
+        "posted": "span.remainingDaysToDeadline ~ span",
     },
     anchor_hint="/Public/Notice/",
     currency="USD",
