@@ -295,12 +295,19 @@ def test_adfd_points_at_the_tenders_page_not_only_the_news_page():
     every run -- a wrong URL wearing the costume of a scraper bug.
     """
     urls = portals.source_urls("adfd")
-    check(any("Procurementtenders.aspx" in u for u in urls),
-          "adfd: the procurement tenders page is a source", f"got {urls}")
-    check("Procurementtenders" in urls[0],
+    check(any(u.endswith("/en/what-we-do/tenders") for u in urls),
+          "adfd: the tenders page is a source", f"got {urls}")
+    check(urls[0].endswith("/en/what-we-do/tenders"),
           "adfd: and it is tried before the news page")
-    check(any("MediaCenter/News" in u for u in urls),
+    check(any("news" in u for u in urls),
           "adfd: news is kept as a genuine secondary source")
+
+    # The .aspx paths search engines still index are legacy. --capture showed
+    # Procurementtenders.aspx answering 200 with nothing but chrome -- the row
+    # anatomy was the "Who we are" menu -- so keeping it would mean a permanent
+    # failure line on a portal that works.
+    check(not any(".aspx" in u for u in urls),
+          "adfd: the legacy .aspx paths are gone", f"got {urls}")
 
     from jordan_tender_monitor.portals import adfd
     check(adfd.SPEC.anchor_hint != "/News/",

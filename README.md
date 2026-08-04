@@ -110,7 +110,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 707 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 708 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

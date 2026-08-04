@@ -7,14 +7,20 @@ explaining away an empty result. It pointed at the news page instead, which
 reported "layout change - no layer found a listing" on every live run -- a
 failure that looked like a scraper problem and was really a wrong URL.
 
-ADFD publishes procurement tenders at
+ADFD does publish tenders, at
 
-    /english/Eservices/Tender/Pages/Procurementtenders.aspx
+    /en/what-we-do/tenders
 
-That page is now the first source. The news page is kept second, because
-tenders for ADFD-financed projects are genuinely often issued by the
-beneficiary government and announced as news rather than listed here -- so it
-is a real secondary source, not a fallback for a broken primary.
+The .aspx path that search engines still index is legacy. --capture showed it
+answers 200 with nothing but chrome: the repeated blocks were div.row,
+div.container and div.footer-links, and the row anatomy was the "Who we are"
+menu. ADFD has rebuilt on a /en/<section>/<page> scheme, so it has been
+dropped rather than kept -- a URL that reliably carries no listing is a
+permanent failure line, not a fallback.
+
+The news page is kept second, because tenders for ADFD-financed projects are
+genuinely often issued by the beneficiary government and announced as news
+rather than listed here -- a real secondary source, not a spare tyre.
 
 A quiet run remains normal for this portal. What is no longer acceptable is a
 quiet run that was really a 404 in disguise.
@@ -30,22 +36,24 @@ KEY = "adfd"
 SPEC = HtmlSpec(
     key=KEY,
     urls=[
-        "https://www.adfd.ae/english/Eservices/Tender/Pages/Procurementtenders.aspx",
-        "https://www.adfd.ae/english/MediaCenter/News/Pages/default.aspx",
+        "https://www.adfd.ae/en/what-we-do/tenders",
+        "https://www.adfd.ae/en/media-centre/news",
     ],
     # SELECTOR HINTS ONLY -- written without access to the live pages, which
     # were blocked from the build environment. If a hint is wrong the quality
     # gate rejects it and a class-independent layer takes over. Confirm with:
     #     python run.py --capture adfd
     #
-    # This is a SharePoint site (.aspx, dfwp = Data Form Web Part), so the
-    # generated markup is the usual web-part soup and the class-independent
-    # layers are likely to do the real work here.
+    # NOT SharePoint. The earlier hints assumed .aspx meant SharePoint web
+    # parts; the capture showed a Bootstrap rebuild (div.row, div.container,
+    # div.col-lg-6), so dfwp-item and ms-listviewtable could never have
+    # matched. These are generic hints for that style, and the
+    # class-independent layers are expected to do the real work.
     selectors=[
         "div.tender-item",
-        "li.dfwp-item",
+        "div.card",
         "div.news-item",
-        "table.ms-listviewtable tbody tr",
+        "table tbody tr",
     ],
     # The tenders page is the primary source now, so the anchor hint must not
     # be pinned to /News/ -- that was silently excluding every tender link from
