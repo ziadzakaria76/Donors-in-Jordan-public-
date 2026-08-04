@@ -1,0 +1,39 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`DOCX converter > converts the whole document 1`] = `
+"# Donor Landscape Review
+
+## Executive summary
+
+Funding rose by **18%** against a *falling* baseline[^1]. See the [portal listing](https://example.org/notices) for detail.
+
+### Priority sectors
+
+- Water
+  - Rural supply
+    - Metering
+- Education
+
+1. Submit the concept note
+   1. Attach the budget
+2. Await clearance
+
+> The window closes at the end of the quarter.
+
+وزارة التخطيط والتعاون الدولي تعلن عن فرص جديدة[^2]
+
+| Donor | Sector | Value |
+| --- | --- | ---: |
+| World Bank | Water | 250,000 |
+| World Bank | Education | 130,000 |
+| Total \\| all sectors | Total \\| all sectors | 380,000 |
+
+![image: image-1.png]
+
+[^1]: Figures are provisional pending audit.
+[^2]: Converted at the 2026 average rate.
+
+## Images
+
+- \`image-1.png\` (image/png) — Funding by sector"
+`;

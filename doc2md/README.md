@@ -4,9 +4,9 @@ Convert PDF, Word and Excel files into clean, token-efficient Markdown for
 feeding to an LLM. Mobile-first, installable, and **entirely client-side** —
 no backend, no upload, no analytics. Files never leave the device.
 
-> **Status: phase 2 of 6.** The app shell and the spreadsheet pipeline
-> (XLSX / XLSM / CSV) are built and tested. DOCX and PDF are stubs that report
-> which phase implements them. See [Build status](#build-status).
+> **Status: phase 3 of 6.** The app shell, the spreadsheet pipeline
+> (XLSX / XLSM / CSV) and the DOCX pipeline are built and tested. PDF is a stub
+> that reports which phase implements it. See [Build status](#build-status).
 
 ## Quick start
 
@@ -37,11 +37,13 @@ src/
   core/
     types.ts                the contract every converter implements
     registry.ts             file-type dispatch, size/type validation
+    gfm-table.ts            grid → GFM table, shared by every converter
     postprocess.ts          shared token-efficiency pass + front-matter
     share-target.ts         redeems files handed over by the Android share sheet
     share-target-constants.ts   shared between page and worker
   converters/
-    spreadsheet.ts          XLSX / XLSM / CSV  → SheetJS
+    spreadsheet.ts          XLSX / XLSM → SheetJS
+    delimited.ts            CSV — an RFC 4180 reader, no spreadsheet engine
     docx.ts                 DOCX → mammoth → turndown
     pdf.ts                  PDF  → pdf.js with layout reconstruction
   ui/
@@ -55,9 +57,9 @@ a spreadsheet never downloads pdf.js. `npm run check:size` enforces the budget:
 
 ```
     1.6 KB  index.html
-   31.4 KB  assets/index-*.css
-   22.2 KB  assets/index-*.js
-   55.2 KB  TOTAL (budget 300.0 KB)
+   31.6 KB  assets/index-*.css
+   22.4 KB  assets/index-*.js
+   55.6 KB  TOTAL (budget 300.0 KB)
 ```
 
 **Vanilla TypeScript, not React.** The UI is one screen with a list on it.
@@ -161,6 +163,33 @@ What the XLSX/CSV converter does beyond dumping cells:
   the browser's bidi layout of a plain-text line, not the data. The rendered
   preview shows the true column order.
 
+## Word documents
+
+DOCX goes through mammoth to semantic HTML, then turndown to Markdown. What is
+worth knowing:
+
+- **Headings come from Word styles, never font size.** A 14pt bold paragraph is
+  not a heading, and a document whose Heading 3 is styled smaller than its body
+  text still has a Heading 3 in it. Beyond mammoth's defaults the map covers
+  Title, Quote / Intense Quote / Block Text, and inline code styles.
+- **Images are never embedded.** The image bytes are not even read — reading
+  them is what produces a base64 data URI, and a 2 MB screenshot inlined into
+  Markdown is the exact thing this tool exists to avoid. Each becomes
+  `![image: image-1.png]`, with a `## Images` footer listing name, MIME type
+  and alt text.
+- **Footnotes** become inline `[^1]` markers with `[^1]: …` definitions at the
+  end. The "↑" back-links are navigation, not content, and are dropped.
+- **Tables** are rendered by the same code as spreadsheets, so both look alike
+  downstream. `colspan` and `rowspan` are expanded into a plain grid with the
+  merged value repeated across every cell it covers — GFM has no notion of a
+  span, and a row trailing off into blanks is worse than one that repeats a
+  label. This replaces turndown-plugin-gfm's table support, which cannot do it.
+- **Lists** keep their nesting, at `- item` and two-space indents rather than
+  turndown's `-   item` and four. Same structure, fewer tokens on every line.
+- **Headers and footers** stay out of the body, so "Confidential draft" does
+  not appear once per page.
+- Document order is never changed; the images footer is the only thing appended.
+
 ## Testing
 
 ```bash
@@ -186,7 +215,7 @@ npm run smoke
 | --- | --- | --- |
 | 1 | Scaffold, PWA, share target, UI shell, batch queue, zip export | **done** |
 | 2 | XLSX / XLSM / CSV pipeline | **done** |
-| 3 | DOCX pipeline (style mapping + turndown) | stub |
+| 3 | DOCX pipeline (style mapping + turndown) | **done** |
 | 4 | PDF pipeline (layout reconstruction) | stub |
 | 5 | Token-efficiency post-processor + YAML front-matter | passthrough |
 | 6 | Share-target polish, offline caching, UI polish | partly done |

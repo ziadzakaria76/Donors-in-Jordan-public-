@@ -213,9 +213,69 @@ check('raw view shows a GFM table', raw.includes('| Donor | Sector | Value |'), 
 check('title kept above the table', raw.includes('Annual Report 2026'), true);
 check('merged cell repeated down its range', raw.split('World Bank').length - 1, 2);
 
-// Two finished files should offer the batch zip.
+// A .docx exercises mammoth's *browser* build. The unit tests run its Node
+// entry point, so this is the only place the shipped unzip path is proven.
+const {
+  Document,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+} = await import('docx');
+const doc = new Document({
+  sections: [
+    {
+      children: [
+        new Paragraph({ text: 'Field Report', heading: HeadingLevel.HEADING_1 }),
+        new Paragraph({
+          children: [new TextRun('Signed off by the '), new TextRun({ text: 'ministry', bold: true })],
+        }),
+        new Table({
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({ children: [new Paragraph('Site')] }),
+                new TableCell({ children: [new Paragraph('Cost')] }),
+              ],
+            }),
+            new TableRow({
+              children: [
+                new TableCell({ rowSpan: 2, children: [new Paragraph('Irbid')] }),
+                new TableCell({ children: [new Paragraph('4000')] }),
+              ],
+            }),
+            new TableRow({
+              children: [new TableCell({ children: [new Paragraph('6000')] })],
+            }),
+          ],
+        }),
+      ],
+    },
+  ],
+});
+await page.setInputFiles('#file-input', {
+  name: 'field-report.docx',
+  mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  buffer: Buffer.from(await Packer.toBuffer(doc)),
+});
+const docxCard = page.locator('[data-item]:has-text("field-report.docx")');
+await openOutput(docxCard);
+await docxCard.locator('[data-action="view-raw"]').click();
+const docxRaw = await docxCard.locator('pre').innerText();
+check('DOCX heading mapped from its Word style', docxRaw.includes('# Field Report'), true);
+check('DOCX bold preserved', docxRaw.includes('**ministry**'), true);
 check(
-  'batch bar appears with two results',
+  'DOCX merged cell repeated',
+  docxRaw.includes('| Irbid | 4000 |') && docxRaw.includes('| Irbid | 6000 |'),
+  true,
+);
+
+// Three finished files should offer the batch zip.
+check(
+  'batch bar appears with results',
   await page.locator('#batch-bar:not(.hidden)').count(),
   1,
 );
