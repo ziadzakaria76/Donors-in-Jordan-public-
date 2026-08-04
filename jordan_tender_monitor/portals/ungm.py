@@ -108,6 +108,24 @@ def _row_count(fragment: str) -> int:
     return len(BeautifulSoup(fragment, "html.parser").select(ROW_SELECTOR))
 
 
+def _country_cells(fragment: str) -> list[str]:
+    """The country each row DISPLAYS -- the last span, per the live row anatomy.
+
+    We ask UNGM for Jordan and it answers with rows whose displayed country is
+    often something else. That gap is the whole question about this portal: it
+    is either UNGM's filter being broader than its country column (in which
+    case the downstream text filter is right to drop them) or notices that
+    cover Jordan among several countries (in which case dropping them loses
+    real work). Counting the values is what tells the two apart, so the run
+    says it out loud rather than leaving a bare "50 not Jordan" to be guessed at.
+    """
+    cells = []
+    for row in BeautifulSoup(fragment, "html.parser").select(ROW_SELECTOR):
+        spans = row.find_all("span")
+        cells.append(spans[-1].get_text(" ", strip=True) if spans else "")
+    return cells
+
+
 def _fetch_search(url: str) -> str:
     """Page the search endpoint and return every page's markup, concatenated.
 
@@ -121,6 +139,7 @@ def _fetch_search(url: str) -> str:
     base.warm_session(LISTING)
 
     pages: list[str] = []
+    countries: list[str] = []
     stride = 0
     total = 0
     for index in range(MAX_PAGES):
@@ -129,6 +148,7 @@ def _fetch_search(url: str) -> str:
         if not found:
             break
         pages.append(fragment)
+        countries.extend(_country_cells(fragment))
         total += found
         if stride == 0:
             stride = found
@@ -146,6 +166,12 @@ def _fetch_search(url: str) -> str:
             "--capture ungm to see what it sends now", SEARCH)
 
     log.info("ungm: %d notices over %d page(s) of %d", total, len(pages), stride)
+    if countries:
+        from collections import Counter
+        tally = Counter(countries)
+        log.info("ungm: countries displayed by a Jordan-filtered search: %s",
+                 ", ".join(f"{name or '(blank)'}={count}"
+                           for name, count in tally.most_common(12)))
     # One document, so the extraction cascade sees every row at once.
     return "<html><body>" + "".join(pages) + "</body></html>"
 
