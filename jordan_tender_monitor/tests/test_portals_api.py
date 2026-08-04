@@ -106,6 +106,87 @@ def test_worldbank_parses_documented_shape():
              "worldbank: an unpublished value stays None rather than becoming 0")
 
 
+def test_worldbank_builds_a_link_when_the_api_sends_no_url_field():
+    """Every World Bank row reached the report unlinked, and nothing said so.
+
+    The fixture above carries a "url" key, which is what let four wrong guesses
+    in _pick() pass their tests for months: the fixture was written to the
+    shape the module hoped for, not the shape the API sends. The live response
+    has no URL field at all, so 20 of 27 opportunities in a clean run were
+    unclickable. This is the same response WITHOUT that key.
+    """
+    payload = {"procnotices": [
+        {"id": "OP00291234",
+         "project_name": "Jordan Public Financial Management Reform",
+         "bid_description": "Consulting services for treasury modernisation.",
+         "project_id": "P175447"},
+    ]}
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+    check_eq(len(records), 1, "worldbank: the notice still parses without a url")
+    check_eq(records[0]["url"],
+             "https://projects.worldbank.org/en/projects-operations/"
+             "procurement-detail/OP00291234",
+             "worldbank: the link is built from the notice id")
+
+
+def test_worldbank_prefers_the_apis_own_url_over_a_built_one():
+    """If the response ever does carry a link, that is the authoritative one."""
+    payload = {"procnotices": [
+        {"id": "OP00291234",
+         "bid_description": "Consulting services, Amman, Jordan.",
+         "notice_url": "https://projects.worldbank.org/somewhere/else"},
+    ]}
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+    check_eq(records[0]["url"], "https://projects.worldbank.org/somewhere/else",
+             "worldbank: a real URL field wins over the constructed one")
+
+
+def test_worldbank_will_not_invent_a_link_from_a_project_id():
+    """A dead link is worse than no link: absent is visibly missing, dead reads as checked.
+
+    Project ids (P175447) and notice ids (OP00291234) sit in the same response
+    and both look like identifiers. Rendering a project id into the notice-page
+    template produces a URL that resolves to nothing.
+    """
+    payload = {"procnotices": [
+        {"project_id": "P175447",
+         "notice_no": "RFP-2026-014",
+         "bid_description": "Consulting services, Amman, Jordan."},
+    ]}
+    with _Stub(payload):
+        records = worldbank.fetch_tenders()
+    check_eq(len(records), 1, "worldbank: the notice is still reported")
+    check_eq(records[0]["url"], None,
+             "worldbank: no link rather than a fabricated one")
+
+
+def test_field_anatomy_reports_what_a_response_carries():
+    """The diagnostic that would have caught the missing URL field in one run."""
+    items = [
+        {"id": "OP001", "title": "A", "notice_url": "https://example.org/1"},
+        {"id": "OP002", "title": "B"},
+        {"id": "OP003", "title": "C", "empty": ""},
+    ]
+    lines = "\n".join(base.field_anatomy(items))
+    check("3 notices" in lines, "field_anatomy: counts the notices")
+    check("id" in lines and "3/3" in lines,
+          "field_anatomy: reports a field present on every notice")
+    check("1/3" in lines,
+          "field_anatomy: fill rate distinguishes a rare field from a common one")
+    check("URL-ish" in lines, "field_anatomy: flags the field a link could come from")
+    check("empty" not in lines,
+          "field_anatomy: a key whose only value is empty does not count as populated")
+
+
+def test_every_api_portal_diagnostic_is_reachable_from_the_cli():
+    """--capture covered the HTML portals only, which is how this bug survived."""
+    from jordan_tender_monitor import portals
+    check("worldbank" in portals.api_portals(),
+          "capture: the World Bank API can be inspected from the command line")
+
+
 def test_worldbank_accepts_alternative_response_keys():
     """The API has used both a keyed dict and a flat list over the years."""
     with _Stub({"notices": _WB["procnotices"]}):
@@ -848,6 +929,11 @@ TESTS = [
     test_scan_count_distinguishes_empty_from_filtered_out,
     test_worldbank_accepts_alternative_response_keys,
     test_worldbank_empty_response_is_diagnosed_not_silent,
+    test_worldbank_builds_a_link_when_the_api_sends_no_url_field,
+    test_worldbank_prefers_the_apis_own_url_over_a_built_one,
+    test_worldbank_will_not_invent_a_link_from_a_project_id,
+    test_field_anatomy_reports_what_a_response_carries,
+    test_every_api_portal_diagnostic_is_reachable_from_the_cli,
     test_ted_parses_multilingual_fields,
     test_ted_builds_a_url_when_links_are_missing,
     test_ted_empty_response_is_diagnosed,

@@ -112,9 +112,12 @@ def cmd_capture(portal_key: str) -> int:
     from jordan_tender_monitor.portals.htmlkit import QUALITY_THRESHOLD
 
     capturable = portals.html_portals()
+    api_capturable = portals.api_portals()
+    if portal_key in api_capturable:
+        return _capture_api(portal_key, api_capturable[portal_key])
     if portal_key not in capturable:
-        print(f"'{portal_key}' is not an HTML portal. Capturable portals:\n  "
-              + "\n  ".join(sorted(capturable)))
+        print(f"'{portal_key}' cannot be captured. Capturable portals:\n  "
+              + "\n  ".join(sorted(set(capturable) | set(api_capturable))))
         return 2
 
     config.LIVE_FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
@@ -188,6 +191,51 @@ def cmd_capture(portal_key: str) -> int:
     if not any_saved:
         print("Nothing was captured -- every source URL failed. The portal is "
               "unreachable from here, so its selectors cannot be verified.\n")
+        return 1
+    return 0
+
+
+def _capture_api(portal_key: str, module) -> int:
+    """Report the fields an API portal's response really carries.
+
+    The HTML half of --capture answers "which selector finds the rows"; this
+    answers the equivalent question for JSON, "which key holds the value", and
+    it exists because nothing did. worldbank.py looked for its link under four
+    field names, found none of them, and emitted every row unlinked without a
+    word of complaint -- a question no amount of reading the module could
+    settle, and one live response answers instantly.
+    """
+    from jordan_tender_monitor import portals
+    from jordan_tender_monitor.portals import base
+
+    print(f"\nCapturing {portals.name(portal_key)} (API)...\n")
+    try:
+        results = module.capture_api()
+    except base.PortalError as exc:
+        print(f"  FAILED: {exc}\n")
+        return 1
+
+    any_items = False
+    for url, items in results:
+        print(f"  Source: {url}")
+        if not items:
+            print("    the endpoint answered but carried no notices\n")
+            continue
+        any_items = True
+        for line in base.field_anatomy(items):
+            print(line)
+
+        # One whole notice, so a field the summary truncated can still be read.
+        import json
+        first = next((i for i in items if isinstance(i, dict)), None)
+        if first is not None:
+            print("\n    First notice in full:")
+            for line in json.dumps(first, indent=2, default=str).splitlines()[:60]:
+                print(f"      {line}")
+        print()
+
+    if not any_items:
+        print("Nothing was captured -- the endpoint returned no notices.\n")
         return 1
     return 0
 

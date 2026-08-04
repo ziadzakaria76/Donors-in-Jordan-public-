@@ -45,6 +45,16 @@ def html_portals() -> dict[str, ModuleType]:
     return {k: m for k, m in MODULES.items() if hasattr(m, "capture")}
 
 
+def api_portals() -> dict[str, ModuleType]:
+    """Portals whose raw JSON can be captured for field verification.
+
+    The API portals were outside --capture entirely, which is how worldbank.py
+    kept reading its link from four field names the API does not use: there was
+    no command that would have shown the real ones.
+    """
+    return {k: m for k, m in MODULES.items() if hasattr(m, "capture_api")}
+
+
 def source_urls(key: str) -> list[str]:
     """The URLs a portal polls, for the failure table in the report."""
     module = MODULES.get(key)

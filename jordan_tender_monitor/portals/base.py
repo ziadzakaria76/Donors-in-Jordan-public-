@@ -14,6 +14,7 @@ unavailable with the URL to check by hand.
 from __future__ import annotations
 
 import hashlib
+import re
 import threading
 import time
 from datetime import date
@@ -240,6 +241,55 @@ def build_record(
         "language": language,
         "reference": reference,
     }
+
+
+_URLISH_KEY_RE = re.compile(r"url|link|href|uri", re.I)
+
+
+def field_anatomy(items: list, limit: int = 40) -> list[str]:
+    """Printable report of the fields an API response actually carries.
+
+    The HTML portals have --capture; the API portals had nothing, and the gap
+    showed. worldbank.py read its link from _pick("url", "notice_url",
+    "pdf_url", "noticeurl") -- four plausible spellings, none of them the one
+    the API uses -- so every World Bank row reached the report with no link and
+    no complaint. A field that is absent and a field that is empty look
+    identical to _pick(), and both look identical to "the notice has no URL".
+
+    So report what is there rather than asking whether a guess was right.
+    Fill rate is the column that matters: a key present on 3 of 200 notices is
+    not the field you want, however promising its name.
+    """
+    if not items:
+        return ["      (no items -- nothing to describe)"]
+
+    dicts = [i for i in items if isinstance(i, dict)]
+    if not dicts:
+        return [f"      ({len(items)} items, none of them objects)"]
+
+    fill: dict[str, int] = {}
+    sample: dict[str, str] = {}
+    for item in dicts:
+        for key, value in item.items():
+            if value in (None, "", [], {}):
+                continue
+            fill[key] = fill.get(key, 0) + 1
+            if key not in sample:
+                sample[key] = textutil.clean(str(value))[:70]
+
+    lines = [f"      {len(dicts)} notices; {len(fill)} fields ever populated"]
+    ranked = sorted(fill.items(), key=lambda kv: (-kv[1], kv[0]))
+    for key, count in ranked[:limit]:
+        # Flag the two things a caller is nearly always hunting for: a link,
+        # and an identifier a link could be built from.
+        mark = ""
+        if _URLISH_KEY_RE.search(key) or sample[key].startswith("http"):
+            mark = "  <-- URL-ish"
+        lines.append(f"      {key:28} {count:5}/{len(dicts)}  "
+                     f"{sample[key]!r}{mark}")
+    if len(ranked) > limit:
+        lines.append(f"      ... and {len(ranked) - limit} more fields")
+    return lines
 
 
 def row_to_record(portal: str, row: Row, default_currency: str | None = None) -> dict:
