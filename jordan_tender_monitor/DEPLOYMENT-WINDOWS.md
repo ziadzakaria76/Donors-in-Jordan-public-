@@ -116,7 +116,7 @@ Now prove the code itself is sound before touching credentials:
 python jordan_tender_monitor\tests\run_all.py
 ```
 
-Expect **All 708 checks passed**. This needs no network and no credentials, so
+Expect **All 712 checks passed**. This needs no network and no credentials, so
 a failure here is an install problem, not a configuration one.
 
 ---

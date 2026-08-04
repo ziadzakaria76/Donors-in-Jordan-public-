@@ -16,12 +16,23 @@ properly rather than guessed at:
     Bangladesh, Indonesia, Cote d'Ivoire and the Balkan office, and never one
     for Jordan.
 
-So this is not a broken scraper and no URL will fix it. The office index does
-exist and is read, because it is where the office would put a notice if it had
-one; when it carries no listing the portal reports "no listing published",
-which the run classifies apart from a failure. A source with nothing to read
-must not put a permanent red line in every report -- that is how a reader
-learns to ignore the status table, and the status table is the alarm.
+So this is not a broken scraper and no URL will fix it. The portal reports
+"no listing published", which the run classifies apart from a failure: a
+source with nothing to read must not put a permanent red line in every report,
+because that is how a reader learns to ignore the status table, and the status
+table is the alarm.
+
+THE OFFICE INDEX WAS TRIED AS A SOURCE AND REMOVED. It exists and returns 200,
+which made it look like the sensible fallback, and it put two phantom tenders
+straight into the report:
+
+    [22.5] Message from the Chief Representative   JICA | Unclassified
+    [22.5] Related Information                     JICA | Unclassified
+
+Those are the page's own section headings. A clean, honest 404 became a
+listing of navigation dressed as opportunities -- strictly worse than the
+failure it replaced, and the exact mistake this portal already made once by
+asserting its way around an empty result. An index page is not a listing.
 """
 
 from __future__ import annotations
@@ -34,14 +45,13 @@ KEY = "jica"
 SPEC = HtmlSpec(
     key=KEY,
     urls=[
-        # Both procurement spellings are kept ahead of the office index: they
-        # 404 today, and if JICA Jordan ever publishes one it will be at one of
-        # these, at which point this portal starts working with no code change.
+        # Both procurement spellings, and nothing else. They 404 today; if JICA
+        # Jordan ever publishes a procurement page it will be at one of these,
+        # and this portal starts working with no code change. Adding a page
+        # that merely EXISTS, to avoid an empty result, is what produced two
+        # phantom tenders -- see the docstring.
         "https://www.jica.go.jp/english/overseas/jordan/others/procurement.html",
         "https://www.jica.go.jp/jordan/english/office/others/procurement.html",
-        # The office index, which does exist and is the only page that could
-        # carry a notice today.
-        "https://www.jica.go.jp/english/overseas/jordan/office/index.html",
     ],
     # SELECTOR HINTS ONLY -- written without access to the live pages, which
     # were blocked from the build environment. If a hint is wrong the quality

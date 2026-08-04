@@ -286,6 +286,47 @@ def test_jica_uses_the_restructured_url():
     check(any("/jordan/english/office/" in u for u in urls),
           "jica: the pre-migration URL is kept as a second source")
 
+    # An index page is not a listing. The office index was added as a fallback
+    # because it exists and returns 200, and it put two phantom tenders in the
+    # report -- "Message from the Chief Representative" and "Related
+    # Information", the page's own section headings. A clean 404 became
+    # navigation dressed as opportunities.
+    check(all(u.endswith("procurement.html") for u in urls),
+          "jica: every source is a procurement page, not an index", f"got {urls}")
+
+
+def test_jica_reports_no_listing_rather_than_failing():
+    """JICA Jordan publishes nothing; that is a fact, not a fault.
+
+    Reporting it as UNAVAILABLE puts a permanent red line in every report,
+    which teaches the reader to ignore the status table -- and the status table
+    is the alarm.
+    """
+    from jordan_tender_monitor.portals import jica
+
+    original = harvester.harvest
+    try:
+        def fail(spec):
+            raise PortalError("HTTP 404 - the URL has moved", spec.urls[0])
+        harvester.harvest = fail
+        try:
+            jica.fetch_tenders()
+            check(False, "jica: a total failure must still raise")
+        except PortalError as exc:
+            check(exc.reason.startswith("no listing published"),
+                  "jica: the reason is classified as no-listing, not a failure",
+                  f"got {exc.reason!r}")
+            check("404" in exc.reason,
+                  "jica: and the underlying detail is preserved, so a genuine "
+                  "change is still visible")
+    finally:
+        harvester.harvest = original
+
+    # And the scraper classifies it apart from broken.
+    from jordan_tender_monitor.agents.scraper import PortalHealth
+    health = PortalHealth(key="jica", name="JICA", tier=3, status="no listing")
+    check(not health.broken, "jica: a no-listing portal does not count as broken")
+
 
 def test_adfd_points_at_the_tenders_page_not_only_the_news_page():
     """The module used to assert ADFD had no procurement database. It has one.
@@ -387,5 +428,6 @@ TESTS = [
     test_portal_registry_is_complete,
     test_kfw_points_at_gtai_not_kfw_de,
     test_jica_uses_the_restructured_url,
+    test_jica_reports_no_listing_rather_than_failing,
     test_adfd_points_at_the_tenders_page_not_only_the_news_page,
 ]
