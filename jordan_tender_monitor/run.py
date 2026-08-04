@@ -244,6 +244,54 @@ def _describe_network(module) -> list[str]:
     return lines + [""]
 
 
+_DUPLICATE_IGNORED = {"id", "_layer", "_quality", "url", "reference"}
+
+
+def _describe_duplicate_titles(records: list[dict], limit: int = 6) -> list[str]:
+    """Groups of records sharing a title, and what actually differs inside them.
+
+    "Two notices share a title" is not evidence that they are one notice. The
+    World Bank published "Medical Insurance Services (Jordan: Support for
+    Industry Development Fund)" under two ids and it looks like one opportunity
+    reported twice -- but two records can share a title and differ in
+    eligibility, deadline or scope, and merging those would delete a real
+    tender.
+
+    The only way to tell is to look at every other field, so this prints them.
+    id, url and reference are ignored because they differ BY DEFINITION in any
+    pair worth asking about.
+    """
+    from collections import defaultdict
+
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for record in records:
+        title = (record.get("title") or "").strip().lower()
+        if title:
+            groups[title].append(record)
+    repeated = {t: rs for t, rs in groups.items() if len(rs) > 1}
+    if not repeated:
+        return ["    No two notices share a title.", ""]
+
+    lines = [f"    {len(repeated)} title(s) appear more than once "
+             f"({sum(len(r) for r in repeated.values())} records):"]
+    for title, rows in list(repeated.items())[:limit]:
+        lines.append(f"      {len(rows)}x {title[:78]!r}")
+        keys = {k for row in rows for k in row} - _DUPLICATE_IGNORED
+        differing = [k for k in sorted(keys)
+                     if len({str(row.get(k)) for row in rows}) > 1]
+        for row in rows:
+            lines.append(f"          url={row.get('url')}")
+        if differing:
+            lines.append(f"          DIFFER: {', '.join(differing)}")
+            for key in differing:
+                for row in rows:
+                    lines.append(f"            {key}= {str(row.get(key))[:110]!r}")
+        else:
+            lines.append("          identical in every field except "
+                         "id/url/reference")
+    return lines + [""]
+
+
 def _describe_selects(html: str, needle: str = "jordan") -> list[str]:
     """Filter dropdowns and the option value the needle sits on.
 
@@ -300,6 +348,16 @@ def _capture_api(portal_key: str, module) -> int:
         any_items = True
         for line in base.field_anatomy(items):
             print(line)
+
+        # Records the portal would actually report, checked for same-title
+        # groups. The raw items above cannot answer this: a portal composes its
+        # title from several fields, so duplication is only visible after the
+        # module has built its records.
+        try:
+            for line in _describe_duplicate_titles(module.fetch_tenders()):
+                print(line)
+        except base.PortalError as exc:
+            print(f"    (could not build records to check for duplicates: {exc})")
 
         # One whole notice, so a field the summary truncated can still be read.
         import json
