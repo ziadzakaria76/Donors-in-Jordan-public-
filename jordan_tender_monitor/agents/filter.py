@@ -85,6 +85,35 @@ def _passes_deadline(record: dict, today: date) -> tuple[bool, str | None]:
     return (True, None)
 
 
+def _passes_undated_lookback(record: dict, today: date) -> bool:
+    """A stale UNDATED notice is not an opportunity.
+
+    A dated notice leaves the report when it closes. An undated one never does,
+    because there is no deadline to expire -- so undated notices accumulate for
+    as long as the source has been publishing them. That was invisible while
+    the World Bank read was truncated at 500; once it returned its real 1,625
+    notices it produced 1,036 reported opportunities from one portal, most of
+    them years old, which is not a bid-review pack.
+
+    THREE CASES, and only the first is filtered:
+
+      * undated with a publication date  -> keep while the publication date is
+        inside the window
+      * dated                            -> untouched, judged on its deadline
+        however old the notice is
+      * no dates at all                  -> KEPT. There is nothing to judge it
+        on, and inventing a verdict would silently delete live tenders.
+    """
+    if config.UNDATED_LOOKBACK_DAYS is None:
+        return True
+    if record.get("closing_date") is not None:
+        return True
+    posted = record.get("posted_date")
+    if posted is None:
+        return True
+    return (today - posted).days <= config.UNDATED_LOOKBACK_DAYS
+
+
 def _passes_lookback(record: dict, today: date) -> bool:
     if config.LOOKBACK_DAYS is None:
         return True
@@ -157,6 +186,9 @@ def apply_filters(records: list[dict], today: date | None = None
         if flag:
             flags.append(flag)
 
+        if not _passes_undated_lookback(record, today):
+            drop(f"undated and published over {config.UNDATED_LOOKBACK_DAYS} days ago")
+            continue
         if not _passes_lookback(record, today):
             drop("outside lookback window")
             continue

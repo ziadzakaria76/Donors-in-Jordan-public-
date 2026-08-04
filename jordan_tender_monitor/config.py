@@ -188,6 +188,43 @@ EXCLUDE_CLOSED = True
 KEEP_UNKNOWN_DEADLINE = True
 UNKNOWN_DEADLINE_NOTE = "Deadline not published - verify on portal"
 
+# How long an UNDATED notice stays in the report. None disables the window.
+#
+# Undated notices are kept (above) because most donor notices publish no
+# deadline and dropping them would delete the majority of the pipeline. The
+# consequence is that they never age out: a dated notice leaves the report when
+# it closes, an undated one never does. Once the World Bank read stopped
+# truncating at 500 and returned its real 1,625 notices, that turned into 1,036
+# reported opportunities from one portal, most of them years old -- a document
+# nobody can use as a bid-review pack.
+#
+# So an undated notice is kept only while its PUBLICATION date is recent.
+# This applies to undated notices ONLY: a notice with a real deadline is judged
+# on that deadline, however old it is, and a notice with no dates at all is
+# kept, because there is nothing to judge it on and inventing a verdict would
+# silently delete live tenders.
+def _undated_window() -> int | None:
+    """JTM_UNDATED_LOOKBACK_DAYS, with "0" or "none" meaning no window.
+
+    A malformed value keeps the default rather than raising. Losing the whole
+    run to a typo in an environment variable is a worse outcome than a window
+    that is not the one you meant, and the effective value is stated in the
+    report either way.
+    """
+    raw = os.getenv("JTM_UNDATED_LOOKBACK_DAYS", "").strip().lower()
+    if not raw:
+        return 90
+    if raw in ("0", "none", "off", "never"):
+        return None
+    try:
+        days = int(raw)
+    except ValueError:
+        return 90
+    return days if days > 0 else None
+
+
+UNDATED_LOOKBACK_DAYS: int | None = _undated_window()
+
 # --------------------------------------------------------------------------
 # Q7 -- NEW-ONLY MODE: on, SQLite-backed.
 # The first run reports everything because the database starts empty; that is
