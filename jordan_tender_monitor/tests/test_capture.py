@@ -269,6 +269,129 @@ def test_kfw_points_at_gtai_not_kfw_de():
     check("kfw.de" not in urls, "kfw: kfw.de is NOT used as a tender source")
 
 
+def test_jica_uses_the_restructured_url():
+    """The old URL returned HTTP 404 on every live run.
+
+    JICA moved country pages from /<country>/english/office/others/... to
+    /english/overseas/<country>/others/..., confirmed by the live Indonesia
+    procurement page and the live Jordan office index. Both spellings are kept
+    because the old scheme still answers for several country offices, and
+    harvest() tolerates one source failing when another works.
+    """
+    urls = portals.source_urls("jica")
+    check(any("/english/overseas/jordan/" in u for u in urls),
+          "jica: the restructured URL is a source", f"got {urls}")
+    check_eq(urls[0], "https://www.jica.go.jp/english/overseas/jordan/others/procurement.html",
+             "jica: and it is tried first")
+    check(any("/jordan/english/office/" in u for u in urls),
+          "jica: the pre-migration URL is kept as a second source")
+
+    # An index page is not a listing. The office index was added as a fallback
+    # because it exists and returns 200, and it put two phantom tenders in the
+    # report -- "Message from the Chief Representative" and "Related
+    # Information", the page's own section headings. A clean 404 became
+    # navigation dressed as opportunities.
+    check(all(u.endswith("procurement.html") for u in urls),
+          "jica: every source is a procurement page, not an index", f"got {urls}")
+
+
+def test_jica_reports_no_listing_rather_than_failing():
+    """JICA Jordan publishes nothing; that is a fact, not a fault.
+
+    Reporting it as UNAVAILABLE puts a permanent red line in every report,
+    which teaches the reader to ignore the status table -- and the status table
+    is the alarm.
+    """
+    from jordan_tender_monitor.portals import jica
+
+    original = harvester.harvest
+    try:
+        def fail(spec):
+            raise PortalError("HTTP 404 - the URL has moved", spec.urls[0])
+        harvester.harvest = fail
+        try:
+            jica.fetch_tenders()
+            check(False, "jica: a total failure must still raise")
+        except PortalError as exc:
+            check(exc.reason.startswith("no listing published"),
+                  "jica: the reason is classified as no-listing, not a failure",
+                  f"got {exc.reason!r}")
+            check("404" in exc.reason,
+                  "jica: and the underlying detail is preserved, so a genuine "
+                  "change is still visible")
+    finally:
+        harvester.harvest = original
+
+    # And the scraper classifies it apart from broken.
+    from jordan_tender_monitor.agents.scraper import PortalHealth
+    health = PortalHealth(key="jica", name="JICA", tier=3, status="no listing")
+    check(not health.broken, "jica: a no-listing portal does not count as broken")
+
+
+def test_adfd_points_at_the_tenders_page_not_only_the_news_page():
+    """The module used to assert ADFD had no procurement database. It has one.
+
+    That claim was a confident comment explaining away an empty result, and it
+    pointed the scraper at the news page, which reported 'layout change' on
+    every run -- a wrong URL wearing the costume of a scraper bug.
+    """
+    urls = portals.source_urls("adfd")
+    check(any(u.endswith("/en/what-we-do/tenders") for u in urls),
+          "adfd: the tenders page is a source", f"got {urls}")
+    check(urls[0].endswith("/en/what-we-do/tenders"),
+          "adfd: and it is tried before the news page")
+    check(any("news" in u for u in urls),
+          "adfd: news is kept as a genuine secondary source")
+
+    # The .aspx paths search engines still index are legacy. --capture showed
+    # Procurementtenders.aspx answering 200 with nothing but chrome -- the row
+    # anatomy was the "Who we are" menu -- so keeping it would mean a permanent
+    # failure line on a portal that works.
+    check(not any(".aspx" in u for u in urls),
+          "adfd: the legacy .aspx paths are gone", f"got {urls}")
+
+    from jordan_tender_monitor.portals import adfd
+    check(adfd.SPEC.fetcher is None,
+          "adfd: no headless browser -- rendering was tried and changed nothing")
+    check(adfd.SPEC.anchor_hint != "/News/",
+          "adfd: the anchor hint no longer excludes every tender link")
+
+    import inspect
+    source = inspect.getsource(adfd)
+    check("has NO procurement database" not in source,
+          "adfd: the claim that contradicted the live site is gone")
+
+
+def test_adfd_reports_no_listing_rather_than_failing():
+    """Four URLs, plain and rendered, all carry chrome and no listing.
+
+    That is a fact about ADFD -- it finances projects, and tenders for
+    ADFD-financed work are issued by the beneficiary government -- not a broken
+    scraper. A permanent red line in the status table teaches the reader to
+    stop looking at it.
+    """
+    from jordan_tender_monitor.portals import adfd
+
+    original = harvester.harvest
+    try:
+        def fail(spec):
+            raise PortalError("layout change - the page loaded but no layer "
+                              "found a listing", spec.urls[0])
+        harvester.harvest = fail
+        try:
+            adfd.fetch_tenders()
+            check(False, "adfd: a total failure must still raise")
+        except PortalError as exc:
+            check(exc.reason.startswith("no listing published"),
+                  "adfd: classified as no-listing, not as a failure",
+                  f"got {exc.reason!r}")
+            check("layout change" in exc.reason,
+                  "adfd: the underlying detail survives, so a genuine change "
+                  "is still visible")
+    finally:
+        harvester.harvest = original
+
+
 def test_politeness_delay_is_enforced_per_host():
     """Two seconds between requests to the same host, and it must actually wait.
 
@@ -336,4 +459,8 @@ TESTS = [
     test_all_broken_is_detected_for_the_subject_line,
     test_portal_registry_is_complete,
     test_kfw_points_at_gtai_not_kfw_de,
+    test_jica_uses_the_restructured_url,
+    test_jica_reports_no_listing_rather_than_failing,
+    test_adfd_points_at_the_tenders_page_not_only_the_news_page,
+    test_adfd_reports_no_listing_rather_than_failing,
 ]

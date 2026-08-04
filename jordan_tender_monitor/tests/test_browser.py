@@ -23,6 +23,7 @@ import types
 from contextlib import contextmanager
 from pathlib import Path
 
+from jordan_tender_monitor import portals
 from jordan_tender_monitor.portals import base, browser, giz, harvester, ungm
 from jordan_tender_monitor.portals.base import PortalError
 
@@ -182,7 +183,18 @@ def test_importing_the_portals_does_not_import_playwright():
           "browser: importing the portal registry does not pull in playwright")
 
 
-def test_only_ungm_depends_on_the_browser():
+def test_the_browser_dependency_stays_contained():
+    """One portal needs it, and a second was tried and rejected on evidence.
+
+    ADFD looked like the same client-rendered shape as UNGM, so it was wired
+    through the browser. The render worked -- the page grew and
+    section.aos-animate appeared, which only exists once Animate-On-Scroll
+    initialises in a real browser -- and every layer still found zero rows.
+    The listing was not hidden by JavaScript; it is not there. So the
+    dependency came back out. 400 MB that provably changes nothing is worse
+    than none, and a portal carrying an unnecessary dependency is a portal
+    that fails for a reason nobody can act on.
+    """
     import inspect
 
     from jordan_tender_monitor import portals as registry
@@ -190,7 +202,17 @@ def test_only_ungm_depends_on_the_browser():
     users = sorted(key for key, module in registry.MODULES.items()
                    if "browser." in inspect.getsource(module))
     check_eq(users, ["ungm"],
-             "browser: exactly one portal takes the headless-browser dependency")
+             "browser: only the portal that demonstrably needs it declares it")
+    check(len(users) * 2 < len(registry.MODULES),
+          "browser: and it stays a small minority of the thirteen",
+          f"{len(users)} of {len(registry.MODULES)}")
+
+    for key in users:
+        spec = registry.MODULES[key].SPEC
+        check(spec.fetcher is not None,
+              f"browser: {key} routes through a custom fetcher")
+        check(key in portals.html_portals(),
+              f"browser: {key} is still capturable for diagnosis")
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +460,7 @@ def test_giz_dropped_the_page_that_carried_no_listing():
 TESTS = [
     test_playwright_stays_out_of_the_main_requirements,
     test_importing_the_portals_does_not_import_playwright,
-    test_only_ungm_depends_on_the_browser,
+    test_the_browser_dependency_stays_contained,
     test_a_missing_browser_is_an_instruction_not_a_traceback,
     test_render_says_how_to_install_when_the_import_fails,
     test_an_uninstalled_chromium_is_diagnosed_separately_from_a_missing_package,

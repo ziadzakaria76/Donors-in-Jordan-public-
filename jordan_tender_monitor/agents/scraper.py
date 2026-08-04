@@ -26,7 +26,7 @@ class PortalHealth:
     key: str
     name: str
     tier: int
-    status: str              # "ok" | "unavailable" | "unconfigured"
+    status: str              # "ok" | "unavailable" | "unconfigured" | "no listing"
     count: int = 0
     # Notices the portal returned BEFORE Jordan filtering. None when the portal
     # is inherently Jordan-specific and never filters. "OK: 0" is ambiguous on
@@ -44,11 +44,17 @@ class PortalHealth:
 
     @property
     def broken(self) -> bool:
-        """Unconfigured is not broken.
+        """Unconfigured and no-listing are not broken.
 
         SAM.gov needs an API key whose approval takes weeks. Reporting a
         paperwork delay as a scraper failure would cry wolf for a month and
         train the reader to ignore the alert that matters.
+
+        "No listing" is the same argument for a different cause. JICA's Jordan
+        office publishes no procurement page at all -- verified, both URL
+        schemes 404 while Bangladesh and Indonesia answer on both. A source
+        that has nothing to read is not a scraper that has stopped working,
+        and reporting it as one puts a permanent red line in every report.
         """
         return self.status == "unavailable"
 
@@ -71,8 +77,13 @@ class ScrapeResult:
         return [h for h in self.health if h.status == "unconfigured"]
 
     @property
+    def no_listing_portals(self) -> list[PortalHealth]:
+        return [h for h in self.health if h.status == "no listing"]
+
+    @property
     def all_broken(self) -> bool:
-        considered = [h for h in self.health if h.status != "unconfigured"]
+        considered = [h for h in self.health
+                      if h.status not in ("unconfigured", "no listing")]
         return bool(considered) and all(h.broken for h in considered)
 
 
@@ -88,7 +99,12 @@ def _run_one(key: str, module) -> PortalHealth:
         records = module.fetch_tenders()
     except PortalError as exc:
         reason = exc.reason
-        health.status = "unconfigured" if reason.startswith("not configured") else "unavailable"
+        if reason.startswith("not configured"):
+            health.status = "unconfigured"
+        elif reason.startswith("no listing published"):
+            health.status = "no listing"
+        else:
+            health.status = "unavailable"
         health.reason = reason
         if exc.url and exc.url not in health.urls:
             health.urls.insert(0, exc.url)

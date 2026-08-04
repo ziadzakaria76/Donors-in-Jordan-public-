@@ -75,7 +75,7 @@ def decorate(tenders: list[dict], today: date | None = None) -> list[dict]:
 def build_subject(reported: int, health: list, first_run: bool = False) -> str:
     """Subject line that states the run's health, not just its count."""
     broken = [h for h in health if getattr(h, "broken", False)]
-    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    total = len([h for h in health if getattr(h, "status", "") not in ("unconfigured", "no listing")])
     ok = total - len(broken)
     prefix = config.EMAIL_SUBJECT_PREFIX
 
@@ -170,6 +170,11 @@ def _health_table(health: list) -> str:
         elif h.status == "unconfigured":
             status = '<span style="color:#8A6D00">NOT CONFIGURED</span>'
             detail = _e(h.reason)
+        elif h.status == "no listing":
+            # Not red. This source publishes nothing to read, which is a fact
+            # about the source rather than a fault in the monitor.
+            status = '<span style="color:#8A6D00">NO LISTING</span>'
+            detail = _e(h.reason)
         else:
             status = '<span style="color:#C62828"><b>UNAVAILABLE</b></span>'
             urls = "<br>".join(f'<a href="{_e(u)}">{_e(u)}</a>' for u in h.urls[:2])
@@ -198,7 +203,7 @@ def build_email_html(result: dict, health: list, first_run: bool = False) -> str
     tenders = result["tenders"]
     today = date.today()
     broken = [h for h in health if getattr(h, "broken", False)]
-    total = len([h for h in health if h.status != "unconfigured"])
+    total = len([h for h in health if h.status not in ("unconfigured", "no listing")])
 
     banner = ""
     if broken and len(broken) == total:
@@ -309,7 +314,7 @@ def run_slug(reported: int, health: list) -> str:
         2026-08-03_ACTION-NEEDED_all-13-portals-unreachable.docx
     """
     broken = [h for h in health if getattr(h, "broken", False)]
-    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    total = len([h for h in health if getattr(h, "status", "") not in ("unconfigured", "no listing")])
     ok = total - len(broken)
 
     if total and len(broken) == total:
@@ -329,7 +334,7 @@ def run_slug(reported: int, health: list) -> str:
 def status_line(reported: int, health: list) -> str:
     """One-sentence run status, shown at the top of both documents."""
     broken = [h for h in health if getattr(h, "broken", False)]
-    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    total = len([h for h in health if getattr(h, "status", "") not in ("unconfigured", "no listing")])
 
     if total and len(broken) == total:
         return (f"{config.ACTION_NEEDED_PREFIX}: all {total} portals were unreachable. "
@@ -434,7 +439,7 @@ def _append_status_sheet(wb, health: list, reported: int) -> None:
         ws.cell(row=row, column=6, value=h.urls[0] if h.urls and not h.ok else "")
 
         fill_hex = (config.COLOR_HIGH if h.ok
-                    else config.COLOR_MEDIUM if h.status == "unconfigured"
+                    else config.COLOR_MEDIUM if h.status in ("unconfigured", "no listing")
                     else config.COLOR_LOW)
         fill = PatternFill(start_color=fill_hex, end_color=fill_hex, fill_type="solid")
         for col in range(1, 7):
@@ -465,7 +470,7 @@ def write_docx(tenders: list[dict], health: list, result: dict, path: Path) -> P
     # later should not have to infer from an empty list whether the pipeline was
     # quiet or the scrapers were dead.
     broken = [h for h in health if getattr(h, "broken", False)]
-    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    total = len([h for h in health if getattr(h, "status", "") not in ("unconfigured", "no listing")])
     status = doc.add_paragraph()
     run = status.add_run(status_line(len(tenders), health))
     run.bold = True
@@ -565,7 +570,7 @@ def write_markdown(tenders: list[dict], health: list, result: dict, path: Path) 
     outcome is two taps and no file manager.
     """
     broken = [h for h in health if getattr(h, "broken", False)]
-    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    total = len([h for h in health if getattr(h, "status", "") not in ("unconfigured", "no listing")])
     lines: list[str] = []
 
     if broken and len(broken) == total:
@@ -606,7 +611,8 @@ def write_markdown(tenders: list[dict], health: list, result: dict, path: Path) 
                 detail += f" via `{h.layer}`"
         else:
             detail = (h.reason or "").replace("|", "\\|")[:160]
-        mark = {"ok": "OK", "unconfigured": "not configured"}.get(h.status, "**UNAVAILABLE**")
+        mark = {"ok": "OK", "unconfigured": "not configured",
+                "no listing": "no listing published"}.get(h.status, "**UNAVAILABLE**")
         lines.append(f"| {h.name} | {mark} | {detail} |")
 
     if broken:
@@ -673,7 +679,7 @@ def build_alert(health: list, reason: str, written: dict[str, Path] | None = Non
     filtered; an alert that reads like a daily digest gets ignored.
     """
     broken = [h for h in health if getattr(h, "broken", False)]
-    total = len([h for h in health if getattr(h, "status", "") != "unconfigured"])
+    total = len([h for h in health if getattr(h, "status", "") not in ("unconfigured", "no listing")])
     today = date.today()
 
     subject = f"{config.ALERT_SUBJECT_PREFIX} - {reason} ({today.isoformat()})"
