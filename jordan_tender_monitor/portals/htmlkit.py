@@ -28,6 +28,7 @@ can see beats a silent zero.
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
 import re
 from dataclasses import dataclass, field
@@ -524,6 +525,30 @@ def _node_to_row(node, base_url: str, anchor_hint: str | None = None,
     return row
 
 
+# How far from today a procurement date can credibly sit. Wide on purpose --
+# this is a nonsense filter, not a business rule.
+_DATE_PLAUSIBILITY_YEARS = 30
+
+
+def _plausible_notice_date(value) -> bool:
+    """Reject a parse that succeeded on something that was not a date.
+
+    parse_date is permissive by design, and permissive parsers say yes to
+    things a human never would. Both of these are real strings out of one UNGM
+    row, and both parse:
+
+        "Expires in 48 days" -> 2048-08-04   (the 48 read as a year)
+        "WFP-SDN-00220"      -> 0220-08-04   (a reference number)
+
+    A field selector that scans a row's siblings will meet both. "Did it parse"
+    cannot tell them from a date; "is it within a human lifetime of today" can.
+    """
+    if value is None:
+        return False
+    today = _dt.date.today()
+    return abs(value.year - today.year) <= _DATE_PLAUSIBILITY_YEARS
+
+
 _FIELD_ATTRS = {
     "title": "title",
     "closing": "closing_text",
@@ -557,6 +582,26 @@ def _apply_field_selectors(row: Row, node, field_selectors: dict | None) -> None
     These are hints like the row selectors, not contracts. A selector that
     stops matching leaves the generically-inferred value in place rather than
     blanking it, and the quality gate still judges the result.
+
+    EVERY MATCH IS TRIED, not just the first, and for a date field only a match
+    that actually parses as a date is used. Both rules exist because the row
+    above is not the only shape UNGM serves. Its search endpoint omits
+    .remainingDays entirely:
+
+        span                          '04-Aug-2026 13:00 (GMT 3.00)'
+        span.remainingDaysToDeadline  '0.310509'
+        span                          '27-Jul-2026'          <- publication
+
+    A selector pinned to one optional sibling breaks the moment that sibling is
+    absent; one that matches every following sibling picks up 'Expires within
+    24 hours', 'UNRWA' and 'Jordan' as candidates. Scanning for the first that
+    is a date handles both shapes with one selector.
+
+    And a match that is NOT a date must not be written to a date field at all.
+    select_one() plus "_first_date_text(value) or value" did exactly that: it
+    overwrote a correctly-inferred publication date with the text 'Expires
+    within 24 hours'. A field that is wrong is worse than a field that is
+    missing, because the pipeline can see that a field is missing.
     """
     if not field_selectors:
         return
@@ -565,21 +610,41 @@ def _apply_field_selectors(row: Row, node, field_selectors: dict | None) -> None
         if not attr:
             continue
         try:
-            element = node.select_one(selector)
+            elements = node.select(selector)
         except Exception:  # noqa: BLE001 - a bad hint must not kill the row
             continue
-        if element is None:
-            continue
-        value = clean(element.get_text(" "))
-        if not value:
-            continue
-        if name in ("closing", "posted"):
-            # Narrow to the date span, exactly as a labelled field is narrowed.
-            # UNGM writes its deadline as "30-Sep-2026 19:00 (GMT +3.00)", and
-            # the trailing timezone defeats the parser outright -- the selector
-            # found the right cell and the deadline was still lost.
-            value = _first_date_text(value) or value
-        setattr(row, attr, value)
+
+        for element in elements:
+            value = clean(element.get_text(" "))
+            if not value:
+                continue
+            if name in ("closing", "posted"):
+                # Narrow to the date, exactly as a labelled field is narrowed.
+                # UNGM writes its deadline as "30-Sep-2026 19:00 (GMT +3.00)",
+                # and the trailing timezone defeats the parser outright -- the
+                # selector found the right cell and the deadline was still lost.
+                #
+                # Then reject countdowns, and only then require it to parse.
+                # Both guards are load-bearing and neither is enough alone:
+                #
+                #   _first_date_text() NARROWS but does not validate -- it
+                #   returns "Expires in 48 days" unchanged.
+                #
+                #   parse_date() then ACCEPTS that string, reading the 48 as
+                #   the year 2048 and filling in today for the rest. So a
+                #   "does it parse" check passes it too, and a countdown lands
+                #   in the publication date as 2048-08-04.
+                #
+                # Caught by the deadline-after-publication invariant, which is
+                # the only reason it is not sitting in a report right now.
+                narrowed = _first_date_text(value)
+                if not narrowed or _RELATIVE_DURATION_RE.search(narrowed):
+                    continue
+                if not _plausible_notice_date(parse_date(narrowed)):
+                    continue
+                value = narrowed
+            setattr(row, attr, value)
+            break
 
 
 _DATE_SPAN_RE = re.compile(

@@ -2,26 +2,51 @@
 UNGM -- the United Nations Global Marketplace. Tier 2, and the single richest
 Jordan source: UNDP, UNICEF, WFP, UNOPS, UNHCR and UNRWA all publish here.
 
-VERIFIED AGAINST THE LIVE SITE, and both HTTP-level approaches are dead ends:
+THE SEARCH ENDPOINT WORKS. An earlier note in this module said otherwise --
+"POST /Public/Notice/Search returned 395 bytes ... the endpoint either moved or
+now requires a token the UI mints client-side" -- and that was wrong on both
+counts. It has not moved and it needs no token. The earlier attempt sent the
+wrong body and read the reply as JSON; the endpoint takes a specific JSON
+filter and answers with an HTML fragment.
 
-  * POST /Public/Notice/Search returned 395 bytes -- no rows, no error. The
-    endpoint either moved or now requires a token the UI mints client-side.
-  * GET /Public/Notice returned 141 KB of pure navigation. The derived
-    selectors were menu containers; not one notice was in the markup. The
-    listing is assembled client-side after load.
+That mistaken conclusion is what bought the headless browser and the scroll
+loop, and it cost more than the browser. The scroll loop was driving this very
+endpoint by hand: a --capture network trace showed five POSTs with PageIndex
+running 0,1,2,3,4 -- one per scroll pass. Forty passes read 615 rows of a
+WORLDWIDE listing and were still growing, to keep the three that were Jordan.
 
-So this portal is rendered in a headless browser. Playwright is an OPTIONAL
-dependency (requirements-browser.txt) -- when it is absent this portal fails
-with an install instruction and the other twelve are unaffected.
+The endpoint takes Countries, so the listing we read is Jordan's, and paging it
+properly ends the cap rather than raising it. The browser remains as a fallback
+and is no longer on the fast path.
+
+    GET /Public/Notice returns 141 KB of pure navigation -- the rows are not in
+    the initial HTML. That part of the old note was correct, and it is why the
+    fallback still needs a browser.
 """
 
 from __future__ import annotations
 
+import datetime as _dt
+import logging
+import re as _re
+from collections import Counter
+
+from bs4 import BeautifulSoup
+
+from ..utils import text as textutil
 from . import base, browser, harvester
 from .harvester import HtmlSpec
 
+log = logging.getLogger(__name__)
+
 KEY = "ungm"
 LISTING = "https://www.ungm.org/Public/Notice"
+SEARCH = "https://www.ungm.org/Public/Notice/Search"
+
+# From the page's own selNoticeCountry dropdown (234 options), read by
+# --capture rather than guessed. UNGM uses its own numeric ids, not ISO codes,
+# so there is nothing to derive this from -- it has to come from the page.
+JORDAN_COUNTRY_ID = "2395"
 
 # A row selector to wait for before reading the DOM. A hint only: if it never
 # appears the page is still read after the settle delay, so a renamed class
@@ -39,21 +64,157 @@ ROW_HINT = "div.tableRow, table tbody tr, li.notice"
 # "read everything" and "read the first N" must not look alike.
 MAX_SCROLLS = 40
 
+# What the UI itself asks for. See _fetch_search(): the value that actually
+# governs paging is the one page one returns, not this one.
+PAGE_SIZE = 15
+
 ROW_SELECTOR = "div.dataRow.notice-table"
 
 
-def _fetch_rendered(url: str) -> str:
-    """Render the listing in a headless browser and return the DOM.
+# Pages of Jordan-only results, not pages of the world. Jordan runs to a
+# couple of dozen open notices, so this is headroom rather than a limit -- but
+# it is still logged when reached, because a cap that is hit silently turns
+# "read everything" and "read the first N" into the same output.
+MAX_PAGES = 40
 
-    A plain fetch cannot work here -- see the module docstring. If Playwright
-    is missing the error says how to install it, which is more useful than a
-    portal that silently reports zero.
+
+def _search_body(page_index: int, page_size: int) -> dict:
+    """The filter the UNGM UI itself posts, with Countries filled in.
+
+    Copied field-for-field from a --capture network trace rather than
+    reconstructed from the docs, because the last reconstruction of this
+    request is what convinced everyone the endpoint was dead.
+
+    IsActive + DeadlineFrom=today are the site's own "currently open" filter.
+    They are kept because they are what the UI sends, not relied upon: the
+    pipeline re-checks every deadline downstream, on the standing rule that a
+    source's own filter is a hint and never a guarantee.
+    """
+    today = _dt.date.today().strftime("%d-%b-%Y")
+    return {
+        "PageIndex": page_index,
+        "PageSize": page_size,
+        "Title": "", "Description": "", "Reference": "",
+        "PublishedFrom": "", "PublishedTo": today,
+        "DeadlineFrom": today, "DeadlineTo": "",
+        "Countries": [JORDAN_COUNTRY_ID],
+        "Agencies": [], "UNSPSCs": [], "NoticeTypes": [],
+        "SortField": "Deadline", "SortAscending": True,
+        "isPicker": False, "IsSustainable": False, "IsActive": True,
+        "NoticeDisplayType": None,
+        "NoticeSearchTotalLabelId": "noticeSearchTotal",
+        "TypeOfCompetitions": [],
+    }
+
+
+def _row_count(fragment: str) -> int:
+    return len(BeautifulSoup(fragment, "html.parser").select(ROW_SELECTOR))
+
+
+# What the last completed search displayed in each row's country cell.
+# A log line was the obvious home for this and the wrong one: it is emitted at
+# fetch time, which in --capture output lands a hundred lines above anything
+# you are reading. A diagnostic you have to go hunting for does not get read.
+LAST_COUNTRY_TALLY: Counter = Counter()
+
+
+def _country_cells(fragment: str) -> list[str]:
+    """The country each row DISPLAYS -- the last span, per the live row anatomy.
+
+    We ask UNGM for Jordan and it answers with rows whose displayed country is
+    often something else. That gap is the whole question about this portal: it
+    is either UNGM's filter being broader than its country column (in which
+    case the downstream text filter is right to drop them) or notices that
+    cover Jordan among several countries (in which case dropping them loses
+    real work). Counting the values is what tells the two apart, so the run
+    says it out loud rather than leaving a bare "50 not Jordan" to be guessed at.
+    """
+    cells = []
+    for row in BeautifulSoup(fragment, "html.parser").select(ROW_SELECTOR):
+        spans = row.find_all("span")
+        cells.append(spans[-1].get_text(" ", strip=True) if spans else "")
+    return cells
+
+
+def _fetch_search(url: str) -> str:
+    """Page the search endpoint and return every page's markup, concatenated.
+
+    THE PAGE SIZE IS MEASURED, NOT ASSUMED. Asking for 100 and receiving 15
+    because the server caps it would make every page look short, and "short
+    page" is the signal this loop uses for "the listing has ended" -- so an
+    unhonoured PageSize would stop the read after one page and call it
+    complete. Whatever page one returns IS the page size; that is the only
+    number that cannot be wrong.
+    """
+    base.warm_session(LISTING)
+
+    pages: list[str] = []
+    countries: list[str] = []
+    stride = 0
+    total = 0
+    for index in range(MAX_PAGES):
+        fragment = base.post_text(SEARCH, _search_body(index, PAGE_SIZE))
+        found = _row_count(fragment)
+        if not found:
+            break
+        pages.append(fragment)
+        countries.extend(_country_cells(fragment))
+        total += found
+        if stride == 0:
+            stride = found
+        if found < stride:
+            break
+    else:
+        log.warning(
+            "ungm: read %d notices across the %d-page cap and the last page "
+            "was still full -- there are probably more", total, MAX_PAGES)
+
+    if not pages:
+        raise base.PortalError(
+            "the search endpoint answered but returned no notice rows -- the "
+            "filter shape or the row markup may have changed; run "
+            "--capture ungm to see what it sends now", SEARCH)
+
+    log.info("ungm: %d notices over %d page(s) of %d", total, len(pages), stride)
+    LAST_COUNTRY_TALLY.clear()
+    LAST_COUNTRY_TALLY.update(countries)
+    # One document, so the extraction cascade sees every row at once.
+    return "<html><body>" + "".join(pages) + "</body></html>"
+
+
+def _fetch_rendered(url: str) -> str:
+    """Fallback: render the listing in a headless browser and scroll it.
+
+    Kept because the search endpoint is undocumented and could change shape
+    without notice, and a portal that goes dark is worse than a slow one. It is
+    genuinely worse than the endpoint, though -- it scrolls a WORLDWIDE listing
+    and stops at a cap -- so which path ran is logged rather than left to be
+    inferred from timing.
     """
     if not browser.available():
         raise base.PortalError(
             f"UNGM needs a headless browser: {browser.INSTALL_HINT}", url)
     return browser.render(url, wait_for=ROW_HINT,
                           scroll_for=ROW_SELECTOR, max_scrolls=MAX_SCROLLS)
+
+
+def _fetch(url: str) -> str:
+    """The search endpoint, falling back to the browser if it ever stops working."""
+    try:
+        return _fetch_search(url)
+    except base.PortalError as exc:
+        if browser.available():
+            log.warning("ungm: the search endpoint failed (%s); falling back "
+                        "to scrolling the rendered listing, which reads the "
+                        "WORLDWIDE list and stops at a cap", exc.reason)
+            return _fetch_rendered(url)
+        # Both paths gone. Name BOTH, because either one alone sends you after
+        # the wrong problem: the endpoint error alone hides that a browser
+        # would have rescued the run, and the install hint alone hides that the
+        # endpoint -- the thing worth fixing -- has broken.
+        raise base.PortalError(
+            f"the search endpoint failed ({exc.reason}) and the browser "
+            f"fallback is unavailable: {browser.INSTALL_HINT}", url) from exc
 
 
 SPEC = HtmlSpec(
@@ -90,28 +251,107 @@ SPEC = HtmlSpec(
     field_selectors={
         "title": "span.ungm-title",
         "closing": "span:has(+ span.remainingDaysToDeadline)",
-        # "~" rather than "+": the adjacent-sibling form worked on the fixture
-        # and matched nothing on the live page, so the publication date came
-        # back empty while the deadline read correctly. The published span is
-        # the first span AFTER the counter, but not necessarily the very next
-        # node. The deadline uses ":has(+ ...)" and does work live, which is
-        # what matters most -- a missing publication date costs ranking
-        # precision; a missing deadline would drop the notice.
-        "posted": "span.remainingDays ~ span",
+        # Anchored to .remainingDaysToDeadline, which every row has, NOT to
+        # .remainingDays, which only the browser-rendered rows have. Pinning it
+        # to the optional sibling worked until the search endpoint replaced the
+        # scroll loop, at which point every publication date silently became
+        # None -- the selector still matched nothing and nothing complained.
+        #
+        # This matches several spans (the counter is followed by the date, the
+        # agency, the reference and the country). _apply_field_selectors takes
+        # the first that parses as a date, so it reads correctly whether or not
+        # .remainingDays is present.
+        "posted": "span.remainingDaysToDeadline ~ span",
     },
     anchor_hint="/Public/Notice/",
     currency="USD",
-    # The rendered listing is worldwide -- no country filter is applied before
-    # it arrives, so this one is doing real work rather than defence in depth.
-    filter_to_jordan=True,
-    fetcher=_fetch_rendered,
-    notes="JavaScript-rendered listing; needs Playwright",
+    # Filtering happens in _is_jordan() instead: the generic text filter reads
+    # the country cell, and for UNGM the majority of Jordan notices print
+    # "Multiple destinations" there rather than a country name.
+    filter_to_jordan=False,
+    fetcher=_fetch,
+    notes="Jordan-filtered search endpoint; browser fallback",
 )
 
 
+# What UNGM puts in the country cell when a notice covers more than one
+# country. It is a label, not a country, and it is the majority of a
+# Jordan-filtered result set -- 51 of 70 on the run that found it.
+_MULTI_COUNTRY_RE = _re.compile(r"multiple\s+destinations", _re.I)
+
+
+def _is_jordan(record: dict) -> bool:
+    """Tri-state, and the middle state is the whole point.
+
+    THE TEXT FILTER WAS DROPPING 51 OF 70 NOTICES. We ask UNGM for
+    Countries=[Jordan], it answers with 70 rows, and only 19 of them print
+    "Jordan" in the country cell. The other 51 print "Multiple destinations" --
+    they ARE Jordan notices, they just cover several countries and the column
+    has no room to say so. Running the standard text filter over them threw
+    away three quarters of the portal's Jordan work, and the count went UP at
+    the same time (3 to 19), so it read as a win.
+
+      - the row names Jordan          -> keep. The strongest evidence there is.
+      - the row says "Multiple
+        destinations"                 -> keep. The column CANNOT express the
+                                         answer, so it is not evidence of
+                                         anything; the query we sent is.
+      - the row names another country -> drop. Here the column can express the
+                                         answer and disagrees, so believe it.
+
+    This is not a retreat from "never trust a source's own country filter". The
+    World Bank earned that rule by IGNORING countryshortname and returning
+    worldwide notices -- its filter did nothing. UNGM's demonstrably works: it
+    turns thousands of worldwide notices into 70, and every row it labels with
+    a single country labels it Jordan. The rule is about not letting a source's
+    filter be the only check, and the single-country rows still get checked.
+    What changed is that a blank answer is no longer read as a "no".
+    """
+    blob = " ".join(str(record.get(f) or "")
+                    for f in ("title", "description", "url"))
+    if textutil.mentions_jordan(record.get("title"), record.get("description"),
+                                url=record.get("url")):
+        return True
+    return bool(_MULTI_COUNTRY_RE.search(blob))
+
+
 def fetch_tenders() -> list[dict]:
-    return harvester.harvest(SPEC)
+    records = harvester.harvest(SPEC)
+    kept = [r for r in records if _is_jordan(r)]
+    # harvest() no longer filters for us, so the pre-filter total has to be
+    # recorded here or the status line would read "19 (19 read)".
+    base.note_scanned(len(records))
+    return kept
 
 
 def capture():
     return harvester.capture(SPEC)
+
+
+# How many scroll passes the diagnostic makes. Small on purpose: the question
+# it answers -- "what does the page ask for when it needs more rows?" -- is
+# answered by the first lazy-load call, not the four hundredth.
+CAPTURE_SCROLLS = 4
+
+
+def capture_network() -> list[dict]:
+    """The XHR/fetch calls the listing makes on load and while scrolling.
+
+    Scrolling is a workaround for not knowing the endpoint. 40 passes read 615
+    rows and the listing was still growing, so the cap was truncating a
+    worldwide list that we then filter down to a handful of Jordan notices --
+    reading thousands of rows to keep three. If the page fetches its rows from
+    an endpoint that takes a page number or a country, calling it directly
+    replaces the whole scroll loop.
+
+    Guessing that endpoint has already failed here once (POST
+    /Public/Notice/Search returned 395 bytes), so this reports what the UI
+    actually calls rather than what it plausibly might.
+    """
+    if not browser.available():
+        raise base.PortalError(
+            f"UNGM needs a headless browser: {browser.INSTALL_HINT}", LISTING)
+    log: list[dict] = []
+    browser.render(LISTING, wait_for=ROW_HINT, scroll_for=ROW_SELECTOR,
+                   max_scrolls=CAPTURE_SCROLLS, network_log=log)
+    return log
