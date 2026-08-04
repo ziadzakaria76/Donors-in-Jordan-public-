@@ -329,6 +329,62 @@ def score_all(records: list[dict], today: date | None = None) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+# Everything the report shows about a notice, except its publication date.
+# posted_date is excluded ON PURPOSE -- it is the one field that legitimately
+# differs between a notice and its own re-publication, and therefore the only
+# difference that does NOT make two rows two opportunities.
+_REPUBLICATION_FIELDS = (
+    "title", "portal", "closing_date", "estimated_value_usd", "description",
+    "eligibility", "contact", "notice_type", "sector", "language",
+)
+
+
+def _republished_within_portal(record: dict, existing: dict) -> bool:
+    """The same notice published twice by one portal, under two notice ids.
+
+    DERIVED FROM THE LIVE DATA, not from what sounded reasonable. A --capture
+    diagnostic grouped the World Bank's records by title and printed what
+    differed inside each group. Two shapes came back, and they need opposite
+    treatment:
+
+        2x "Medical Insurance Services (Jordan: Support for Industry
+            Development Fund)"          DIFFER: posted_date
+                                        2026-06-15 / 2026-06-03
+
+        3x "Artificial Intelligence Penetration measurement in Jordan"
+            DIFFER: closing_date, contact, description, notice_type,
+                    posted_date, sector
+            notice_type: Contract Award / REOI / REOI
+
+    The first is one procurement re-published twelve days later: identical
+    deadline, description, contact, type, sector, value. Reporting it twice
+    overstates the pipeline and wastes a reader's attention.
+
+    The second is a procurement LIFECYCLE -- the original expression of
+    interest, a deadline extension, and finally the contract award. An earlier
+    version of this function matched on title plus a non-conflicting deadline,
+    and it would have merged a CONTRACT AWARD into an open opportunity. That is
+    not a tidier report; that is hiding the fact that the work is already gone.
+
+    So: every material field must match, and only the publication date may
+    differ. Anything else -- a changed deadline, a changed notice type, a
+    different description -- means these are two things, and both stay.
+
+    BOTH must actually carry a publication date. A missing posted_date means
+    "not published", not "a different date", and the evidence above is about
+    two notices that both had one. Merging a dateless record into a dated one
+    on the strength of everything else matching would be inferring a
+    re-publication from an absence -- the same move this codebase refuses when
+    it keeps undated notices rather than guessing they are stale.
+    """
+    if not (record.get("posted_date") and existing.get("posted_date")):
+        return False
+    for name in _REPUBLICATION_FIELDS:
+        if record.get(name) != existing.get(name):
+            return False
+    return True
+
+
 def deduplicate(records: list[dict]) -> tuple[list[dict], int]:
     """Collapse the same notice appearing on more than one portal.
 
@@ -360,7 +416,13 @@ def deduplicate(records: list[dict]) -> tuple[list[dict], int]:
                 duplicate = existing
                 break
             if record.get("portal") == existing.get("portal"):
-                continue  # same portal: only an identical URL counts
+                # Same portal: an identical URL (above), or the same notice
+                # re-published under a second id. NEVER fuzzy here -- see
+                # _republished_within_portal() and this docstring.
+                if _republished_within_portal(record, existing):
+                    duplicate = existing
+                    break
+                continue
             other = clean(existing.get("title")).lower()
             if not title or not other:
                 continue
@@ -374,10 +436,25 @@ def deduplicate(records: list[dict]) -> tuple[list[dict], int]:
             continue
 
         merged += 1
-        also = duplicate.setdefault("also_on", [])
-        label = config.PORTAL_NAMES.get(record["portal"], record["portal"])
-        if label not in also:
-            also.append(label)
+        if record.get("portal") == duplicate.get("portal"):
+            # "Also published on: World Bank" would say nothing. What is worth
+            # keeping is the second notice page -- these are two real URLs, and
+            # dropping one is the sort of quiet loss this project keeps finding.
+            other = duplicate.setdefault("also_urls", [])
+            if (record.get("url") and record["url"] != duplicate.get("url")
+                    and record["url"] not in other):
+                other.append(record["url"])
+            # The LATEST publication date wins. These notices carry no deadline,
+            # so posted_date is what the undated-lookback window judges them on;
+            # keeping the earlier one would age a live re-publication out.
+            mine, theirs = record.get("posted_date"), duplicate.get("posted_date")
+            if mine and (not theirs or mine > theirs):
+                duplicate["posted_date"] = mine
+        else:
+            also = duplicate.setdefault("also_on", [])
+            label = config.PORTAL_NAMES.get(record["portal"], record["portal"])
+            if label not in also:
+                also.append(label)
         # Keep whichever copy actually has the field.
         for field_name in ("closing_date", "posted_date", "estimated_value_usd",
                            "description", "contact", "notice_type", "eligibility"):

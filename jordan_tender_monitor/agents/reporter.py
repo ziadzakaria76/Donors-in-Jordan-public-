@@ -134,6 +134,11 @@ def _tender_block(t: dict) -> str:
     also = ""
     if t.get("also_on"):
         also = f'<div class="meta">Also published on: {_e(", ".join(t["also_on"]))}</div>'
+    for extra in (t.get("also_urls") or []):
+        # The same notice re-published under a second id. Both pages are real,
+        # so the merge shows both rather than picking one and losing the other.
+        also += (f'<div class="meta">Also published as: '
+                 f'<a href="{_e(extra)}">{_e(extra)}</a></div>')
     link = (f'<div class="meta"><a href="{_e(t.get("url"))}">Open the notice</a></div>'
             if t.get("url") else '<div class="meta">No direct link published</div>')
     desc = truncate(t.get("description") or "", config.DESCRIPTION_CHAR_LIMIT)
@@ -502,6 +507,8 @@ def write_docx(tenders: list[dict], health: list, result: dict, path: Path) -> P
             doc.add_paragraph(f"Contact: {t['contact']}")
         if t.get("also_on"):
             doc.add_paragraph(f"Also published on: {', '.join(t['also_on'])}")
+        for extra in (t.get("also_urls") or []):
+            doc.add_paragraph(f"Also published as: {extra}")
         if t.get("description"):
             body = doc.add_paragraph(truncate(t["description"], 2000))
             if t.get("language") == "ar":

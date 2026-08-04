@@ -968,3 +968,121 @@ TESTS = [
     test_tender_ids_are_stable_across_runs,
     test_portal_health_unconfigured_is_not_broken,
 ]
+
+
+# ---------------------------------------------------------------------------
+# One notice published twice by one portal
+# ---------------------------------------------------------------------------
+
+def _wb(url, posted, **over):
+    """A World Bank record, defaulting to the live duplicate's shape."""
+    fields = dict(title="Medical Insurance Services (Jordan: Support for "
+                        "Industry Development Fund)",
+                  description="Consulting services, Amman, Jordan.",
+                  closing=None, url=url, posted=posted)
+    fields.update(over)
+    record = _record(**fields)
+    record["portal"] = "worldbank"
+    return record
+
+
+def test_a_notice_republished_under_a_second_id_is_reported_once():
+    """VERIFIED AGAINST THE LIVE API, which is the only reason this is safe.
+
+    A --capture diagnostic grouped the World Bank's records by title and
+    printed what differed inside each group:
+
+        2x "Medical Insurance Services (...)"   DIFFER: posted_date
+                                                2026-06-15 / 2026-06-03
+
+    Identical deadline, description, contact, notice type, sector and value.
+    One procurement, published twice, twelve days apart.
+    """
+    first = _wb("https://projects.worldbank.org/.../OP00448805",
+                TODAY - timedelta(days=20))
+    again = _wb("https://projects.worldbank.org/.../OP00451187",
+                TODAY - timedelta(days=8))
+
+    result = filters.process([first, again], TODAY)
+    check_eq(len(result["tenders"]), 1,
+             "dedupe: one opportunity, not two")
+    check_eq(result["merged_duplicates"], 1,
+             "dedupe: and the merge is counted rather than silent")
+
+    kept = result["tenders"][0]
+    check_eq(kept["posted_date"], TODAY - timedelta(days=8),
+             "dedupe: the LATEST publication date survives -- these carry no "
+             "deadline, so it is what the undated window judges them on")
+    # Which copy survives depends on sort order and does not matter. What
+    # matters is that BOTH notice pages are still reachable from the row --
+    # they are two real URLs, and dropping one is the quiet loss this whole
+    # session kept turning up.
+    reachable = {kept.get("url"), *(kept.get("also_urls") or [])}
+    check(any("OP00448805" in u for u in reachable),
+          "dedupe: the first notice page is still reachable", repr(reachable))
+    check(any("OP00451187" in u for u in reachable),
+          "dedupe: and so is the second", repr(reachable))
+
+
+def test_a_procurement_lifecycle_is_never_collapsed():
+    """The group the first version of this rule would have destroyed.
+
+        3x "Artificial Intelligence Penetration measurement in Jordan"
+            DIFFER: closing_date, contact, description, notice_type, ...
+            notice_type: Contract Award / REOI / REOI
+
+    An earlier rule matched on title plus a non-conflicting deadline, which
+    would have merged a CONTRACT AWARD into an open opportunity -- reporting
+    work that is already gone as available, which is worse than reporting it
+    twice.
+    """
+    award = _wb("https://projects.worldbank.org/.../OP00448124",
+                TODAY - timedelta(days=30),
+                title="AI Penetration measurement in Jordan",
+                description="Contract Award. Project P170669.")
+    award["notice_type"] = "Contract Award"
+    reoi = _wb("https://projects.worldbank.org/.../OP00262725",
+               TODAY - timedelta(days=40),
+               title="AI Penetration measurement in Jordan",
+               description="Request for expressions of interest. MoDEE.")
+    reoi["notice_type"] = "Request for Expression of Interest"
+
+    result = filters.process([award, reoi], TODAY)
+    check_eq(len(result["tenders"]), 2,
+             "dedupe: an award and an open REOI stay separate")
+    check_eq(result["merged_duplicates"], 0, "dedupe: nothing was merged")
+
+
+def test_an_absent_publication_date_is_not_a_different_one():
+    """A missing field is not evidence, here as everywhere else in this code.
+
+    The live evidence covers two notices that BOTH carried a publication date.
+    It says nothing about a dateless one, so a record with no posted_date is
+    never merged into a dated one on the strength of everything else matching.
+    """
+    dated = _wb("https://projects.worldbank.org/.../OP001", TODAY - timedelta(days=5))
+    dateless = _wb("https://projects.worldbank.org/.../OP002", None)
+
+    result = filters.process([dated, dateless], TODAY)
+    check_eq(len(result["tenders"]), 2,
+             "dedupe: a dateless notice is not assumed to be a re-publication")
+
+
+def test_a_changed_deadline_means_a_new_chance_to_bid():
+    """A re-tender with a new deadline is not a duplicate row."""
+    first = _wb("https://projects.worldbank.org/.../OP001",
+                TODAY - timedelta(days=40), closing=TODAY + timedelta(days=5))
+    retender = _wb("https://projects.worldbank.org/.../OP002",
+                   TODAY - timedelta(days=5), closing=TODAY + timedelta(days=40))
+
+    result = filters.process([first, retender], TODAY)
+    check_eq(len(result["tenders"]), 2,
+             "dedupe: two deadlines are two opportunities")
+
+
+TESTS += [
+    test_a_notice_republished_under_a_second_id_is_reported_once,
+    test_a_procurement_lifecycle_is_never_collapsed,
+    test_an_absent_publication_date_is_not_a_different_one,
+    test_a_changed_deadline_means_a_new_chance_to_bid,
+]
