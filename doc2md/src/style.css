@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+
+/* Tailwind v4 keys `dark:` off the media query by default; Doc2MD has an
+   explicit toggle, so bind it to the class the boot script sets instead. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-ink-950: #0b1020;
+  --color-ink-900: #111827;
+  --color-ink-850: #161f33;
+  --color-ink-800: #1f2937;
+  --color-brand-400: #818cf8;
+  --color-brand-500: #6366f1;
+  --color-brand-600: #4f46e5;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scrollbar-gutter: stable;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply dark:bg-ink-950 dark:text-slate-100;
+    /* Keep content clear of the notch and the gesture bar. */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior-y: none;
+  }
+
+  /* Every interactive element clears the 48px touch target minimum. */
+  button,
+  [role='button'],
+  label.tappable {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+}
+
+/* A real utility rather than a component class, so the variants below can
+   `@apply btn` — Tailwind v4 will not apply a class defined in the same layer.
+   min-h-12 is the 48px touch target floor every control inherits. */
+@utility btn {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4
+    text-base font-medium transition-colors select-none
+    disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+@layer components {
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-500 active:bg-brand-500;
+  }
+
+  .btn-secondary {
+    @apply btn border border-slate-300 bg-white text-slate-800 hover:bg-slate-100
+      dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10;
+  }
+
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-200/60
+      dark:text-slate-300 dark:hover:bg-white/10;
+  }
+
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm
+      dark:border-white/10 dark:bg-ink-900;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+}
+
+/* The rendered-Markdown preview. Deliberately small — the point is to spot a
+   broken table, not to be a reading app. */
+.md-preview {
+  @apply text-[15px] leading-relaxed break-words;
+}
+.md-preview h1,
+.md-preview h2,
+.md-preview h3,
+.md-preview h4,
+.md-preview h5,
+.md-preview h6 {
+  @apply mt-4 mb-2 font-semibold text-slate-900 first:mt-0 dark:text-white;
+}
+.md-preview h1 { @apply text-xl; }
+.md-preview h2 { @apply text-lg; }
+.md-preview h3 { @apply text-base; }
+.md-preview p { @apply my-2; }
+.md-preview ul { @apply my-2 list-disc pl-5; }
+.md-preview ol { @apply my-2 list-decimal pl-5; }
+.md-preview li { @apply my-1; }
+.md-preview a { @apply text-brand-600 underline dark:text-brand-400; }
+.md-preview code {
+  @apply rounded bg-slate-200/70 px-1 py-0.5 text-[0.9em] dark:bg-white/10;
+}
+.md-preview pre {
+  @apply my-3 overflow-x-auto rounded-lg bg-slate-200/70 p-3 dark:bg-black/40;
+}
+.md-preview pre code { @apply bg-transparent p-0; }
+.md-preview blockquote {
+  @apply my-3 border-l-4 border-slate-300 pl-3 text-slate-600
+    dark:border-white/20 dark:text-slate-400;
+}
+.md-preview hr { @apply my-4 border-slate-200 dark:border-white/10; }
+.md-preview table {
+  @apply my-3 w-max min-w-full border-collapse text-sm;
+}
+.md-preview th,
+.md-preview td {
+  @apply border border-slate-200 px-2 py-1 text-left align-top dark:border-white/10;
+}
+.md-preview th { @apply bg-slate-100 font-semibold dark:bg-white/5; }
+.md-preview .table-scroll { @apply overflow-x-auto; }

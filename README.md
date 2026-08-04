@@ -7,6 +7,10 @@ working file to disk.
 
 Full documentation: **[`jordan_tender_monitor/README.md`](jordan_tender_monitor/README.md)**
 
+This repository also hosts **[Doc2MD](doc2md/README.md)** (`doc2md/`), an
+unrelated standalone PWA that converts PDF, Word and Excel files to
+token-efficient Markdown entirely in the browser.
+
 ## Status — first live run completed 3 August 2026
 
 The scrapers have now run against live pages. Results by portal:
