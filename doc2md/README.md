@@ -4,9 +4,9 @@ Convert PDF, Word and Excel files into clean, token-efficient Markdown for
 feeding to an LLM. Mobile-first, installable, and **entirely client-side** —
 no backend, no upload, no analytics. Files never leave the device.
 
-> **Status: phase 3 of 6.** The app shell, the spreadsheet pipeline
-> (XLSX / XLSM / CSV) and the DOCX pipeline are built and tested. PDF is a stub
-> that reports which phase implements it. See [Build status](#build-status).
+> **Status: phase 4 of 6.** All three converters — spreadsheet, Word and PDF —
+> are built and tested. What remains is the shared token-efficiency pass and
+> the YAML front-matter. See [Build status](#build-status).
 
 ## Quick start
 
@@ -45,7 +45,8 @@ src/
     spreadsheet.ts          XLSX / XLSM → SheetJS
     delimited.ts            CSV — an RFC 4180 reader, no spreadsheet engine
     docx.ts                 DOCX → mammoth → turndown
-    pdf.ts                  PDF  → pdf.js with layout reconstruction
+    pdf.ts                  PDF  → pdf.js driver
+    pdf-layout.ts           lines, headings, paragraphs, tables, furniture
   ui/
     app.ts                  the whole UI (vanilla TS, no framework)
     markdown.ts             small GFM-subset renderer for the preview pane
@@ -57,9 +58,9 @@ a spreadsheet never downloads pdf.js. `npm run check:size` enforces the budget:
 
 ```
     1.6 KB  index.html
-   31.6 KB  assets/index-*.css
-   22.4 KB  assets/index-*.js
-   55.6 KB  TOTAL (budget 300.0 KB)
+   32.4 KB  assets/index-*.css
+   22.5 KB  assets/index-*.js
+   56.4 KB  TOTAL (budget 300.0 KB)
 ```
 
 **Vanilla TypeScript, not React.** The UI is one screen with a list on it.
@@ -190,6 +191,44 @@ worth knowing:
   not appear once per page.
 - Document order is never changed; the images footer is the only thing appended.
 
+## PDFs
+
+A PDF has no paragraphs, headings or tables — only glyphs at coordinates.
+Everything structural is inferred, in `pdf-layout.ts`, which is kept free of
+pdf.js so the geometry can be tested on its own.
+
+- **Lines** are runs sharing a baseline. A column gap arrives from pdf.js as a
+  single space whose *width* spans the gap, so the width is what separates a
+  table row from a sentence — not the character.
+- **Headings** come from font size *ranked*, not from fixed ratios. Distinct
+  sizes above the body are sorted and become h1, h2, h3 in turn, so a document
+  with 13/12/11pt headings over 10pt body gets a clean hierarchy instead of
+  three h3s. Running heads are excluded when working out what the body size is,
+  or 8pt furniture on every page can outvote the actual text.
+- **Paragraphs** rejoin wrapped lines. A line continues the one above it when
+  the leading is normal, it starts at or left of it, and the line above either
+  reached the right margin or did not finish its sentence. A line that both
+  stops short *and* ends a sentence is one the author meant to end. A first-line
+  indent starts a new paragraph.
+- **Tables** need three rows, two columns, consistent segment counts and every
+  segment landing in a distinct column. Anything less stays plain text — losing
+  a table's formatting is recoverable, inventing one is not.
+- **Running heads and feet** go when their shape — digits normalised, so
+  "Page 3 of 10" matches "Page 7 of 10" — repeats in the top or bottom margin of
+  at least 60% of pages. Bare page numbers go regardless.
+- **Pages with no text layer** become
+  `<!-- page N: no text layer, OCR needed -->` and a warning. A scan is exactly
+  the case where silently dropping a page would go unnoticed.
+- **Arabic and other RTL text** comes out in logical order. A PDF stores an RTL
+  run in visual order; pdf.js reverses each run back to logical on extraction,
+  and the line assembler orders the runs right-to-left to match. No string is
+  ever reversed.
+
+**Offline note.** pdf.js's worker is a 2 MB `.mjs`, so the service worker
+precaches about 3.5 MB in total. That download happens in the background after
+the page is already interactive, and it is what makes every format convert with
+no connection — the smoke test converts a PDF with the network cut.
+
 ## Testing
 
 ```bash
@@ -216,7 +255,7 @@ npm run smoke
 | 1 | Scaffold, PWA, share target, UI shell, batch queue, zip export | **done** |
 | 2 | XLSX / XLSM / CSV pipeline | **done** |
 | 3 | DOCX pipeline (style mapping + turndown) | **done** |
-| 4 | PDF pipeline (layout reconstruction) | stub |
+| 4 | PDF pipeline (layout reconstruction) | **done** |
 | 5 | Token-efficiency post-processor + YAML front-matter | passthrough |
 | 6 | Share-target polish, offline caching, UI polish | partly done |
 | 7 | Fixture-based snapshot tests per format | pending |

@@ -273,7 +273,64 @@ check(
   true,
 );
 
-// Three finished files should offer the batch zip.
+/**
+ * A two-page PDF: a large-font title, two body lines that wrap, and a second
+ * page with no content stream at all. Written inline rather than imported from
+ * tests/pdf-writer.ts because this script is plain JavaScript, and the smoke
+ * test only needs Helvetica at fixed coordinates.
+ */
+function buildProbePdf() {
+  const pageOne = [
+    ['Quarterly Brief', 60, 760, 20],
+    ['This is one paragraph that wraps across two lines here and keeps', 60, 720, 10],
+    ['going to the margin before it finally stops.', 60, 704, 10],
+  ]
+    .map(
+      ([text, x, y, size]) =>
+        `BT /F1 ${size} Tf 1 0 0 1 ${x} ${y} Tm (${text.replace(/([\\()])/g, '\\$1')}) Tj ET`,
+    )
+    .join('\n');
+
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R >> >> /Contents 4 0 R >>',
+    `<< /Length ${Buffer.byteLength(pageOne)} >>\nstream\n${pageOne}\nendstream`,
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 7 0 R >> >> /Contents 6 0 R >>',
+    '<< /Length 0 >>\nstream\n\nendstream',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+  ];
+
+  let out = '%PDF-1.7\n';
+  const offsets = [];
+  objects.forEach((body, i) => {
+    offsets.push(Buffer.byteLength(out));
+    out += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(out);
+  out += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const offset of offsets) out += `${String(offset).padStart(10, '0')} 00000 n \n`;
+  out += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}
+
+// A PDF exercises pdf.js's *default* build and its real web worker. The unit
+// tests run the legacy build in-process, so this is the only place the shipped
+// worker path runs at all.
+await page.setInputFiles('#file-input', {
+  name: 'brief.pdf',
+  mimeType: 'application/pdf',
+  buffer: Buffer.from(buildProbePdf()),
+});
+const pdfCard = page.locator('[data-item]:has-text("brief.pdf")');
+await openOutput(pdfCard);
+await pdfCard.locator('[data-action="view-raw"]').click();
+const pdfRaw = await pdfCard.locator('pre').innerText();
+check('PDF heading inferred from font size', pdfRaw.includes('# Quarterly Brief'), true);
+check('PDF wrapped lines rejoined', pdfRaw.includes('one paragraph that wraps across two lines here'), true);
+check('PDF page without text flagged for OCR', pdfRaw.includes('no text layer, OCR needed'), true);
+
+// Four finished files should offer the batch zip.
 check(
   'batch bar appears with results',
   await page.locator('#batch-bar:not(.hidden)').count(),
@@ -281,6 +338,28 @@ check(
 );
 
 await page.screenshot({ path: process.env.SHOT2 ?? '/tmp/doc2md-phase2.png', fullPage: true });
+
+// --- offline conversion ----------------------------------------------------
+// The real test of the precache: pdf.js's worker is a 2 MB .mjs, and a glob
+// that misses it leaves PDF conversion working right up until the network
+// goes away.
+await context.setOffline(true);
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForTimeout(500);
+await page.setInputFiles('#file-input', {
+  name: 'offline.pdf',
+  mimeType: 'application/pdf',
+  buffer: Buffer.from(buildProbePdf()),
+});
+const offlineCard = page.locator('[data-item]:has-text("offline.pdf")');
+await openOutput(offlineCard);
+await offlineCard.locator('[data-action="view-raw"]').click();
+check(
+  'PDF converts with the network cut',
+  (await offlineCard.locator('pre').innerText()).includes('# Quarterly Brief'),
+  true,
+);
+await context.setOffline(false);
 
 console.log(
   errors.length ? `FAIL  console errors: ${errors.join(' | ')}` : 'PASS  no console errors',

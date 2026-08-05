@@ -24,8 +24,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,wasm}'],
-        // pdf.js ships a worker well past workbox's 2 MB default.
+        // `mjs` matters: pdf.js emits its worker with that extension, and
+        // leaving it out precaches everything *except* the one file a PDF
+        // conversion needs — which fails only once the user is offline.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico,wasm}'],
+        // That worker alone is past workbox's 2 MB default.
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
       devOptions: { enabled: true, type: 'module', navigateFallback: 'index.html' },
