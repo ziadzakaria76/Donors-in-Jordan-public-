@@ -1,0 +1,43 @@
+name: doc2md
+
+# Scoped by path: the Doc2MD PWA is independent of the Python tender monitor,
+# so a change to one should not spend CI minutes on the other.
+on:
+  push:
+    branches: [main]
+    paths: ['doc2md/**', '.github/workflows/doc2md.yml']
+  pull_request:
+    paths: ['doc2md/**', '.github/workflows/doc2md.yml']
+
+defaults:
+  run:
+    working-directory: doc2md
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: doc2md/package-lock.json
+
+      # Playwright is a devDependency for the local smoke test only; CI does
+      # not drive a browser, so skip the ~150 MB browser download.
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: Unit tests
+        run: npm test
+
+      # Covers the quality gate: zero TypeScript errors, and a build that
+      # actually emits the service worker and manifest.
+      - name: Build
+        run: npm run build
+
+      - name: Check the initial bundle stayed under 300 KB
+        run: node scripts/check-bundle-size.mjs

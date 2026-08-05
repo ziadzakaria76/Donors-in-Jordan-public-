@@ -1,0 +1,40 @@
+{
+  "name": "doc2md",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client-side PDF/DOCX/XLSX to LLM-friendly Markdown converter (PWA)",
+  "scripts": {
+    "dev": "npm run icons && vite",
+    "build": "npm run icons && npm run typecheck && vite build",
+    "preview": "vite preview --host",
+    "icons": "node scripts/generate-icons.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sw.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check:size": "node scripts/check-bundle-size.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "mammoth": "1.12.0",
+    "pdfjs-dist": "5.7.284",
+    "turndown": "7.2.4",
+    "turndown-plugin-gfm": "1.0.2",
+    "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "^26.1.2",
+    "@types/turndown": "5.0.6",
+    "docx": "^9.7.1",
+    "playwright": "^1.62.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vite": "8.2.0",
+    "vite-plugin-pwa": "1.3.0",
+    "vitest": "4.1.10",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1"
+  }
+}
