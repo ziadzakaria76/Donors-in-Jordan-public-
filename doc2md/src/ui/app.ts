@@ -2,6 +2,7 @@ import {
   ACCEPT_ATTRIBUTE,
   convert,
   formatBytes,
+  kindFor,
   MAX_FILE_BYTES,
   rejectionReason,
 } from '../core/registry';
@@ -259,6 +260,7 @@ async function runQueue(): Promise<void> {
         });
         item.markdown = finalize({
           filename: item.file.name,
+          kind: kindFor(item.file),
           markdown: result.markdown,
           meta: result.meta,
         });

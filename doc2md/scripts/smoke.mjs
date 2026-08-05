@@ -266,6 +266,11 @@ await openOutput(docxCard);
 await docxCard.locator('[data-action="view-raw"]').click();
 const docxRaw = await docxCard.locator('pre').innerText();
 check('DOCX heading mapped from its Word style', docxRaw.includes('# Field Report'), true);
+check(
+  'front matter describes the source document',
+  /^---\nsource: field-report\.docx\ntype: docx\nconverted: \d{4}-\d{2}-\d{2}\nwords: \d+\n---\n/.test(docxRaw),
+  true,
+);
 check('DOCX bold preserved', docxRaw.includes('**ministry**'), true);
 check(
   'DOCX merged cell repeated',
@@ -329,6 +334,12 @@ const pdfRaw = await pdfCard.locator('pre').innerText();
 check('PDF heading inferred from font size', pdfRaw.includes('# Quarterly Brief'), true);
 check('PDF wrapped lines rejoined', pdfRaw.includes('one paragraph that wraps across two lines here'), true);
 check('PDF page without text flagged for OCR', pdfRaw.includes('no text layer, OCR needed'), true);
+check('front matter records the page count', /\npages: 2\n/.test(pdfRaw), true);
+check(
+  'front matter renders as a block in the preview, not a rule',
+  await pdfCard.locator('.md-preview hr').count(),
+  0,
+);
 
 // Four finished files should offer the batch zip.
 check(

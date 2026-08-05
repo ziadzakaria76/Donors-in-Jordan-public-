@@ -4,9 +4,9 @@ Convert PDF, Word and Excel files into clean, token-efficient Markdown for
 feeding to an LLM. Mobile-first, installable, and **entirely client-side** —
 no backend, no upload, no analytics. Files never leave the device.
 
-> **Status: phase 4 of 6.** All three converters — spreadsheet, Word and PDF —
-> are built and tested. What remains is the shared token-efficiency pass and
-> the YAML front-matter. See [Build status](#build-status).
+> **Status: phase 5 of 6.** All three converters, the shared token-efficiency
+> pass and the YAML front-matter are built and tested. What remains is UI
+> polish. See [Build status](#build-status).
 
 ## Quick start
 
@@ -38,7 +38,7 @@ src/
     types.ts                the contract every converter implements
     registry.ts             file-type dispatch, size/type validation
     gfm-table.ts            grid → GFM table, shared by every converter
-    postprocess.ts          shared token-efficiency pass + front-matter
+    postprocess.ts          shared token-efficiency pass + front matter
     share-target.ts         redeems files handed over by the Android share sheet
     share-target-constants.ts   shared between page and worker
   converters/
@@ -58,9 +58,9 @@ a spreadsheet never downloads pdf.js. `npm run check:size` enforces the budget:
 
 ```
     1.6 KB  index.html
-   32.4 KB  assets/index-*.css
-   22.5 KB  assets/index-*.js
-   56.4 KB  TOTAL (budget 300.0 KB)
+   32.5 KB  assets/index-*.css
+   24.3 KB  assets/index-*.js
+   58.4 KB  TOTAL (budget 300.0 KB)
 ```
 
 **Vanilla TypeScript, not React.** The UI is one screen with a list on it.
@@ -229,6 +229,44 @@ precaches about 3.5 MB in total. That download happens in the background after
 the page is already interactive, and it is what makes every format convert with
 no connection — the smoke test converts a PDF with the network cut.
 
+## The shared output pass
+
+Every converter's Markdown goes through the same last step before you see it.
+
+**Token efficiency.** At most one blank line anywhere; trailing whitespace
+gone; empty headings and all-empty table rows dropped; smart quotes, en and em
+dashes, ellipses and exotic spaces folded to ASCII. Fenced code blocks are left
+exactly as they are — their whitespace and punctuation are content — and inline
+code spans keep their punctuation too, so a `--flag` survives.
+
+**Invisible characters** are stripped: zero-width space, soft hyphen, stray
+BOMs, and C0/C1 controls other than newline and tab. Two zero-width characters
+are deliberately kept: **U+200C** and **U+200D**, the non-joiner and joiner.
+They are invisible, but they change how Arabic, Persian and many Indic scripts
+render and in some words what they say, so stripping every zero-width character
+alike would quietly corrupt them.
+
+**Front matter** is prepended as YAML:
+
+```yaml
+---
+source: donor-review.pdf
+type: pdf
+pages: 3
+converted: 2026-08-05
+words: 116
+---
+```
+
+`sheets: [Orders, المانحون]` replaces `pages` for a workbook, and `images: 2`
+appears when a document had any. Values are quoted only when YAML would
+otherwise misread them — decided by a denylist of the characters YAML treats as
+syntax rather than an allowlist of safe ones, because an allowlist has to
+enumerate every script a sheet name might use and quietly quotes Arabic when it
+does not.
+
+**Token count.** The card shows a live `~N tokens` estimate at chars ÷ 4.
+
 ## Testing
 
 ```bash
@@ -256,7 +294,7 @@ npm run smoke
 | 2 | XLSX / XLSM / CSV pipeline | **done** |
 | 3 | DOCX pipeline (style mapping + turndown) | **done** |
 | 4 | PDF pipeline (layout reconstruction) | **done** |
-| 5 | Token-efficiency post-processor + YAML front-matter | passthrough |
+| 5 | Token-efficiency post-processor + YAML front-matter | **done** |
 | 6 | Share-target polish, offline caching, UI polish | partly done |
 | 7 | Fixture-based snapshot tests per format | pending |
 
