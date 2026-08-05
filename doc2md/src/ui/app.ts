@@ -12,7 +12,7 @@ import { renderMarkdown } from './markdown';
 import { icons } from './icons';
 import { currentTheme, toggleTheme } from './theme';
 
-type ItemStatus = 'queued' | 'converting' | 'done' | 'error';
+type ItemStatus = 'queued' | 'converting' | 'done' | 'error' | 'cancelled';
 
 interface QueueItem {
   id: string;
@@ -23,6 +23,8 @@ interface QueueItem {
   error: string;
   warnings: string[];
   markdown: string;
+  /** Output was cut short; re-running with full export would produce more. */
+  truncated: boolean;
   view: 'rendered' | 'raw';
   open: boolean;
 }
@@ -33,6 +35,9 @@ const state = {
   running: false,
   toast: '',
 };
+
+/** Aborts the conversion currently in flight, if the user asks to stop it. */
+let inFlight: AbortController | null = null;
 
 let toastTimer: number | undefined;
 let nextId = 0;
@@ -76,7 +81,7 @@ export function mountApp(root: HTMLElement): void {
 
 function shell(): string {
   return `
-    <div class="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-4 pb-24">
+    <div class="mx-auto flex min-h-dvh w-full max-w-3xl flex-col px-4 pb-32">
       <header class="flex items-center gap-3 py-4">
         <img src="icons/favicon.svg" alt="" class="size-9 rounded-lg" width="36" height="36" />
         <div class="min-w-0 flex-1">
@@ -109,6 +114,22 @@ function shell(): string {
           </span>
         </label>
       </section>
+
+      <div id="batch-progress" class="hidden pt-4">
+        <div class="card flex items-center gap-3 px-4 py-3">
+          <div class="min-w-0 flex-1">
+            <p data-slot="batch-label" class="truncate text-sm font-medium"></p>
+            <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+              <div data-slot="batch-bar-fill"
+                class="h-full rounded-full bg-brand-500 transition-[width]" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Announced rather than shown: progress ticks would be far too chatty
+           for a screen reader, so only completions are read out. -->
+      <p id="queue-status" role="status" aria-live="polite" class="sr-only"></p>
 
       <main id="queue" class="flex flex-col gap-3 pt-4"></main>
 
@@ -195,6 +216,22 @@ function onClick(event: Event): void {
         void runQueue();
       }
       break;
+    case 'convert-in-full': {
+      state.fullExport = true;
+      const toggle = document.querySelector<HTMLInputElement>('[data-action="full-export"]');
+      if (toggle) toggle.checked = true;
+      reconvertTruncated();
+      break;
+    }
+    case 'stop':
+      // Only the in-flight conversion has a controller; a queued item is
+      // simply dropped back out of the queue.
+      if (item?.status === 'converting') inFlight?.abort();
+      else if (item) {
+        item.status = 'cancelled';
+        render();
+      }
+      break;
   }
 }
 
@@ -208,7 +245,25 @@ function onChange(event: Event): void {
   }
   if (target.dataset['action'] === 'full-export') {
     state.fullExport = target.checked;
+    if (state.fullExport) reconvertTruncated();
   }
+}
+
+/**
+ * Turning full export on re-runs the files it would change. Without this the
+ * truncation warning tells the user to flip a switch that does nothing to the
+ * file they are looking at.
+ */
+function reconvertTruncated(): void {
+  const affected = state.items.filter((item) => item.status === 'done' && item.truncated);
+  if (affected.length === 0) return;
+  for (const item of affected) {
+    item.status = 'queued';
+    item.warnings = [];
+    item.truncated = false;
+  }
+  showToast(`Re-converting ${affected.length} file${affected.length === 1 ? '' : 's'} in full`);
+  void runQueue();
 }
 
 // --------------------------------------------------------------------- queue
@@ -225,6 +280,7 @@ function addFiles(files: File[]): void {
       error: reason ?? '',
       warnings: [],
       markdown: '',
+      truncated: false,
       view: 'rendered',
       open: false,
     });
@@ -248,10 +304,13 @@ async function runQueue(): Promise<void> {
       item.status = 'converting';
       item.progress = 0;
       item.stage = 'Reading';
+      item.error = '';
+      inFlight = new AbortController();
       render();
       try {
         const result = await convert(item.file, {
           fullExport: state.fullExport,
+          signal: inFlight.signal,
           onProgress: (fraction, stage) => {
             item.progress = Math.min(1, Math.max(0, fraction));
             if (stage) item.stage = stage;
@@ -265,13 +324,21 @@ async function runQueue(): Promise<void> {
           meta: result.meta,
         });
         item.warnings = result.meta.warnings;
+        item.truncated = result.meta.truncated ?? false;
         item.status = 'done';
         item.progress = 1;
         item.open = state.items.length === 1;
       } catch (error) {
-        // One bad file must never take the rest of the batch down with it.
-        item.status = 'error';
-        item.error = error instanceof Error ? error.message : String(error);
+        // One bad file must never take the rest of the batch down with it —
+        // and a file the user stopped is not a failure.
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          item.status = 'cancelled';
+        } else {
+          item.status = 'error';
+          item.error = error instanceof Error ? error.message : String(error);
+        }
+      } finally {
+        inFlight = null;
       }
       render();
     }
@@ -295,12 +362,49 @@ function render(): void {
   must<HTMLElement>('[data-slot="zip-label"]').textContent =
     `Download all ${done.length} as .zip`;
 
+  renderBatchProgress(done.length);
+
   const toast = must<HTMLElement>('#toast');
   toast.innerHTML = state.toast
     ? `<span class="rounded-full bg-slate-900 px-4 py-2 text-sm text-white shadow-lg
         dark:bg-white dark:text-slate-900">${escape(state.toast)}</span>`
     : '';
   toast.classList.toggle('opacity-0', !state.toast);
+}
+
+/**
+ * With several files queued, per-card progress does not answer "how far through
+ * the batch am I". This strip does, and it doubles as the screen-reader
+ * announcement — but only on completions, since progress ticks several times a
+ * second would make the page unusable with a reader on.
+ */
+function renderBatchProgress(doneCount: number): void {
+  const pending = state.items.filter(
+    (item) => item.status === 'queued' || item.status === 'converting',
+  );
+  const strip = must<HTMLElement>('#batch-progress');
+  const total = state.items.filter((item) => item.status !== 'error').length;
+
+  strip.classList.toggle('hidden', pending.length === 0 || total < 2);
+  if (pending.length > 0 && total >= 2) {
+    const current = state.items.find((item) => item.status === 'converting');
+    const position = total - pending.length + 1;
+    must<HTMLElement>('[data-slot="batch-label"]').textContent = current
+      ? `Converting ${position} of ${total} · ${current.file.name}`
+      : `Queued ${pending.length} of ${total}`;
+    must<HTMLElement>('[data-slot="batch-bar-fill"]').style.width =
+      `${Math.round(((total - pending.length) / total) * 100)}%`;
+  }
+
+  const status = must<HTMLElement>('#queue-status');
+  const next =
+    state.items.length === 0
+      ? ''
+      : pending.length === 0
+        ? `${doneCount} of ${state.items.length} converted.`
+        : `Converting. ${doneCount} of ${state.items.length} done.`;
+  // Rewriting identical text makes some readers announce it twice.
+  if (status.textContent !== next) status.textContent = next;
 }
 
 /** Cheap in-place update for progress ticks, which fire far too often to re-render on. */
@@ -342,13 +446,19 @@ function itemCard(item: QueueItem): string {
       ${
         item.status === 'converting'
           ? `<div class="px-4 pb-4">
-               <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+               <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10"
+                 role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                 aria-valuenow="${Math.round(item.progress * 100)}"
+                 aria-label="Converting ${escape(item.file.name)}">
                  <div data-slot="bar" class="h-full rounded-full bg-brand-500 transition-[width]"
                    style="width:${Math.round(item.progress * 100)}%"></div>
                </div>
-               <p data-slot="stage" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                 ${item.stage ? `${escape(item.stage)}… ${Math.round(item.progress * 100)}%` : 'Converting…'}
-               </p>
+               <div class="mt-2 flex items-center gap-2">
+                 <p data-slot="stage" class="flex-1 text-xs text-slate-500 dark:text-slate-400">
+                   ${item.stage ? `${escape(item.stage)}… ${Math.round(item.progress * 100)}%` : 'Converting…'}
+                 </p>
+                 <button type="button" data-action="stop" class="btn-ghost text-sm">Stop</button>
+               </div>
              </div>`
           : ''
       }
@@ -372,6 +482,18 @@ function itemCard(item: QueueItem): string {
           : ''
       }
 
+      ${
+        item.status === 'cancelled'
+          ? `<div class="mx-4 mb-4 flex items-center gap-2 rounded-xl bg-slate-100 p-3 text-sm
+               text-slate-600 dark:bg-white/5 dark:text-slate-300">
+               <span class="flex-1">Stopped before it finished.</span>
+               <button type="button" data-action="retry" class="btn-ghost !px-3 text-sm">
+                 Convert again
+               </button>
+             </div>`
+          : ''
+      }
+
       ${item.status === 'done' ? resultBody(item) : ''}
     </article>
   `;
@@ -379,10 +501,23 @@ function itemCard(item: QueueItem): string {
 
 function resultBody(item: QueueItem): string {
   const warnings = item.warnings.length
-    ? `<ul class="mx-4 mb-3 space-y-1 rounded-xl bg-amber-50 p-3 text-xs text-amber-800
+    ? `<div class="mx-4 mb-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800
          dark:bg-amber-400/10 dark:text-amber-200">
-         ${item.warnings.map((warning) => `<li>${escape(warning)}</li>`).join('')}
-       </ul>`
+         <ul class="space-y-1">
+           ${item.warnings.map((warning) => `<li>${escape(warning)}</li>`).join('')}
+         </ul>
+         ${
+           // The toggle lives at the top of the page. On a phone with several
+           // files queued that is a long scroll away from the warning that
+           // names it, so offer it here too.
+           item.truncated
+             ? `<button type="button" data-action="convert-in-full"
+                  class="btn-ghost mt-1 !px-2 text-xs text-amber-900 dark:text-amber-100">
+                  Convert this in full
+                </button>`
+             : ''
+         }
+       </div>`
     : '';
 
   const preview = item.open
@@ -443,6 +578,8 @@ function statusChip(item: QueueItem): string {
       return `<span class="chip bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">${icons.check}</span>`;
     case 'error':
       return `<span class="chip bg-rose-500/15 text-rose-700 dark:text-rose-300">${icons.alert}</span>`;
+    case 'cancelled':
+      return `<span class="chip bg-slate-200 text-slate-600 dark:bg-white/10 dark:text-slate-300">Stopped</span>`;
   }
 }
 

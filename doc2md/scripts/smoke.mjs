@@ -22,6 +22,18 @@ const context = await browser.newContext({
     'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Mobile Safari/537.36',
 });
 const page = await context.newPage();
+
+// The README claims the app makes no external network calls at runtime. Record
+// every request so that claim is checked rather than asserted.
+const foreignRequests = [];
+const origin = new URL(BASE).origin;
+page.on('request', (request) => {
+  const url = request.url();
+  if (!url.startsWith(origin) && !url.startsWith('data:') && !url.startsWith('blob:')) {
+    foreignRequests.push(url);
+  }
+});
+
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => {
@@ -371,6 +383,83 @@ check(
   true,
 );
 await context.setOffline(false);
+
+// --- full export re-converts what it would change ---------------------------
+// A truncation warning that names a toggle is only useful if flipping the
+// toggle acts on the file the warning is attached to.
+const big = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(
+  big,
+  XLSX.utils.aoa_to_sheet([
+    ['Ref', 'Value'],
+    ...Array.from({ length: 620 }, (_, i) => [`REF-${i + 1}`, (i + 1) * 10]),
+  ]),
+  'Notices',
+);
+await page.setInputFiles('#file-input', {
+  name: 'notices.xlsx',
+  mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  buffer: Buffer.from(XLSX.write(big, { type: 'buffer', bookType: 'xlsx' })),
+});
+const bigCard = page.locator('[data-item]:has-text("notices.xlsx")');
+await openOutput(bigCard);
+await bigCard.locator('[data-action="view-raw"]').click();
+check(
+  'a long sheet is truncated and says so',
+  (await bigCard.locator('pre').innerText()).includes('truncated: 620 rows total'),
+  true,
+);
+
+check(
+  'the truncation warning carries its own action',
+  await bigCard.locator('[data-action="convert-in-full"]').count(),
+  1,
+);
+await bigCard.locator('[data-action="convert-in-full"]').click();
+await page.waitForTimeout(1800);
+check(
+  'and it ticks the global toggle so later files match',
+  await page.locator('[data-action="full-export"]').isChecked(),
+  true,
+);
+await openOutput(bigCard);
+await bigCard.locator('[data-action="view-raw"]').click();
+const fullText = await bigCard.locator('pre').innerText();
+check('turning full export on re-converts the truncated file', fullText.includes('REF-620'), true);
+check('and the truncation note is gone', fullText.includes('truncated:'), false);
+
+// --- quality gates ---------------------------------------------------------
+// Headless Chrome never fires `beforeinstallprompt`, so installability is
+// checked against the criteria Chrome documents rather than by waiting for an
+// event that cannot arrive here. Chrome's own manifest parser is still used —
+// getAppManifest reports anything it could not read.
+const cdp = await page.context().newCDPSession(page);
+const appManifest = await cdp.send('Page.getAppManifest');
+check("Chrome's manifest parser reports no errors", appManifest.errors, []);
+
+const manifest = await page.evaluate(async () => {
+  const link = document.querySelector('link[rel=manifest]');
+  return (await fetch(link.href)).json();
+});
+const iconAtLeast = (size) =>
+  (manifest.icons ?? []).some((icon) =>
+    String(icon.sizes ?? '')
+      .split(/\s+/)
+      .some((pair) => Number(pair.split('x')[0]) >= size),
+  );
+check('manifest names the app', Boolean(manifest.name && manifest.short_name), true);
+check('manifest has a 192px and a 512px icon', iconAtLeast(192) && iconAtLeast(512), true);
+check('manifest has a start_url', Boolean(manifest.start_url), true);
+check(
+  'manifest requests a standalone display',
+  ['standalone', 'fullscreen', 'minimal-ui'].includes(manifest.display),
+  true,
+);
+check('manifest declares a maskable icon', (manifest.icons ?? []).some((i) => i.purpose === 'maskable'), true);
+// The remaining criterion is a service worker with a fetch handler, which the
+// offline reload above already proved by serving the shell from cache.
+
+check('no requests to any external origin', foreignRequests, []);
 
 console.log(
   errors.length ? `FAIL  console errors: ${errors.join(' | ')}` : 'PASS  no console errors',

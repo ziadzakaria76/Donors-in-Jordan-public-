@@ -4,9 +4,9 @@ Convert PDF, Word and Excel files into clean, token-efficient Markdown for
 feeding to an LLM. Mobile-first, installable, and **entirely client-side** —
 no backend, no upload, no analytics. Files never leave the device.
 
-> **Status: phase 5 of 6.** All three converters, the shared token-efficiency
-> pass and the YAML front-matter are built and tested. What remains is UI
-> polish. See [Build status](#build-status).
+> **Status: complete.** All six phases are built and tested — three converters,
+> the shared output pass, and the PWA around them. See
+> [Build status](#build-status).
 
 ## Quick start
 
@@ -58,9 +58,9 @@ a spreadsheet never downloads pdf.js. `npm run check:size` enforces the budget:
 
 ```
     1.6 KB  index.html
-   32.5 KB  assets/index-*.css
-   24.3 KB  assets/index-*.js
-   58.4 KB  TOTAL (budget 300.0 KB)
+   32.9 KB  assets/index-*.css
+   27.4 KB  assets/index-*.js
+   61.9 KB  TOTAL (budget 300.0 KB)
 ```
 
 **Vanilla TypeScript, not React.** The UI is one screen with a list on it.
@@ -267,6 +267,21 @@ does not.
 
 **Token count.** The card shows a live `~N tokens` estimate at chars ÷ 4.
 
+## Working with a batch
+
+- **Every file is independent.** One that fails shows why on its own card and
+  the rest keep converting. A file we could never read (`.doc`, `.xls`) says
+  what to do about it instead of offering a pointless retry.
+- **Conversions can be stopped.** A 50 MB PDF on a phone is a long wait with no
+  way out otherwise; the queued files behind it carry on afterwards.
+- **The truncation warning is actionable.** It used to name a toggle at the top
+  of the page and leave you to find it — a long scroll on a phone with several
+  files queued. Now the warning carries a *Convert this in full* button that
+  ticks the toggle and re-runs the files it would change.
+- **Batch progress** shows position and filename while several files are in
+  flight. Screen readers are told only about completions: progress fires
+  several times a second and announcing each tick makes the page unusable.
+
 ## Testing
 
 ```bash
@@ -295,11 +310,12 @@ npm run smoke
 | 3 | DOCX pipeline (style mapping + turndown) | **done** |
 | 4 | PDF pipeline (layout reconstruction) | **done** |
 | 5 | Token-efficiency post-processor + YAML front-matter | **done** |
-| 6 | Share-target polish, offline caching, UI polish | partly done |
-| 7 | Fixture-based snapshot tests per format | pending |
+| 6 | Cancellation, batch progress, actionable warnings, quality gates | **done** |
+| 7 | Fixture-based snapshot tests per format | **done** |
 
-Until a converter is built, opening a file of that type produces a per-file
-error naming the phase — the batch keeps running and other files still convert.
+Each converter has fixtures built in code and a Markdown snapshot: three
+workbooks plus two CSVs, three Word documents, four PDFs. Between them they
+cover headings, nested lists, tables with merged cells, and Arabic.
 
 ## Notes
 

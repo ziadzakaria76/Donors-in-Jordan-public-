@@ -52,13 +52,17 @@ async function convertWorkbook(
 
   const warnings: string[] = [];
   const sections: string[] = [`# ${baseName(file.name)}`];
+  let truncated = false;
 
   for (const [index, name] of names.entries()) {
+    options.signal?.throwIfAborted();
     options.onProgress?.(index / names.length, `Sheet ${index + 1} of ${names.length}`);
     const sheet = workbook.Sheets[name];
     sections.push(`## Sheet: ${name}`);
     const body = sheet
-      ? renderGrid(sheetToGrid(XLSX, sheet), options, warnings, `Sheet "${name}"`)
+      ? renderGrid(sheetToGrid(XLSX, sheet), options, warnings, `Sheet "${name}"`, () => {
+          truncated = true;
+        })
       : '';
     sections.push(body || '<!-- empty sheet -->');
   }
@@ -66,7 +70,7 @@ async function convertWorkbook(
   options.onProgress?.(1, 'Done');
   return {
     markdown: sections.join('\n\n'),
-    meta: { sheets: names, warnings },
+    meta: { sheets: names, warnings, truncated },
   };
 }
 
@@ -137,14 +141,17 @@ async function convertDelimited(
   options.onProgress?.(0, 'Reading');
   const grid = parseDelimited(await file.text());
   const warnings: string[] = [];
-  const body = renderGrid(grid, options, warnings, 'This file');
+  let truncated = false;
+  const body = renderGrid(grid, options, warnings, 'This file', () => {
+    truncated = true;
+  });
   options.onProgress?.(1, 'Done');
 
   return {
     // No "## Sheet:" heading here — the file is the sheet, and naming it twice
     // would just cost tokens.
     markdown: [`# ${baseName(file.name)}`, body || '<!-- no rows -->'].join('\n\n'),
-    meta: { sheets: [baseName(file.name)], warnings },
+    meta: { sheets: [baseName(file.name)], warnings, truncated },
   };
 }
 
@@ -155,6 +162,7 @@ function renderGrid(
   options: ConvertOptions,
   warnings: string[],
   label: string,
+  onTruncated?: () => void,
 ): string {
   const grid = normalizeGrid(raw);
   if (grid.length === 0) return '';
@@ -187,6 +195,7 @@ function renderGrid(
     warnings.push(
       `${label}: showing ${TRUNCATE_TO} of ${total} rows. Turn on "Full export" to include them all.`,
     );
+    onTruncated?.();
     return parts.join('\n\n');
   }
 

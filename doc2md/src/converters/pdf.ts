@@ -45,6 +45,7 @@ export const convert: Converter = async (file, options) => {
         0.05 + (0.75 * (number - 1)) / document.numPages,
         `Page ${number} of ${document.numPages}`,
       );
+      options.signal?.throwIfAborted();
       const page = await document.getPage(number);
       try {
         const viewport = page.getViewport({ scale: 1 });

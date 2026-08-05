@@ -86,6 +86,9 @@ export const convert: Converter = async (file, options) => {
     );
   }
 
+  // mammoth's parse cannot be interrupted, so this is the first point after it
+  // where a cancellation can take effect.
+  options.signal?.throwIfAborted();
   options.onProgress?.(0.6, 'Converting');
   const service = createTurndown(Turndown, gfmModule.strikethrough, gfmModule.taskListItems);
   const body = service.turndown(result.value).trim();

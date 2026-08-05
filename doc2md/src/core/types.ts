@@ -24,6 +24,11 @@ export interface ConversionMeta {
   images?: string[];
   /** Non-fatal problems worth showing the user (truncation, missing OCR...). */
   warnings: string[];
+  /**
+   * Output was cut short and re-running with `fullExport` would produce more.
+   * Lets the UI act on its own truncation warning rather than only stating it.
+   */
+  truncated?: boolean;
 }
 
 export interface ConversionResult {
