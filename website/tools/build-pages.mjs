@@ -627,11 +627,11 @@ ${pageHero({
           <h2 style="font-size:var(--fs-h3);margin-block-end:1.25rem" data-i18n="contact.directTitle">تواصل مباشر</h2>
           <ul class="tick-list" style="gap:1.25rem">
             <li><span data-icon="phone"></span><span><strong data-i18n="cta.call">اتصل بنا</strong><br>
-              <a data-tel href="#" data-company-phone class="link-arrow">+962 6 552 0176</a></span></li>
+              <a data-tel href="#" data-company-phone class="link-arrow">+962 7 9073 0903</a></span></li>
             <li><span data-icon="whatsapp"></span><span><strong data-i18n="cta.whatsapp">واتساب</strong><br>
               <a data-wa href="#" target="_blank" rel="noopener" class="link-arrow" data-i18n="contact.waLink">ابدأ محادثة</a></span></li>
             <li><span data-icon="mail"></span><span><strong data-i18n="form.email">البريد الإلكتروني</strong><br>
-              <a data-mail="sales" href="#" class="link-arrow">sales@generalsherman.jo</a></span></li>
+              <a data-mail="sales" href="#" data-company-email class="link-arrow">Mohammed.Zakaria90@hotmail.com</a></span></li>
             <li><span data-icon="pin"></span><span><strong data-i18n="contact.office">مكتب المبيعات</strong><br>
               <span data-i18n="footer.address">شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن</span></span></li>
             <li><span data-icon="clock"></span><span><strong data-i18n="contact.hours">ساعات العمل</strong><br>

@@ -674,7 +674,7 @@ const ogBg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" wid
     return out;
   })()}
   <text x="80" y="416" font-family="IBM Plex Sans Arabic, sans-serif" font-size="64" font-weight="700" fill="#F8F5F0">شركة جنرال شيرمان للإسكان</text>
-  <text x="80" y="472" font-family="IBM Plex Sans Arabic, sans-serif" font-size="32" font-weight="400" fill="#D6B87E">شققٌ فاخرة في أرقى مناطق عمّان</text>
+  <text x="80" y="472" font-family="IBM Plex Sans Arabic, sans-serif" font-size="32" font-weight="400" fill="#D6B87E">نبني مستقبلك — شقق سكنية في غرب عمّان</text>
   <text x="80" y="546" font-family="IBM Plex Sans Arabic, sans-serif" font-size="24" font-weight="500" fill="#9AA5AA" letter-spacing="3">GENERAL SHERMAN HOUSING · AMMAN, JORDAN</text>
 </svg>`;
 

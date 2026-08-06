@@ -10,18 +10,19 @@
 const COMPANY = {
   name: { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },   // «REPLACE»
   short: { ar: "جنرال شيرمان", en: "General Sherman" },                              // «REPLACE»
-  tagline: { ar: "سكنٌ يليق بمقامك", en: "Homes with standing" },
+  tagline: { ar: "نبني مستقبلك", en: "We build your future" },
   founded: null,                      // «REPLACE» — unverified, so no page states one
   intro: {
     ar: "شركة أردنية للتطوير العقاري متخصصة في الشقق السكنية الفاخرة في غرب عمّان، تجمع بين العمارة الهادئة والتشطيبات عالية الجودة والتسليم في موعده.",
     en: "A Jordanian residential developer specialising in luxury apartments across West Amman — restrained architecture, high-specification finishes, and delivery on schedule.",
   },
-  phone: "+962 6 552 0176",           // «REPLACE»
-  phoneHref: "+96265520176",
-  whatsapp: "962790000176",           // «REPLACE» — digits only, no + or spaces
-  email: "info@generalsherman.jo",        // «REPLACE»
-  salesEmail: "sales@generalsherman.jo",  // «REPLACE»
-  domain: "https://www.generalsherman.jo",// «REPLACE»
+  phone: "+962 7 9073 0903",
+  phoneHref: "+962790730903",
+  whatsapp: "962790730903",           // same mobile as `phone` — change if WhatsApp is on another line
+  email: "Mohammed.Zakaria90@hotmail.com",
+  salesEmail: "Mohammed.Zakaria90@hotmail.com",   // one address for both for now
+  domain: "https://www.generalsherman.jo",// «REPLACE» — no domain registered yet;
+                                      // this feeds canonical/og:url and the sitemap
   address: {
     ar: "شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن",
     en: "46 Abdullah Ghosheh Street, 3rd Floor, Amman 11194, Jordan",

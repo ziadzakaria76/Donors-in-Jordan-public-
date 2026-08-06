@@ -518,10 +518,14 @@ table.data tbody tr:hover { background: #FCFAF6; }
 .footer ul { display: grid; gap: 0.7rem; }
 .footer .brand__name { color: var(--ivory); }
 .footer .brand__mark { color: var(--brass-2); }
+.footer__tagline {
+  margin: 0.9rem 0 0; font-size: 1.05rem; font-weight: 600; color: var(--brass-2);
+  letter-spacing: 0.01em;
+}
 .footer__about { max-width: 40ch; margin-block-start: 1.25rem; }
 .footer__contact li { display: flex; gap: 0.65rem; align-items: flex-start; }
 .footer__contact .icon { inline-size: 1.05em; block-size: 1.05em; color: var(--brass-2); flex: none; margin-block-start: 0.42em; }
-.socials { display: flex; gap: 0.6rem; margin-block-start: 1.5rem; }
+.footer .socials { display: flex; gap: 0.6rem; margin-block-start: 1.5rem; }
 .socials a { inline-size: 38px; block-size: 38px; display: grid; place-items: center; border: 1px solid rgba(250, 247, 241, 0.2); border-radius: 50%; transition: background 0.2s, border-color 0.2s, color 0.2s; }
 .socials a:hover { background: var(--brass); border-color: var(--brass); color: #fff; }
 .socials .icon { inline-size: 17px; block-size: 17px; }

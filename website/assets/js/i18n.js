@@ -10,6 +10,7 @@ const T = {
   "brand.name": { ar: "جنرال شيرمان", en: "General Sherman" },
   "brand.full": { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },
   "brand.tag": { ar: "General Sherman Housing", en: "شركة جنرال شيرمان للإسكان" },
+  "brand.tagline": { ar: "نبني مستقبلك", en: "We build your future" },
 
   /* home page */
   "home.eyebrow": { ar: "تطوير عقاري في غرب عمّان", en: "Residential development in West Amman" },
