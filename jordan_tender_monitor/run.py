@@ -88,7 +88,12 @@ def cmd_check_portals() -> int:
             detail += f" via {h.layer or 'api'}"
             mark = "OK        "
         elif h.status == "no listing":
-            print(f"  NO LISTING  {h.name}: {h.reason}")
+            # Was a bare print() that then fell through to the shared line
+            # below with `mark` and `detail` left over from the previous
+            # portal -- so ADFD and JICA, which report this on every run,
+            # printed a second line carrying another portal's status, and the
+            # very first portal raised NameError.
+            mark, detail = "NO LISTING", h.reason
         elif h.status == "unconfigured":
             mark, detail = "NOT SET UP", h.reason
         else:
