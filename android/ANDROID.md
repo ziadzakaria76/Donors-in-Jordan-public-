@@ -226,6 +226,17 @@ with every deadline on the portal garbage.
 
 ---
 
+## Before the app can do everything
+
+**The workflow the app drives must be on the repository's default branch.**
+`workflow_dispatch` only offers inputs that exist on the branch the workflow
+file is read from, so until the change that added the `--probe` mode is merged
+to `main`, the Portals screen's **Test it** step will be rejected by GitHub
+with a 422. Reading runs, downloading reports and files, and starting an
+ordinary run all work regardless.
+
+---
+
 ## Things the app cannot do, and why
 
 **Read the run page summary.** GitHub's REST API does not expose a job's step

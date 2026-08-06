@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                     onOpenUrl = ::openUrl,
                     onOpenFile = ::openFile,
                     onShareFile = ::shareFile,
-                    notificationsAllowed = notifier.canPost(),
+                    notificationsAllowed = notifier::canPost,
                     onRequestNotificationPermission = ::askForNotifications,
                 )
             }
@@ -187,7 +187,15 @@ private fun AppScaffold(
     onOpenUrl: (String) -> Unit,
     onOpenFile: (File) -> Unit,
     onShareFile: (File) -> Unit,
-    notificationsAllowed: Boolean,
+    /**
+     * Re-read rather than passed as a value.
+     *
+     * It was a Boolean captured once in onCreate, so granting the permission
+     * left "Android is not allowing notifications" on screen until the app was
+     * restarted -- a warning that outlives the thing it warns about teaches
+     * people to ignore warnings.
+     */
+    notificationsAllowed: () -> Boolean,
     onRequestNotificationPermission: () -> Unit,
 ) {
     val app: AppViewModel = viewModel(factory = factory)
@@ -217,6 +225,9 @@ private fun AppScaffold(
     val fingerprint by settingsVm.fingerprint.collectAsState()
     val verifyResult by settingsVm.verifyResult.collectAsState()
     val pollStatus by settingsVm.pollStatus.collectAsState()
+    // Keyed on the tab, so returning to Settings after granting the permission
+    // re-checks it.
+    val canNotify = remember(tab) { notificationsAllowed() }
 
     // Load a tab's data the first time it is opened, and not again.
     //
@@ -232,7 +243,11 @@ private fun AppScaffold(
                 if (reportState.report == null && !reportState.loading) {
                     app.refreshLatestReport()
                 }
-            Tab.RUN -> if (!runState.loaded && !runState.loading) app.refreshRuns()
+            // Files needs a run to download from, and it is reached without
+            // going through Run -- so it loads the list too, or the screen
+            // says "no run selected yet" about a list nobody has fetched.
+            Tab.RUN, Tab.FILES ->
+                if (!runState.loaded && !runState.loading) app.refreshRuns()
             Tab.PORTALS ->
                 if (!portalsState.loaded && !portalsState.loading) portalsVm.load()
             // Local reads, so this is free and can happen every time. It has
@@ -332,7 +347,7 @@ private fun AppScaffold(
                 verifyResult = verifyResult,
                 pollStatus = pollStatus,
                 nowMillis = System.currentTimeMillis(),
-                notificationsAllowed = notificationsAllowed,
+                notificationsAllowed = canNotify,
                 onRequestNotificationPermission = onRequestNotificationPermission,
                 modifier = modifier,
             )
