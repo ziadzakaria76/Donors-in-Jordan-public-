@@ -16,7 +16,10 @@
   /* ------------------------------------------------------- contract plans */
 
   function renderPlanCards() {
-    $("#plan-cards").innerHTML = PAYMENT_PLANS.map((plan) => `
+    const box = $("#plan-cards");
+    if (!box) return;
+    if (!PAYMENT_PLANS.length) { box.closest("section")?.remove(); return; }
+    box.innerHTML = PAYMENT_PLANS.map((plan) => `
       <article class="card reveal" style="padding:clamp(1.4rem,2.8vw,2.25rem);gap:1rem">
         <span class="badge badge--plain">${tx(plan.badge)}</span>
         <h3 class="card__title">${tx(plan.name)}</h3>

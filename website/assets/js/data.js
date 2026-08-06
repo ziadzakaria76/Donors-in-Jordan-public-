@@ -188,6 +188,13 @@ const PROJECTS = [
 
 /* ----------------------------------------------------------- payment plans */
 
+/* «REPLACE» — THESE THREE PLANS ARE INVENTED. They were written as demo
+   content before the company was named, and nothing in the brochure states
+   payment terms. They are commercial claims on a site that now carries the
+   real name, logo and phone number: a 3% early-reservation discount, 36
+   interest-free instalments, and bank financing to 25 years. Replace them
+   with the real terms, or empty this array — the payment-plans page and the
+   per-project plans section both disappear when it is empty. */
 const PAYMENT_PLANS = [
   {
     id: "early",
