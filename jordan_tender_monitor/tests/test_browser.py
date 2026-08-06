@@ -784,6 +784,26 @@ def test_the_release_workflow_cannot_silently_skip_a_release():
     check("contents: write" in release,
           "release: and asks for the one permission that needs")
 
+    # `gh release create` refuses when the release exists, and re-cutting a
+    # tag by hand is a documented reason to dispatch this workflow. Without a
+    # replace path that dispatch fails, leaving the previous APK published
+    # under a tag that has moved -- the wrong build, advertised as the right
+    # one, which is worse than no release at all.
+    check("gh release view" in release,
+          "release: it checks whether the release already exists")
+    check("--clobber" in release,
+          "release: and replaces the asset rather than failing on a re-cut")
+    check("gh release edit" in release,
+          "release: refreshing the notes too, so they match the new asset")
+
+    # A release can be cut from a branch, and the notes point at ANDROID.md.
+    # Pointing at main would 404 for exactly the releases that most need the
+    # instructions -- the early ones, cut before the branch merged.
+    check("blob/main/" not in release,
+          "release: the notes do not link to main, which may not have the file")
+    check("/blob/${{ steps.version.outputs.tag }}/android/ANDROID.md" in release,
+          "release: they link to the tag, which is the commit that was built")
+
     check("debug-signed" in release,
           "release: the notes say the APK is debug-signed")
     # Whitespace-normalised: the notes are wrapped prose, and a sentence

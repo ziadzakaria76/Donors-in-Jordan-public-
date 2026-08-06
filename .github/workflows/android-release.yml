@@ -82,6 +82,12 @@ jobs:
           APK: ${{ steps.package.outputs.name }}
           SHA256: ${{ steps.package.outputs.sha256 }}
         run: |
+          # The ANDROID.md link below is pinned to the tag, not to main. The
+          # tag is guaranteed to contain the file -- it is the commit that was
+          # just built -- whereas main may not, if the release was cut from a
+          # branch. A link in release notes that 404s is worse than no link.
+          # Pinning also means the instructions someone reads are the ones
+          # that match the APK they just downloaded.
           cat > notes.md <<'HEADER'
           Install this on the phone: tap the `.apk` below, and allow your
           browser to install unknown apps if Android asks. No sign-in needed —
@@ -89,7 +95,7 @@ jobs:
           downloads without a GitHub account.
 
           Full instructions, and the exact token permissions the app needs:
-          [`android/ANDROID.md`](${{ github.server_url }}/${{ github.repository }}/blob/main/android/ANDROID.md).
+          [`android/ANDROID.md`](${{ github.server_url }}/${{ github.repository }}/blob/${{ steps.version.outputs.tag }}/android/ANDROID.md).
 
           ### This APK is debug-signed
 
@@ -120,10 +126,28 @@ jobs:
             echo '```'
           } >> notes.md
 
-          gh release create "$TAG" "android/out/$APK" \
-            --title "Jordan Tenders $TAG" \
-            --notes-file notes.md \
-            --verify-tag
+          # Re-cutting a tag is a stated reason this workflow can be
+          # dispatched by hand, and `gh release create` refuses outright when
+          # the release already exists. Failing there would leave the old APK
+          # published under a tag that has since moved -- the wrong build,
+          # advertised as the right one. So replace in place instead, and say
+          # in the log which of the two happened.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists -- replacing its asset and notes."
+            gh release upload "$TAG" "android/out/$APK" --clobber
+            gh release edit "$TAG" \
+              --title "Jordan Tenders $TAG" \
+              --notes-file notes.md
+          else
+            echo "Creating release $TAG."
+            gh release create "$TAG" "android/out/$APK" \
+              --title "Jordan Tenders $TAG" \
+              --notes-file notes.md \
+              --verify-tag
+          fi
+
+          echo "Release: $(gh release view "$TAG" --json url --jq .url)" \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Also attach it to this run
         uses: actions/upload-artifact@v4
