@@ -70,9 +70,10 @@ one — rebuilding it would produce a different file with identical behaviour.
 
 ### Which build is on the phone
 
-**Settings → Apps → Jordan Tenders** shows the version. Released builds are
-`0.4.0`; builds from the Actions tab are `0.0.<commit-count>-<sha>`, which
-names the exact commit they came from.
+**Settings → Apps → Jordan Tenders** shows the version. A released build shows
+the tag it was cut from with the `v` dropped, so `v0.1.0` shows as `0.1.0`.
+A build from the Actions tab shows `0.0.<commit-count>-<sha>`, which names the
+exact commit it came from.
 
 The version code is the repository's commit count, so it always increases and
 Android can tell a newer build from an older one. It will refuse to install an
