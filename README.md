@@ -106,6 +106,20 @@ with the Word and Excel files attached as artifacts.
 A total portal outage makes the run exit non-zero, so GitHub marks it failed and
 notifies you. That is the failure alert, with no mail credentials involved.
 
+### The Android app
+
+**[`android/ANDROID.md`](android/ANDROID.md)** — the same thing with fewer taps.
+The last report offline, a Run button with the workflow's real inputs, the full
+portal health table, and the Word and Excel packs downloaded and opened on the
+phone. Install it from the phone: the APK is built by CI and attached to the run.
+
+It does not scrape — it is a client to the pipeline that already runs on
+GitHub's servers. It reads the `*.json` artifact each run writes, because
+GitHub's REST API does not expose the run page's summary to any client.
+
+**Compiled by CI, never run on a device.** `ANDROID.md` opens with a table of
+what that leaves unverified.
+
 ## Deploying
 
 Step-by-step setup for a Windows Server, including Azure app registration and
@@ -118,7 +132,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 1,119 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 1,435 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`
