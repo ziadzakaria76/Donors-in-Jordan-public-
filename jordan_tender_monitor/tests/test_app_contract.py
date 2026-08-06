@@ -27,7 +27,7 @@ import re
 import tempfile
 from pathlib import Path
 
-from jordan_tender_monitor import fixtures, probe as prober
+from jordan_tender_monitor import config, fixtures, probe as prober
 from jordan_tender_monitor.agents import filter as filters, reporter
 from jordan_tender_monitor.portals import base, harvester
 
@@ -376,6 +376,84 @@ def test_the_forms_rules_are_the_rules_the_loader_enforces():
                  "contract: the form accepts exactly the tiers the loader does")
 
 
+def test_the_app_can_find_the_files_the_run_actually_produces():
+    """The app picks files out of the artifact zip by name. Names drift.
+
+    Every one of these is a bare string on the Kotlin side matched against a
+    filename generated on the Python side, with a CI artifact in between. If
+    one stops matching, the app does not fail -- it reports an artifact with no
+    report in it, which reads exactly like a run that produced nothing.
+    """
+    import io
+
+    source = (APP / "data" / "report" / "ArtifactZip.kt").read_text(encoding="utf-8")
+    marker = re.search(r'name\.contains\("([^"]+)"\)', source)
+    check(marker is not None, "contract: the app's report-file marker was found")
+
+    workflow = io.open(
+        Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
+        / "monitor.yml", encoding="utf-8").read()
+
+    # The JSON report exists ONLY because the workflow asks for it -- the
+    # default is docx and excel. So take the formats from the workflow and
+    # write with them, rather than testing a configuration CI does not use.
+    #
+    # Parsed rather than grepped: monitor.yml sets JTM_OUTPUT_FORMATS twice,
+    # and the first one belongs to the diagnose step, which writes markdown
+    # only. A regex for the first match would have tested the wrong step and
+    # passed while the real one wrote no json at all.
+    import yaml
+
+    steps = yaml.safe_load(workflow)["jobs"]["monitor"]["steps"]
+    running = [s for s in steps if "--run" in str(s.get("run", ""))]
+    check(len(running) == 1,
+          "contract: exactly one step runs the monitor",
+          f"found {[s.get('name') for s in running]}")
+    formats = [f.strip() for f in
+               running[0].get("env", {}).get("JTM_OUTPUT_FORMATS", "").split(",")
+               if f.strip()]
+    check(formats,
+          "contract: the step that runs the monitor states its output formats")
+    check("json" in formats,
+          "contract: and asks for json, which is the only file the app reads",
+          f"it asks for {formats}")
+
+    original = config.OUTPUT_FORMATS
+    try:
+        config.OUTPUT_FORMATS = formats
+        with tempfile.TemporaryDirectory(prefix="jtm-names-") as tmp:
+            records = fixtures.sample_records()
+            health = fixtures.sample_health()
+            result = filters.process(records)
+            reporter.decorate(result["tenders"])
+            written = reporter.write_outputs(result, health, "<html></html>",
+                                             Path(tmp))
+    finally:
+        config.OUTPUT_FORMATS = original
+
+    check("json" in written,
+          "contract: and the run really writes it with those formats",
+          f"wrote {sorted(written)}")
+    if marker and "json" in written:
+        check(marker.group(1) in written["json"].name,
+              f"contract: the app finds {written['json'].name} by "
+              f"{marker.group(1)!r}")
+
+    # The extensions, against the real files rather than against a convention.
+    for kind, extension in (("docx", ".docx"), ("excel", ".xlsx")):
+        if kind in written:
+            check(f'endsWith("{extension}"' in source,
+                  f"contract: the app recognises {extension}, which the run writes")
+            check(written[kind].name.endswith(extension),
+                  f"contract: and the run really writes {extension}")
+
+    # And the workflow has to upload all three, or the app finds an artifact
+    # that is missing exactly the file it came for.
+    for extension in (".docx", ".xlsx", ".json"):
+        check(f"output/*{extension}" in workflow,
+              f"contract: monitor.yml uploads {extension} files")
+
+
 def test_the_apps_workflow_inputs_match_the_workflow():
     """A choice input is matched literally. A typo is a 422 at the moment you tap Run."""
     import io
@@ -417,5 +495,6 @@ TESTS = [
     test_the_probe_schema_constant_matches_on_both_sides,
     test_the_app_reads_the_portal_fields_the_loader_accepts,
     test_the_forms_rules_are_the_rules_the_loader_enforces,
+    test_the_app_can_find_the_files_the_run_actually_produces,
     test_the_apps_workflow_inputs_match_the_workflow,
 ]
