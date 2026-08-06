@@ -29,7 +29,7 @@ from pathlib import Path
 
 from jordan_tender_monitor import fixtures, probe as prober
 from jordan_tender_monitor.agents import filter as filters, reporter
-from jordan_tender_monitor.portals import harvester
+from jordan_tender_monitor.portals import base, harvester
 
 from .harness import check, check_eq
 
@@ -140,9 +140,9 @@ def _check_class(source: str, class_name: str, payload: dict, label: str) -> Non
 # ---------------------------------------------------------------------------
 
 
-def _report_document() -> dict:
-    records = fixtures.sample_records()
-    health = fixtures.sample_health()
+def _report_document(records=None, health=None) -> dict:
+    records = fixtures.sample_records() if records is None else records
+    health = fixtures.sample_health() if health is None else health
     result = filters.process(records)
     reporter.decorate(result["tenders"])
     with tempfile.TemporaryDirectory(prefix="jtm-contract-") as tmp:
@@ -167,6 +167,42 @@ def test_the_app_reads_every_field_the_report_writes():
         _check_class(source, "PortalStatus", portal, "a portal status")
 
 
+def test_the_app_reads_a_report_from_a_run_that_found_nothing():
+    """Empty and broken have to stay distinguishable all the way to the screen.
+
+    A run that found nothing is a normal morning. A run where every portal was
+    unreachable is an emergency. Both produce a report with no opportunities in
+    it, so the difference lives entirely in the run block and the portal
+    statuses -- and if a field goes missing on this path it defaults to 0, the
+    counts read as a quiet day, and the app renders the emergency as the normal
+    morning.
+    """
+    source = (APP / "data" / "report" / "Report.kt").read_text(encoding="utf-8")
+    broken = [h for h in fixtures.sample_health() if h.status != "ok"]
+    check(broken, "contract: the fixture has an unavailable portal to use")
+
+    document = _report_document(records=[], health=broken)
+
+    _check_class(source, "Report", document, "an empty report")
+    _check_class(source, "RunSummary", document["run"], "an empty report's run block")
+    for portal in document["portals"]:
+        _check_class(source, "PortalStatus", portal, "a portal status (empty run)")
+
+    check_eq(document["tender_count"], 0,
+             "contract: an empty report says so with a count, not an absent key")
+    check_eq(document["run"]["portals_ok"], 0,
+             "contract: and reports no portal read successfully")
+    check(document["run"]["portals_broken"] > 0,
+          "contract: and reports the broken ones as broken",
+          f"got {document['run']['portals_broken']}")
+    check(document["run"]["status"] != "ok",
+          "contract: so the run status is not 'ok' -- which is the whole "
+          "difference between a quiet day and an outage",
+          f"got {document['run']['status']!r}")
+    check(document["run"]["status_line"],
+          "contract: with a line that says which of the two it was")
+
+
 def test_the_report_schema_constant_matches_on_both_sides():
     """A mismatch here means the app refuses every report, or accepts a wrong one."""
     source = (APP / "data" / "report" / "Report.kt").read_text(encoding="utf-8")
@@ -182,12 +218,10 @@ def test_the_report_schema_constant_matches_on_both_sides():
 # ---------------------------------------------------------------------------
 
 
-def _probe_document() -> dict:
-    html = (Path(__file__).resolve().parent / "fixtures" / "drupal_views.html"
-            ).read_text(encoding="utf-8")
+def _probe_document(fetch) -> dict:
     original = harvester._fetch
     try:
-        harvester._fetch = lambda spec, url: html
+        harvester._fetch = fetch
         return prober.probe({
             "key": "example", "name": "Example Donor",
             "urls": ["https://example.org/tenders"],
@@ -197,20 +231,53 @@ def _probe_document() -> dict:
         harvester._fetch = original
 
 
-def test_the_app_reads_every_field_the_probe_writes():
+def _reads_well(spec, url):
+    return (Path(__file__).resolve().parent / "fixtures" / "drupal_views.html"
+            ).read_text(encoding="utf-8")
+
+
+def _cannot_be_reached(spec, url):
+    raise base.PortalError("transport error - the host is blocked")
+
+
+def _check_probe_document(document, label: str) -> None:
     source = (APP / "data" / "portals" / "ProbeReport.kt").read_text(encoding="utf-8")
-    document = _probe_document()
 
-    _check_class(source, "ProbeReport", document, "the probe document")
-    _check_class(source, "ProbeVerdict", document["verdict"], "the probe verdict")
+    _check_class(source, "ProbeReport", document, f"the probe document ({label})")
+    _check_class(source, "ProbeVerdict", document["verdict"],
+                 f"the probe verdict ({label})")
 
-    check(document["sources"], "contract: the probe reports a source")
+    check(document["sources"], f"contract: the probe reports a source ({label})")
     for source_result in document["sources"]:
-        _check_class(source, "ProbeSource", source_result, "a probe source")
+        _check_class(source, "ProbeSource", source_result, f"a probe source ({label})")
         for layer in source_result["layers"]:
-            _check_class(source, "ProbeLayer", layer, "a probe layer")
+            _check_class(source, "ProbeLayer", layer, f"a probe layer ({label})")
         for row in source_result["sample_rows"]:
-            _check_class(source, "ProbeRow", row, "a probe sample row")
+            _check_class(source, "ProbeRow", row, f"a probe sample row ({label})")
+
+
+def test_the_app_reads_every_field_the_probe_writes():
+    _check_probe_document(_probe_document(_reads_well), "usable")
+
+
+def test_the_app_reads_a_probe_that_could_not_read_anything():
+    """The failure document is the one the app is most likely to meet first.
+
+    Someone testing a URL they have just typed is more likely to have got it
+    wrong than right. If the writer skips fields on that path, every one of
+    them arrives in the app as 0 or "" -- and the screen reports a portal that
+    found no rows rather than one that could not be reached at all.
+    """
+    document = _probe_document(_cannot_be_reached)
+    _check_probe_document(document, "unreachable")
+
+    source = document["sources"][0]
+    check(not source["fetched"], "contract: the failed source says it was not fetched")
+    check(source["error"], "contract: and carries a reason, not an empty string")
+    check(not document["verdict"]["usable"],
+          "contract: the verdict on an unreachable candidate is not usable")
+    check(document["verdict"]["headline"],
+          "contract: with a headline, so the screen is never blank")
 
 
 def test_the_probe_schema_constant_matches_on_both_sides():
@@ -343,8 +410,10 @@ def test_the_apps_workflow_inputs_match_the_workflow():
 
 TESTS = [
     test_the_app_reads_every_field_the_report_writes,
+    test_the_app_reads_a_report_from_a_run_that_found_nothing,
     test_the_report_schema_constant_matches_on_both_sides,
     test_the_app_reads_every_field_the_probe_writes,
+    test_the_app_reads_a_probe_that_could_not_read_anything,
     test_the_probe_schema_constant_matches_on_both_sides,
     test_the_app_reads_the_portal_fields_the_loader_accepts,
     test_the_forms_rules_are_the_rules_the_loader_enforces,
