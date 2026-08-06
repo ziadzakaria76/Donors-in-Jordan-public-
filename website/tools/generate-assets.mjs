@@ -1,5 +1,5 @@
 /**
- * Image generator for the Diyar Al Ola site.
+ * Image generator for the General Sherman site.
  *
  * The site ships with every image already rendered into assets/img, so you do
  * NOT need to run this to use the site. Run it only if you want to change the
@@ -648,49 +648,58 @@ for (const [name, rooms] of Object.entries(PLANS)) {
   console.log("  ✓", name);
 }
 
-/* Open Graph card + icons */
-const og = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+/* Open Graph card + icons — the brand mark is the client's own artwork
+   (assets/img/logo-mark.png), composited over a generated background rather
+   than redrawn, so the logo on the site is the real one. */
+const LOGO = resolve(IMG, "logo-mark.png");
+
+const ogBg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1">
       <stop offset="0" stop-color="#0E1417"/><stop offset="0.6" stop-color="#1C272D"/><stop offset="1" stop-color="#3A3428"/></linearGradient>
-    <linearGradient id="br" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#D6B87E"/><stop offset="1" stop-color="#B08D4F"/></linearGradient>
-    ${blurDef("soft", 40)}
+    <linearGradient id="glass" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#3E525E"/><stop offset="1" stop-color="#1E2C35"/></linearGradient>
+    ${blurDef("soft", 40)}${grainDef("grain", 0.9)}
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
   <circle cx="980" cy="520" r="260" fill="#B08D4F" opacity="0.25" filter="url(#soft)"/>
-  <linearGradient id="glass" x1="0" y1="0" x2="0.3" y2="1">
-    <stop offset="0" stop-color="#3E525E"/><stop offset="1" stop-color="#1E2C35"/></linearGradient>
   ${(() => {
     const r = rng("og");
     const p = { ...PALETTES.dusk, litRate: 0.4 };
-    let s = "";
+    let out = "";
     for (let i = 0; i < 7; i++) {
       const w = between(r, 80, 130), h = between(r, 150, 330);
-      s += box(r, { x: 640 + i * 84, y: 630 - h, w, h, p, floors: Math.max(4, Math.round(h / 36)), opacity: 0.92, dx: w * 0.18, dy: -w * 0.08 });
+      out += box(r, { x: 640 + i * 84, y: 630 - h, w, h, p, floors: Math.max(4, Math.round(h / 36)), opacity: 0.92, dx: w * 0.18, dy: -w * 0.08 });
     }
-    return s;
+    return out;
   })()}
-  <g transform="translate(80 200)">
-    <path d="M 0 96 L 0 40 A 34 34 0 0 1 68 40 L 68 96" fill="none" stroke="url(#br)" stroke-width="9"/>
-    <path d="M 34 96 L 34 22" stroke="url(#br)" stroke-width="9"/>
-  </g>
-  <text x="80" y="392" font-family="IBM Plex Sans Arabic, sans-serif" font-size="72" font-weight="700" fill="#F8F5F0">ديار العُلا للتطوير العقاري</text>
-  <text x="80" y="452" font-family="IBM Plex Sans Arabic, sans-serif" font-size="34" font-weight="400" fill="#D6B87E">شققٌ فاخرة في أرقى مناطق عمّان</text>
-  <text x="80" y="530" font-family="IBM Plex Sans Arabic, sans-serif" font-size="26" font-weight="500" fill="#9AA5AA" letter-spacing="3">DIYAR AL OLA · AMMAN, JORDAN</text>
+  <text x="80" y="416" font-family="IBM Plex Sans Arabic, sans-serif" font-size="64" font-weight="700" fill="#F8F5F0">شركة جنرال شيرمان للإسكان</text>
+  <text x="80" y="472" font-family="IBM Plex Sans Arabic, sans-serif" font-size="32" font-weight="400" fill="#D6B87E">شققٌ فاخرة في أرقى مناطق عمّان</text>
+  <text x="80" y="546" font-family="IBM Plex Sans Arabic, sans-serif" font-size="24" font-weight="500" fill="#9AA5AA" letter-spacing="3">GENERAL SHERMAN HOUSING · AMMAN, JORDAN</text>
 </svg>`;
-await writeFile(resolve(IMG, "og-image.svg"), og);
-await sharp(Buffer.from(og), { density: 200 }).png({ quality: 90 }).toFile(resolve(IMG, "og-image.png"));
+
+await writeFile(resolve(IMG, "og-image.svg"), ogBg);
+const ogLogo = await sharp(LOGO).resize({ width: 190 }).toBuffer();
+await sharp(Buffer.from(ogBg), { density: 200 })
+  .resize(1200, 630)                      // resize runs before composite in sharp
+  .composite([{ input: ogLogo, top: 86, left: 80 }])
+  .png({ quality: 90 }).toFile(resolve(IMG, "og-image.png"));
 console.log("  ✓ og-image");
 
-const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <defs><linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#D6B87E"/><stop offset="1" stop-color="#A8823F"/></linearGradient></defs>
-  <rect width="64" height="64" rx="14" fill="#0E1417"/>
-  <path d="M 18 48 L 18 27 A 14 14 0 0 1 46 27 L 46 48" fill="none" stroke="url(#b)" stroke-width="5"/>
-  <path d="M 32 48 L 32 15" stroke="url(#b)" stroke-width="5"/>
-</svg>`;
-await writeFile(resolve(ROOT, "favicon.svg"), icon);
-await sharp(Buffer.from(icon), { density: 400 }).resize(180, 180).png().toFile(resolve(ROOT, "apple-touch-icon.png"));
+// Browser tab icon: the mark alone, squared on transparency.
+const markMeta = await sharp(LOGO).metadata();
+const side = Math.max(markMeta.width, markMeta.height);
+const squared = await sharp({
+  create: { width: side, height: side, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+}).composite([{ input: LOGO, gravity: "center" }]).png().toBuffer();
+await sharp(squared).resize(32, 32).png().toFile(resolve(ROOT, "favicon-32.png"));
+
+// iOS tile: the same mark on the brand's ink, since iOS renders it opaque.
+// sharp resizes before it composites, so the tile is built at full size and
+// scaled down in a second pass rather than chained.
+const tile = await sharp({ create: { width: 512, height: 512, channels: 4, background: "#0F1518" } })
+  .composite([{ input: await sharp(LOGO).resize({ width: 340 }).toBuffer(), gravity: "center" }])
+  .png().toBuffer();
+await sharp(tile).resize(180, 180).png().toFile(resolve(ROOT, "apple-touch-icon.png"));
 console.log("  ✓ icons");
 console.log("Done.");

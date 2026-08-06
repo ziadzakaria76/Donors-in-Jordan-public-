@@ -1,5 +1,5 @@
 /* =============================================================================
-   Diyar Al Ola — design system
+   General Sherman — design system
    Written with CSS logical properties throughout, so the same stylesheet
    serves the Arabic (RTL) and English (LTR) versions of every page.
    ========================================================================== */
@@ -177,7 +177,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .header--float .brand__tag { color: rgba(250, 247, 241, 0.7); }
 
 .brand { display: flex; align-items: center; gap: 0.7rem; margin-inline-end: auto; }
-.brand__mark { inline-size: 34px; block-size: 34px; flex: none; }
+.brand__mark { inline-size: 46px; block-size: auto; flex: none; }  /* client artwork, 4:3 */
 .brand__name { font-size: 1.06rem; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; }
 .brand__tag { display: block; font-size: 0.66rem; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
 

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.diyaralola.jo/sitemap.xml
+Sitemap: https://www.generalsherman.jo/sitemap.xml

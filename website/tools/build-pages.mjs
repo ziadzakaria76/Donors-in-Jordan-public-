@@ -44,7 +44,7 @@ const LIGHTBOX = `<div class="modal modal--lightbox" id="lightbox" role="dialog"
   </div>
 </div>`;
 
-const SITE = "https://www.diyaralola.jo";
+const SITE = "https://www.generalsherman.jo";
 
 function head({ file, title, desc, keywords = "", noindex = false }) {
   const url = `${SITE}/${file === "index.html" ? "" : file}`;
@@ -57,7 +57,7 @@ ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" hr
 <link rel="alternate" hreflang="en" href="${url}?lang=en">`}
 <meta name="theme-color" content="#0F1518">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="ديار العُلا للتطوير العقاري">
+<meta property="og:site_name" content="شركة جنرال شيرمان للإسكان">
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${desc}">
 <meta property="og:image" content="${SITE}/assets/img/og-image.png">
@@ -67,7 +67,7 @@ ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" hr
 <meta property="og:locale:alternate" content="en_US">
 <meta property="og:url" content="${url}">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/plex-arabic-arabic-400.woff2" crossorigin>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/plex-arabic-arabic-600.woff2" crossorigin>
@@ -102,8 +102,8 @@ const PAGES = [];
 
 PAGES.push({
   file: "projects.html",
-  title: "مشاريعنا — شقق سكنية في عبدون ودير غبار وخلدا والرابية | ديار العُلا",
-  desc: "خمسة مشاريع سكنية من ديار العُلا في غرب عمّان: ريزيدنس ٧٦ في عبدون، ذا كريسنت في دير غبار، بيت السرو في خلدا، ألتو في أم أذينة، وحدائق الرابية.",
+  title: "مشاريعنا — شقق سكنية في عبدون ودير غبار وخلدا والرابية | جنرال شيرمان",
+  desc: "خمسة مشاريع سكنية من جنرال شيرمان في غرب عمّان: ريزيدنس ٧٦ في عبدون، ذا كريسنت في دير غبار، بيت السرو في خلدا، ألتو في أم أذينة، وحدائق الرابية.",
   keywords: "مشاريع سكنية عمان, شقق عبدون, شقق دير غبار, شقق خلدا, شقق الرابية",
   scripts: ["pages.js"],
   modals: [ENQUIRY],
@@ -157,7 +157,7 @@ ${pageHero({
 
 PAGES.push({
   file: "project.html",
-  title: "تفاصيل المشروع | ديار العُلا للتطوير العقاري",
+  title: "تفاصيل المشروع | شركة جنرال شيرمان للإسكان",
   desc: "تفاصيل المشروع: المخططات، الوحدات المتاحة، جدول التوفّر، خطط الدفع، والموقع على الخريطة.",
   scripts: ["pages.js", "project.js"],
   modals: [ENQUIRY, LIGHTBOX],
@@ -306,8 +306,8 @@ PAGES.push({
 
 PAGES.push({
   file: "units.html",
-  title: "الوحدات المتاحة — شقق للبيع في عمّان بالمساحة والسعر | ديار العُلا",
-  desc: "تصفّح جميع الشقق المتاحة للبيع في مشاريع ديار العُلا مع فلاتر للمنطقة وعدد الغرف والمساحة والسعر والطابق.",
+  title: "الوحدات المتاحة — شقق للبيع في عمّان بالمساحة والسعر | جنرال شيرمان",
+  desc: "تصفّح جميع الشقق المتاحة للبيع في مشاريع جنرال شيرمان مع فلاتر للمنطقة وعدد الغرف والمساحة والسعر والطابق.",
   keywords: "شقق للبيع في عمان, أسعار الشقق في عمان, شقق 3 غرف عمان, شقق بحديقة عمان",
   scripts: ["pages.js", "units.js"],
   modals: [ENQUIRY],
@@ -353,7 +353,7 @@ ${pageHero({
 
 PAGES.push({
   file: "payment-plans.html",
-  title: "خطط الدفع وحاسبة الأقساط — ديار العُلا للتطوير العقاري",
+  title: "خطط الدفع وحاسبة الأقساط — شركة جنرال شيرمان للإسكان",
   desc: "ثلاث خطط دفع: الحجز المبكر بخصم ٣٪، التسليم المريح بأقساط شهرية بدون فوائد، والتمويل البنكي حتى ٢٥ سنة. احسب قسطك الشهري على أي وحدة متاحة.",
   keywords: "خطط دفع شقق الأردن, تقسيط شقق عمان, حاسبة قرض سكني الأردن",
   scripts: ["pages.js", "plans.js"],
@@ -466,8 +466,8 @@ ${pageHero({
 
 PAGES.push({
   file: "gallery.html",
-  title: "معرض الصور — مشاريع ديار العُلا للتطوير العقاري في عمّان",
-  desc: "معالجات معمارية للواجهات والمساحات الداخلية والمرافق المشتركة في مشاريع ديار العُلا بعمّان.",
+  title: "معرض الصور — مشاريع شركة جنرال شيرمان للإسكان في عمّان",
+  desc: "معالجات معمارية للواجهات والمساحات الداخلية والمرافق المشتركة في مشاريع جنرال شيرمان بعمّان.",
   scripts: ["pages.js"],
   modals: [LIGHTBOX],
   main: `
@@ -498,8 +498,8 @@ ${pageHero({
 
 PAGES.push({
   file: "about.html",
-  title: "عن الشركة — ديار العُلا للتطوير العقاري في عمّان منذ ٢٠٠٩",
-  desc: "ديار العُلا: ١٦ مشروعاً مُسلَّماً و٤٨٠ وحدة سكنية في غرب عمّان منذ ٢٠٠٩. كيف نختار الأرض، وكيف نبني، وما الذي نضمنه بعد التسليم.",
+  title: "عن الشركة — شركة جنرال شيرمان للإسكان في عمّان منذ ٢٠٠٩",
+  desc: "جنرال شيرمان: ١٦ مشروعاً مُسلَّماً و٤٨٠ وحدة سكنية في غرب عمّان منذ ٢٠٠٩. كيف نختار الأرض، وكيف نبني، وما الذي نضمنه بعد التسليم.",
   scripts: ["pages.js"],
   modals: [],
   main: `
@@ -520,7 +520,7 @@ ${pageHero({
       <div>
         <p class="eyebrow" data-i18n="about.storyEyebrow">القصة</p>
         <h2 data-i18n="about.storyTitle">لماذا نبني قليلاً</h2>
-        <p class="lead" style="margin-block:1.5rem" data-i18n="about.story1">تأسست ديار العُلا عام ٢٠٠٩ على قاعدة بسيطة: ألا نبدأ مشروعاً جديداً قبل أن يصل السابق إلى مرحلة التشطيبات. هذا يعني نمواً أبطأ من غيرنا، لكنه يعني أيضاً أن المهندس المشرف على مبناك ليس مسؤولاً عن ستة مبانٍ أخرى في الوقت نفسه.</p>
+        <p class="lead" style="margin-block:1.5rem" data-i18n="about.story1">تأسست جنرال شيرمان عام ٢٠٠٩ على قاعدة بسيطة: ألا نبدأ مشروعاً جديداً قبل أن يصل السابق إلى مرحلة التشطيبات. هذا يعني نمواً أبطأ من غيرنا، لكنه يعني أيضاً أن المهندس المشرف على مبناك ليس مسؤولاً عن ستة مبانٍ أخرى في الوقت نفسه.</p>
         <p class="lead" data-i18n="about.story2">نشتري الأرض نقداً قبل التصميم، فلا نضطر لضغط المواصفات لاحقاً لتغطية كلفة التمويل. ونشتري مواد التشطيب الأساسية — البلاط والأدوات الصحية والمصاعد — دفعةً واحدة عند التعاقد، حتى لا يتغير ما وعدناك به إذا تغيرت الأسعار.</p>
       </div>
       <div class="split__media reveal">
@@ -598,8 +598,8 @@ ${pageHero({
 
 PAGES.push({
   file: "contact.html",
-  title: "اتصل بنا — ديار العُلا للتطوير العقاري، عمّان",
-  desc: "تواصل مع فريق مبيعات ديار العُلا: هاتف، واتساب، بريد إلكتروني، أو احجز زيارة لأحد المشاريع في عمّان.",
+  title: "اتصل بنا — شركة جنرال شيرمان للإسكان، عمّان",
+  desc: "تواصل مع فريق مبيعات جنرال شيرمان: هاتف، واتساب، بريد إلكتروني، أو احجز زيارة لأحد المشاريع في عمّان.",
   scripts: ["pages.js"],
   modals: [],
   main: `
@@ -643,7 +643,7 @@ ${pageHero({
           </div>
           <label class="consent">
             <input type="checkbox" name="consent" required>
-            <span data-i18n="form.consent">أوافق على أن تتواصل معي ديار العُلا بخصوص هذا الطلب.</span>
+            <span data-i18n="form.consent">أوافق على أن تتواصل معي جنرال شيرمان بخصوص هذا الطلب.</span>
           </label>
           <button class="btn btn--brass" type="submit" data-i18n="form.send">إرسال الطلب</button>
           <p class="form-note" data-i18n="contact.formNote">نرد على الاستفسارات خلال يوم عمل واحد. إذا كان طلبك عاجلاً، الاتصال أو واتساب أسرع.</p>
@@ -659,7 +659,7 @@ ${pageHero({
             <li><span data-icon="whatsapp"></span><span><strong data-i18n="cta.whatsapp">واتساب</strong><br>
               <a data-wa href="#" target="_blank" rel="noopener" class="link-arrow" data-i18n="contact.waLink">ابدأ محادثة</a></span></li>
             <li><span data-icon="mail"></span><span><strong data-i18n="form.email">البريد الإلكتروني</strong><br>
-              <a data-mail="sales" href="#" class="link-arrow">sales@diyaralola.jo</a></span></li>
+              <a data-mail="sales" href="#" class="link-arrow">sales@generalsherman.jo</a></span></li>
             <li><span data-icon="pin"></span><span><strong data-i18n="contact.office">مكتب المبيعات</strong><br>
               <span data-i18n="footer.address">شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن</span></span></li>
             <li><span data-icon="clock"></span><span><strong data-i18n="contact.hours">ساعات العمل</strong><br>
@@ -703,7 +703,7 @@ ${pageHero({
 
 PAGES.push({
   file: "404.html",
-  title: "الصفحة غير موجودة | ديار العُلا للتطوير العقاري",
+  title: "الصفحة غير موجودة | شركة جنرال شيرمان للإسكان",
   desc: "الصفحة المطلوبة غير موجودة.",
   noindex: true,
   scripts: ["pages.js"],

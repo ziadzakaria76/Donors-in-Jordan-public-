@@ -1,4 +1,4 @@
-# ديار العُلا — Diyar Al Ola Development
+# جنرال شيرمان — General Sherman Housing
 
 A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential
 developer: project showcases, a live unit inventory with filters, a per-building
@@ -37,7 +37,7 @@ The site is a folder of static files. Publish `website/` as the site root.
 | **cPanel / any shared host** | Upload the contents of `website/` into `public_html/` over FTP. Nothing else to configure. |
 | **GitHub Pages** | Push, then set Pages to serve from the branch and the `/website` folder. |
 
-After deploying, replace `https://www.diyaralola.jo` with the real domain in:
+After deploying, replace `https://www.generalsherman.jo` with the real domain in:
 `sitemap.xml`, `robots.txt`, and the `<link rel="canonical">` / `og:url` /
 `hreflang` tags in each page's `<head>` (or in `tools/build-pages.mjs`, then
 re-run `npm run pages`).
@@ -55,8 +55,12 @@ Everything below is invented placeholder content. Search for `«REPLACE»` in
 - **Social links** — the four `href: "#"` entries.
 - **Domain** — `COMPANY.domain` plus the SEO tags noted above.
 - **Projects and units** — see below.
-- **Logo** — the arch mark is inline SVG in the header and footer of every page,
-  and in `favicon.svg`. Swap the two `<path>` elements for your own artwork.
+- **Logo** — `assets/img/logo-mark.png` (house mark) and `assets/img/logo.png`
+  (full stacked lockup) were extracted from the supplied artwork and keyed to
+  transparency. The favicon and iOS tile are generated from the mark by
+  `npm run assets`. **Supply the original vector (AI/EPS/SVG) when you have it**
+  — these are lifted from a raster screenshot, which is fine on screen at the
+  sizes used but will not hold up in print or at very large sizes.
 
 ### Where the form submissions go
 

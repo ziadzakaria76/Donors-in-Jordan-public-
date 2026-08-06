@@ -7,9 +7,9 @@
 
 const T = {
   /* brand + chrome */
-  "brand.name": { ar: "ديار العُلا", en: "Diyar Al Ola" },
-  "brand.full": { ar: "ديار العُلا للتطوير العقاري", en: "Diyar Al Ola Development" },
-  "brand.tag": { ar: "Diyar Al Ola", en: "ديار العُلا" },
+  "brand.name": { ar: "جنرال شيرمان", en: "General Sherman" },
+  "brand.full": { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },
+  "brand.tag": { ar: "General Sherman Housing", en: "شركة جنرال شيرمان للإسكان" },
 
   /* home page */
   "home.eyebrow": { ar: "تطوير عقاري في عمّان منذ ٢٠٠٩", en: "Developing in Amman since 2009" },
@@ -26,7 +26,7 @@ const T = {
     ar: "مشروعان جاهزان للسكن وثلاثة قيد الإنشاء. كل مشروع صُمِّم لأرضه ولمن سيسكنه، لا نسخةً مكررة عن سابقه.",
     en: "Two buildings ready to move into and three under construction. Each one is designed for its own plot and its own buyers, not copied from the last.",
   },
-  "home.whyEyebrow": { ar: "لماذا ديار العُلا", en: "Why Diyar Al Ola" },
+  "home.whyEyebrow": { ar: "لماذا جنرال شيرمان", en: "Why General Sherman" },
   "home.whyTitle": { ar: "ما نعد به مكتوبٌ في العقد", en: "What we promise is written into the contract" },
   "home.whyLead": {
     ar: "لأن الفرق بين شركة تطوير وأخرى لا يظهر في المخطط، بل بعد التسليم بسنتين.",
@@ -65,7 +65,7 @@ const T = {
   "footer.contact": { ar: "تواصل معنا", en: "Contact" },
   "footer.address": { ar: "شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن", en: "46 Abdullah Ghosheh Street, 3rd Floor, Amman 11194, Jordan" },
   "footer.hours": { ar: "السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً", en: "Saturday – Thursday, 9:00 – 18:00" },
-  "footer.rights": { ar: "ديار العُلا للتطوير العقاري. جميع الحقوق محفوظة.", en: "Diyar Al Ola Development. All rights reserved." },
+  "footer.rights": { ar: "شركة جنرال شيرمان للإسكان. جميع الحقوق محفوظة.", en: "General Sherman Housing. All rights reserved." },
   "footer.note": {
     ar: "الصور معالجات معمارية توضيحية، والأسعار قابلة للتغيير دون إشعار مسبق.",
     en: "Images are illustrative architectural studies. Prices are subject to change without notice.",
@@ -194,8 +194,8 @@ const T = {
   "form.send": { ar: "إرسال الطلب", en: "Send enquiry" },
   "form.sending": { ar: "جارٍ الإرسال…", en: "Sending…" },
   "form.consent": {
-    ar: "أوافق على أن تتواصل معي ديار العُلا بخصوص هذا الطلب.",
-    en: "I agree to be contacted by Diyar Al Ola about this enquiry.",
+    ar: "أوافق على أن تتواصل معي جنرال شيرمان بخصوص هذا الطلب.",
+    en: "I agree to be contacted by General Sherman about this enquiry.",
   },
   "form.errRequired": { ar: "هذا الحقل مطلوب.", en: "This field is required." },
   "form.errName": { ar: "يرجى كتابة الاسم الكامل.", en: "Please enter your full name." },
@@ -356,8 +356,8 @@ const T = {
   "about.storyEyebrow": { ar: "القصة", en: "The story" },
   "about.storyTitle": { ar: "لماذا نبني قليلاً", en: "Why we build slowly" },
   "about.story1": {
-    ar: "تأسست ديار العُلا عام ٢٠٠٩ على قاعدة بسيطة: ألا نبدأ مشروعاً جديداً قبل أن يصل السابق إلى مرحلة التشطيبات. هذا يعني نمواً أبطأ من غيرنا، لكنه يعني أيضاً أن المهندس المشرف على مبناك ليس مسؤولاً عن ستة مبانٍ أخرى في الوقت نفسه.",
-    en: "Diyar Al Ola was founded in 2009 on a simple rule: no new project starts until the previous one reaches finishing stage. That makes us grow more slowly than others — and it also means the engineer supervising your building is not running six others at the same time.",
+    ar: "تأسست جنرال شيرمان عام ٢٠٠٩ على قاعدة بسيطة: ألا نبدأ مشروعاً جديداً قبل أن يصل السابق إلى مرحلة التشطيبات. هذا يعني نمواً أبطأ من غيرنا، لكنه يعني أيضاً أن المهندس المشرف على مبناك ليس مسؤولاً عن ستة مبانٍ أخرى في الوقت نفسه.",
+    en: "General Sherman was founded in 2009 on a simple rule: no new project starts until the previous one reaches finishing stage. That makes us grow more slowly than others — and it also means the engineer supervising your building is not running six others at the same time.",
   },
   "about.story2": {
     ar: "نشتري الأرض نقداً قبل التصميم، فلا نضطر لضغط المواصفات لاحقاً لتغطية كلفة التمويل. ونشتري مواد التشطيب الأساسية — البلاط والأدوات الصحية والمصاعد — دفعةً واحدة عند التعاقد، حتى لا يتغير ما وعدناك به إذا تغيرت الأسعار.",

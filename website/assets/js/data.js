@@ -8,8 +8,8 @@
    ========================================================================== */
 
 const COMPANY = {
-  name: { ar: "ديار العُلا للتطوير العقاري", en: "Diyar Al Ola Development" },   // «REPLACE»
-  short: { ar: "ديار العُلا", en: "Diyar Al Ola" },                              // «REPLACE»
+  name: { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },   // «REPLACE»
+  short: { ar: "جنرال شيرمان", en: "General Sherman" },                              // «REPLACE»
   tagline: { ar: "سكنٌ يليق بمقامك", en: "Homes with standing" },
   founded: 2009,
   intro: {
@@ -19,9 +19,9 @@ const COMPANY = {
   phone: "+962 6 552 0176",           // «REPLACE»
   phoneHref: "+96265520176",
   whatsapp: "962790000176",           // «REPLACE» — digits only, no + or spaces
-  email: "info@diyaralola.jo",        // «REPLACE»
-  salesEmail: "sales@diyaralola.jo",  // «REPLACE»
-  domain: "https://www.diyaralola.jo",// «REPLACE»
+  email: "info@generalsherman.jo",        // «REPLACE»
+  salesEmail: "sales@generalsherman.jo",  // «REPLACE»
+  domain: "https://www.generalsherman.jo",// «REPLACE»
   address: {
     ar: "شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن",
     en: "46 Abdullah Ghosheh Street, 3rd Floor, Amman 11194, Jordan",
