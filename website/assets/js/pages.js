@@ -13,6 +13,8 @@
   function homeStats() {
     const box = $("#home-stats");
     if (!box) return;
+    // No figures, no band — a section heading over nothing reads as broken.
+    if (!COMPANY.stats.length) { box.closest("section")?.remove(); return; }
     box.innerHTML = COMPANY.stats.map((s) => `
       <div class="stat reveal">
         <p class="stat__value num">${s.value}</p>
@@ -42,6 +44,7 @@
   function testimonials() {
     const box = $("#home-quotes");
     if (!box) return;
+    if (!TESTIMONIALS.length) { box.closest("section")?.remove(); return; }
     box.innerHTML = TESTIMONIALS.map((q) => {
       const name = tx(q.name);
       const initials = name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("");

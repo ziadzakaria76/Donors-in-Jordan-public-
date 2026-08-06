@@ -511,9 +511,6 @@ ${pageHero({
     lead: '<span data-i18n="about.lead">بدأنا عام ٢٠٠٩ بمبنى واحد في خلدا. اليوم سلّمنا ١٦ مشروعاً و٤٨٠ وحدة، وما زلنا نبني عدداً محدوداً في الوقت نفسه.</span>',
   })}
 
-  <section class="section section--ink section--tight">
-    <div class="wrap"><div class="stat-row" id="home-stats"></div></div>
-  </section>
 
   <section class="section">
     <div class="wrap split split--wide">
@@ -568,15 +565,6 @@ ${pageHero({
     </div>
   </section>
 
-  <section class="section">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="home.quotesEyebrow">آراء الملّاك</p>
-        <h2 data-i18n="home.quotesTitle">ما يقوله من سكن معنا</h2>
-      </div>
-      <div class="quote-grid" id="home-quotes"></div>
-    </div>
-  </section>
 
   <section class="section section--stone">
     <div class="wrap">

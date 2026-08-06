@@ -51,13 +51,9 @@ Everything below is invented placeholder content. Search for `«REPLACE»` in
 
 - **Company identity** — tagline, founding year, commercial registration. The
   name and logo are real; everything around them is not.
-- **The track record** — `COMPANY.stats` (16 projects, 480 homes, 17 years, 98%
-  on time), the founding year, and the company history in `about.*` in
-  `i18n.js` are all invented. With a real name and logo on the page these read
-  as claims the business is making, so replace them with true figures or empty
-  the `stats` array to drop the band entirely.
-- **Testimonials** — `TESTIMONIALS` are invented people and quotes. Replace with
-  real, permissioned quotes or delete the array to remove the section.
+- **Company history** — the founding year, the registration number, and the
+  story in `about.*` in `i18n.js` are still invented. With a real name and logo
+  on the page these read as claims the business is making.
 - **Contact details** — phone, WhatsApp number (digits only, no `+` or spaces),
   both email addresses, the office address and `mapQuery`.
 - **Social links** — the four `href: "#"` entries.
@@ -128,6 +124,41 @@ UI strings live in `assets/js/i18n.js` as `{ ar, en }` pairs keyed by
 what search engines and no-JS visitors see — and repeated in `i18n.js` so that
 switching back from English restores it. **If you change a string in the HTML,
 change its twin in `i18n.js`.**
+
+---
+
+## Restoring the stats and testimonials
+
+Both sections were removed rather than filled, because the figures and quotes
+in them were invented for the build. `COMPANY.stats` and `TESTIMONIALS` in
+`data.js` are now empty arrays, and the markup is gone from `index.html` and
+`about.html`.
+
+To bring either back, add the data **and** restore its section. The renderers
+in `pages.js` delete their own section when the array is empty, so data alone
+is not enough — but it does mean a half-finished restore fails safe rather than
+rendering a heading over nothing.
+
+```html
+<!-- stats band: index.html after the hero, about.html after the page hero -->
+<section class="section section--ink section--tight">
+  <div class="wrap"><div class="stat-row" id="home-stats"></div></div>
+</section>
+
+<!-- testimonials -->
+<section class="section section--stone">
+  <div class="wrap">
+    <div class="section-head">
+      <p class="eyebrow" data-i18n="home.quotesEyebrow">آراء الملّاك</p>
+      <h2 data-i18n="home.quotesTitle">ما يقوله من سكن معنا</h2>
+    </div>
+    <div class="quote-grid" id="home-quotes"></div>
+  </div>
+</section>
+```
+
+The `home.quotes*` keys are still in `i18n.js`, and `.stat-row` / `.quote-grid`
+are still in the stylesheet, so nothing else needs changing.
 
 ---
 

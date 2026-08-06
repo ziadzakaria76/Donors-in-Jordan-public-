@@ -45,17 +45,11 @@ const COMPANY = {
     { id: "linkedin", label: "LinkedIn", href: "#" },    // «REPLACE»
     { id: "youtube", label: "YouTube", href: "#" },      // «REPLACE»
   ],
-  /* «REPLACE» — these are invented figures. The site now carries a real
-     company's name and logo, so publishing an unverified track record is a
-     claim the business would be making. Put the true numbers here or delete
-     the block: the stats band is rendered from this array, so emptying it
-     removes the band from the home and about pages. */
-  stats: [
-    { value: "16", label: { ar: "مشروعاً مُسلَّماً", en: "Projects delivered" } },
-    { value: "480+", label: { ar: "وحدة سكنية", en: "Homes handed over" } },
-    { value: "17", label: { ar: "عاماً في السوق الأردني", en: "Years in the Jordanian market" } },
-    { value: "98%", label: { ar: "تسليم في موعده", en: "Delivered on schedule" } },
-  ],
+  /* Track record. Empty because the figures that were here were invented for
+     the build, and the site now carries the real name and logo. To bring the
+     band back: add entries here and restore the stats <section> in index.html
+     and about.html (see README → "Restoring the stats and testimonials"). */
+  stats: [],
 };
 
 /* --------------------------------------------------------------- districts */
@@ -278,40 +272,9 @@ const AMENITIES = {
 
 /* ------------------------------------------------------------ testimonials */
 
-const TESTIMONIALS = [
-  {
-    name: { ar: "رنا العُمري", en: "Rana Al-Omari" },
-    role: { ar: "مالكة شقة في ريزيدنس ٧٦", en: "Owner, Residence 76" },
-    quote: {
-      ar: "اشترينا على المخطط وكنّا نتوقع التأخير المعتاد. سُلِّمت الشقة قبل الموعد بأسبوعين، وبنفس التشطيبات التي وُعدنا بها في العقد لا نسخة أرخص منها.",
-      en: "We bought off-plan and braced ourselves for the usual delay. The apartment was handed over two weeks early, with the same finishes written into the contract — not a cheaper version of them.",
-    },
-  },
-  {
-    name: { ar: "سامر حدّاد", en: "Samer Haddad" },
-    role: { ar: "مالك شقة في حدائق الرابية", en: "Owner, Rabieh Gardens" },
-    quote: {
-      ar: "ما أقنعني هو أنهم أجابوا عن أسئلتي التقنية بالتفصيل: نوع العزل، وسماكة الزجاج، ومصدر المصاعد. لم أشعر أنني أمام بائع بل أمام مهندس يعرف مبناه.",
-      en: "What convinced me was that they answered the technical questions properly — the insulation, the glazing thickness, where the lifts came from. It felt like talking to an engineer who knew the building, not a salesman.",
-    },
-  },
-  {
-    name: { ar: "د. ليلى الشوابكة", en: "Dr. Laila Al-Shawabkeh" },
-    role: { ar: "مالكة شقة في ذا كريسنت", en: "Owner, The Crescent" },
-    quote: {
-      ar: "كنت أبحث عن شقة عائلية تفصل غرف النوم عن مساحة الضيوف، وهذا نادر في عمّان. التوزيع هنا كان الوحيد الذي لم أحتج لتعديله.",
-      en: "I was looking for a family apartment that separates the bedrooms from the guest space, which is rare in Amman. This was the only layout I did not want to change.",
-    },
-  },
-  {
-    name: { ar: "خالد المجالي", en: "Khaled Al-Majali" },
-    role: { ar: "مستثمر — ثلاث وحدات", en: "Investor — three units" },
-    quote: {
-      ar: "أتعامل معهم منذ ٢٠١٨ في ثلاث وحدات. التقارير الربعية عن نسبة الإنجاز تصل في موعدها، وهذا وحده يوفّر عليّ متابعة أسبوعية.",
-      en: "I have bought three units with them since 2018. The quarterly progress reports arrive when they say they will, which alone saves me chasing them every week.",
-    },
-  },
-];
+/* Empty for the same reason: the quotes here were invented. Add real,
+   permissioned quotes and restore the section markup to bring it back. */
+const TESTIMONIALS = [];
 
 /* ---------------------------------------------------------------- process */
 
