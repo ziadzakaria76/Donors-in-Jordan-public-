@@ -51,6 +51,14 @@ returned a clean listing. Run `python run.py --capture PORTAL` against those.
 (via Germany Trade & Invest) and IsDB (HTML); Saudi Fund, ADFD and JICA
 (announcements only).
 
+The list is data, in
+[`jordan_tender_monitor/portals.json`](jordan_tender_monitor/portals.json), so
+a portal can be added, disabled or repointed without touching code. Eight of
+the thirteen are data alone and go through the generic extraction cascade; five
+keep a module because their source is a search endpoint or an API rather than a
+page. Why each is configured as it is:
+[`PORTALS.md`](jordan_tender_monitor/PORTALS.md).
+
 A failing portal is skipped with a diagnosed reason and reported as unavailable
 with the URL to check by hand. It never aborts the run, and a broken run never
 looks like a quiet one — portal health is in the output filename, and an
@@ -110,7 +118,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 853 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 1,119 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

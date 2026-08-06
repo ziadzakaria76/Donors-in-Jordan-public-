@@ -24,7 +24,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from jordan_tender_monitor import portals
-from jordan_tender_monitor.portals import base, browser, giz, harvester, ungm
+from jordan_tender_monitor.portals import base, browser, harvester, ungm
 from jordan_tender_monitor.portals.base import PortalError
 
 from .harness import check, check_eq
@@ -246,7 +246,17 @@ def test_the_browser_dependency_stays_contained():
 
     from jordan_tender_monitor import portals as registry
 
-    users = sorted(key for key, module in registry.MODULES.items()
+    # Only a portal backed by a module can reach the browser at all: a
+    # data-only portal is a portals.json entry driving the generic cascade,
+    # and there is no field in that file which could ask for a render. The
+    # dependency is contained by construction for eight of the thirteen.
+    coded = {key: module for key, module in registry.MODULES.items()
+             if inspect.ismodule(module)}
+    check(len(coded) < len(registry.MODULES),
+          "browser: most portals are data only and cannot reach it at all",
+          f"{len(coded)} of {len(registry.MODULES)} have code")
+
+    users = sorted(key for key, module in coded.items()
                    if "browser." in inspect.getsource(module))
     check_eq(users, ["ungm"],
              "browser: only the portal that demonstrably needs it declares it")
@@ -674,7 +684,7 @@ def test_giz_dropped_the_page_that_carried_no_listing():
     main-menu__item (33): pure navigation. Kept in the list it would fail on
     every run and make a working portal look half-broken.
     """
-    urls = giz.SPEC.urls
+    urls = portals.source_urls("giz")
     check_eq(len(urls), 1, "giz: one source URL, the German portal")
     check("ausschreibungen.giz.de" in urls[0],
           "giz: and it is the ausschreibungen portal")

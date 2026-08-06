@@ -100,7 +100,15 @@ jobs:
         run: |
           set +e
           targets="${{ github.event.inputs.portals }}"
-          [ -z "$targets" ] && targets="ungm ebrd eib giz kfw isdb sfd adfd jica"
+          # Derived from portals.json rather than listed here. A hard-coded
+          # list would quietly stop covering a portal the moment one was added
+          # to the file, and "diagnose everything" that skips the newest portal
+          # is the one case where it is least true.
+          if [ -z "$targets" ]; then
+            targets=$(python -c "
+from jordan_tender_monitor import portals
+print(' '.join(portals.html_portals()))")
+          fi
           for p in $targets; do
             echo "=============================================================="
             python jordan_tender_monitor/run.py --capture "$p"

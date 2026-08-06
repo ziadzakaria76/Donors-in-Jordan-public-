@@ -20,11 +20,20 @@ being absent costs nothing, and it is what _is_jordan() prefers when present.
 
 from __future__ import annotations
 
+from .. import portal_config
 from ..utils import text as textutil
 from . import base
 
-API = "https://api.ted.europa.eu/v3/notices/search"
 KEY = "ted"
+# From portals.json -- see the note in worldbank.py.
+API = portal_config.primary_url(KEY)
+
+# The fields portals.json therefore must not set: this portal is a REST
+# API and has no HtmlSpec at all, so a selector in the file would be read,
+# accepted and then used by nothing. The loader rejects the entry instead,
+# and a test keeps this list and the file's `code_owned` in step.
+CODE_OWNED = ("selectors", "field_selectors", "anchor_hint", "currency",
+              "filter_to_jordan")
 
 # Three-letter ISO, per the documented buyer-country=DEU example.
 QUERY = 'FT~"Jordan" OR buyer-country=JOR'
@@ -129,7 +138,7 @@ def fetch_tenders() -> list[dict]:
         "page": 1,
         "scope": "ACTIVE",
     }
-    data = base.post_json(API, payload)
+    data = base.post_json(base.require_url(API, KEY), payload)
 
     items = []
     if isinstance(data, dict):
