@@ -135,20 +135,20 @@ the module says why for each. Two are worth repeating here:
 of Jordan notices print "Multiple destinations" in the country cell rather than
 a country name, and the generic text filter was dropping 51 of 70 of them.
 
-### EBRD
+### EBRD — `ebrd`
 
 Two sources: the notices page on ebrd.com, and ECEPP, where the tender
 documents and many of the consultancy assignments actually live. Either failing
 is tolerated as long as the other works. Verified live: 4,012 notices scanned,
 119 Jordan.
 
-### EIB
+### EIB — `eib`
 
 Corporate procurement and notices for EIB-financed projects in one listing;
 Jordan appears mainly under the latter. Returns a bot wall from a data-centre
 IP, so the selectors remain unverified.
 
-### GIZ
+### GIZ — `giz`
 
 **The English page was removed after `--capture` showed it carries no listing
 at all.** Its repeated blocks were `main-menu__container` (74) and
@@ -167,7 +167,7 @@ German formatting is why `utils.money` handles dot-as-thousands and
 `utils.dates` handles "15. Januar 2027": EUR 1.500.000 read as 1.5 would put a
 real contract below the minimum value and delete it.
 
-### KfW — read from GTAI
+### KfW — `kfw`, read from GTAI
 
 **KfW does not publish tender notices on kfw.de.** Germany Trade & Invest is
 entrusted with publishing them, so the source is `gtai.de/en/trade/tenders`.
@@ -175,7 +175,7 @@ Pointing a scraper at kfw.de makes the portal report "unavailable" forever
 while looking like an honest failure — which is worse than not having the
 portal, because it is invisible. A test pins this.
 
-### IsDB
+### IsDB — `isdb`
 
 Jordan is a member country, so IsDB-financed procurement appears regularly.
 Some calls are restricted to member-country firms; those are flagged by the
@@ -187,13 +187,13 @@ Jordan that day.
 
 ## Tier 3 — announcements only
 
-### Saudi Fund for Development
+### Saudi Fund for Development — `sfd`
 
 Publishes in Arabic and English, and many calls are restricted to Saudi firms
 or Saudi-led joint ventures. Flagged, not excluded. Arabic content is kept in
 the original and flagged for manual review. Times out from a data-centre IP.
 
-### ADFD — `no_listing_reason`
+### ADFD — `adfd`, `no_listing_reason`
 
 **ADFD publishes no machine-readable tender listing.** The conclusion is
 negative rather than pending, and it cost four URLs and two fetch strategies to
@@ -231,7 +231,7 @@ What cannot be distinguished from outside is "no open tenders today" from "the
 listing needs an interaction to appear", so `no_listing_reason` says so rather
 than implying certainty.
 
-### JICA — `no_listing_reason`
+### JICA — `jica`, `no_listing_reason`
 
 **JICA's Jordan office publishes no procurement page.** Chased down properly
 rather than guessed at:

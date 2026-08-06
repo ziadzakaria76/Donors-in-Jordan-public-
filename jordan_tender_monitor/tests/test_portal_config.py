@@ -601,6 +601,45 @@ def test_no_listing_reason_is_data_any_portal_can_declare():
                   "no listing: and the real diagnosis survives after 'Detail:'")
 
 
+def test_every_portal_in_the_file_is_explained_in_the_prose():
+    """PORTALS.md carries the reasoning the file cannot.
+
+    Moving the portals into JSON took the prose out of thirteen modules and put
+    it in one document. That only stays true while the document keeps up: a
+    portal added to the file and not to the prose leaves the next person
+    guessing why it is configured the way it is -- and a portal REMOVED from
+    the file but left in the prose is worse, because the explanation reads as
+    current.
+
+    Keys are matched, not display names. "IsDB" and "isdb" are not the same
+    string, and a check on the display name passes for a portal whose key was
+    renamed underneath it.
+    """
+    import re
+
+    prose = (Path(__file__).resolve().parent.parent / "PORTALS.md").read_text(
+        encoding="utf-8")
+    headings = re.findall(r"^### .*$", prose, re.M)
+
+    documented = set()
+    for heading in headings:
+        for key in re.findall(r"`(?:module: )?([a-z0-9_-]+)`", heading):
+            documented.add(key)
+
+    in_file = {p.key for p in portal_config.REGISTRY.portals}
+
+    undocumented = sorted(in_file - documented)
+    check(not undocumented,
+          "prose: every portal in the file has a section in PORTALS.md",
+          f"no section for: {undocumented}")
+
+    # `no_listing_reason` is a marker in some headings, not a portal key.
+    stale = sorted(documented - in_file - {"no_listing_reason"})
+    check(not stale,
+          "prose: and PORTALS.md explains no portal the file no longer has",
+          f"still documented but gone: {stale}")
+
+
 TESTS = [
     test_a_data_only_portal_round_trips_from_file_to_records,
     test_a_data_only_portal_that_reads_nothing_says_which_kind_of_nothing,
@@ -620,4 +659,5 @@ TESTS = [
     test_ungm_derives_its_search_endpoint_from_the_listing_url,
     test_the_file_and_the_module_whitelist_agree,
     test_no_listing_reason_is_data_any_portal_can_declare,
+    test_every_portal_in_the_file_is_explained_in_the_prose,
 ]
