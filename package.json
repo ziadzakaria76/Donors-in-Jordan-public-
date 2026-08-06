@@ -1,0 +1,14 @@
+{
+  "name": "sherman-company-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static bilingual (AR/EN) website for a Jordanian residential developer.",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "assets": "node tools/generate-assets.mjs",
+    "pages": "node tools/build-pages.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.34.0"
+  }
+}
