@@ -27,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -217,6 +218,30 @@ private fun AppScaffold(
     val verifyResult by settingsVm.verifyResult.collectAsState()
     val pollStatus by settingsVm.pollStatus.collectAsState()
 
+    // Load a tab's data the first time it is opened, and not again.
+    //
+    // Without this the Run tab printed "No runs found for this workflow" and
+    // the Portals tab sat empty with its Add button disabled -- both of them
+    // stating a conclusion before anything had been looked at, which is the
+    // one thing this app is not allowed to do. Guarded on the loaded flag
+    // rather than fired on every tab switch, so browsing between tabs does not
+    // spend a request each time.
+    LaunchedEffect(tab, portalsState.loaded, runState.loaded) {
+        when (tab) {
+            Tab.LATEST ->
+                if (reportState.report == null && !reportState.loading) {
+                    app.refreshLatestReport()
+                }
+            Tab.RUN -> if (!runState.loaded && !runState.loading) app.refreshRuns()
+            Tab.PORTALS ->
+                if (!portalsState.loaded && !portalsState.loading) portalsVm.load()
+            // Local reads, so this is free and can happen every time. It has
+            // to: "last checked 20 minutes ago" is only true if it is re-read.
+            Tab.SETTINGS -> settingsVm.refreshPollStatus()
+            else -> Unit
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(title = { Text(topBarTitle(tab, settings.repoSlug)) })
@@ -245,6 +270,7 @@ private fun AppScaffold(
 
             Tab.RUN -> RunScreen(
                 state = runState,
+                onRefreshList = app::refreshRuns,
                 onStartRun = app::startRun,
                 onRefresh = app::refreshRuns,
                 onFollow = app::followRun,

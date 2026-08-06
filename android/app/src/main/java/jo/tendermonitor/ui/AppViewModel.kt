@@ -47,6 +47,15 @@ data class RunState(
     val loading: Boolean = false,
     val problem: Problem? = null,
     val note: String? = null,
+    /**
+     * True once a listing has actually been attempted.
+     *
+     * Without it an empty list means both "we have not looked yet" and "this
+     * workflow has no runs", and the screen would print the second while the
+     * first was true -- a plausible wrong explanation, which is worse than a
+     * blank screen.
+     */
+    val loaded: Boolean = false,
 )
 
 data class FilesState(
@@ -130,7 +139,7 @@ class AppViewModel(
                 }
 
                 is Outcome.Ok -> {
-                    _runs.value = _runs.value.copy(runs = list.value)
+                    _runs.value = _runs.value.copy(runs = list.value, loaded = true)
                     val finished = list.value.firstOrNull { it.isFinished }
                     if (finished == null) {
                         _report.value = _report.value.copy(
@@ -178,7 +187,7 @@ class AppViewModel(
             _runs.value = _runs.value.copy(loading = true, problem = null)
             when (val list = repository.runs(20)) {
                 is Outcome.Ok -> _runs.value = _runs.value.copy(
-                    runs = list.value, loading = false,
+                    runs = list.value, loading = false, loaded = true,
                     watching = _runs.value.watching?.let { watched ->
                         list.value.firstOrNull { it.id == watched.id } ?: watched
                     },

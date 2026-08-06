@@ -156,6 +156,17 @@ fun PortalsScreen(
             item { ProblemCard(problem, onRetry = onReload) }
         }
 
+        if (!state.loaded && !state.loading && state.problem == null) {
+            item {
+                Text(
+                    "The portal list has not been read yet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp),
+                )
+            }
+        }
+
         if (state.loading && state.entries.isEmpty()) {
             item {
                 Row(

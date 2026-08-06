@@ -21,6 +21,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -58,6 +59,7 @@ fun RunScreen(
     state: RunState,
     onStartRun: (scope: String, portals: String, mode: String) -> Unit,
     onRefresh: () -> Unit,
+    onRefreshList: () -> Unit,
     onFollow: (Long) -> Unit,
     onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -196,9 +198,26 @@ fun RunScreen(
             }
         }
 
-        item { SectionHeader("Recent runs") }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader("Recent runs")
+                Spacer(Modifier.weight(1f))
+                if (state.loading) {
+                    CircularProgressIndicator(
+                        Modifier.width(16.dp).height(16.dp), strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(16.dp))
+                } else {
+                    TextButton(onClick = onRefreshList) { Text("Refresh") }
+                }
+            }
+        }
 
-        if (state.runs.isEmpty() && !state.loading) {
+        // Only after a listing has actually been attempted. Before that, an
+        // empty list means "we have not looked", and printing a diagnosis for
+        // a state nobody has checked is exactly the kind of plausible wrong
+        // answer this codebase keeps removing.
+        if (state.runs.isEmpty() && !state.loading && state.loaded) {
             item {
                 Text(
                     "No runs found for this workflow. If that is a surprise, check the " +

@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -20,10 +22,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +60,7 @@ enum class SortBy(val label: String) { SCORE("Score"), DEADLINE("Deadline") }
  *  * hide the cached report behind an error. A stale report with a banner is
  *    more useful than a blank screen.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportScreen(
     state: ReportState,
@@ -69,7 +74,23 @@ fun ReportScreen(
 
     val report = state.report
 
-    Column(modifier.fillMaxSize()) {
+    // Pull to refresh over the whole screen.
+    //
+    // When there is a report the LazyColumn below provides the nested scroll
+    // the gesture rides on. When there is not, the column is made scrollable
+    // instead -- otherwise the one moment you most want to pull, an empty
+    // screen, would be the one moment the gesture did nothing.
+    PullToRefreshBox(
+        isRefreshing = state.loading,
+        onRefresh = onRefresh,
+        modifier = modifier.fillMaxSize(),
+    ) {
+    Column(
+        Modifier.fillMaxSize().then(
+            if (report == null) Modifier.verticalScroll(rememberScrollState())
+            else Modifier
+        )
+    ) {
         if (state.loading) {
             Row(
                 Modifier.fillMaxWidth().padding(12.dp),
@@ -263,6 +284,7 @@ fun ReportScreen(
                 )
             }
         }
+    }
     }
 }
 
