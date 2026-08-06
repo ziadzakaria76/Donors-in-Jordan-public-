@@ -796,6 +796,33 @@ def test_the_release_workflow_cannot_silently_skip_a_release():
     check("gh release edit" in release,
           "release: refreshing the notes too, so they match the new asset")
 
+    # Cutting a release from the Releases page is the only route that needs no
+    # terminal, and it is the route actually available here -- pushing a tag
+    # from this environment is refused. It arrives as a `release` event.
+    import yaml
+
+    document = yaml.safe_load(release)
+    # 'on' is YAML 1.1's boolean true, which is why this is not document["on"].
+    triggers = document.get("on") or document.get(True)
+    check("release" in triggers,
+          "release: a release published from the web form builds the APK",
+          f"triggers are {sorted(triggers)}")
+    check_eq(triggers.get("release", {}).get("types"), ["published"],
+             "release: on published only -- a draft must not build an APK")
+
+    # That form can deliver both a `release` event and a tag `push` for the
+    # same tag. Two concurrent runs would race on the asset upload.
+    check("concurrency:" in release,
+          "release: only one build per tag at a time")
+
+    # And a release published from the web form may carry notes somebody
+    # wrote. Overwriting them would destroy the one part of the release the
+    # workflow did not author.
+    check("--json body" in release,
+          "release: it reads the notes already on the release")
+    check("Keeping the existing notes" in release,
+          "release: and keeps them rather than overwriting what someone wrote")
+
     # A release can be cut from a branch, and the notes point at ANDROID.md.
     # Pointing at main would 404 for exactly the releases that most need the
     # instructions -- the early ones, cut before the branch merged.

@@ -139,14 +139,38 @@ new one and paste it in.
 
 ## Cutting a release
 
+### From the phone, with no terminal
+
+1. Open the repository's **Releases** page → **Draft a new release**.
+2. **Choose a tag** → type a new one, `v0.2.0`, and pick **Create new tag on
+   publish**. Set **Target** to the branch you want to release from.
+3. Give it a title, write notes or leave them empty, and **Publish release**.
+
+The **Android release** workflow picks it up, builds the APK and attaches it
+to the release you just made. Refresh the page after a few minutes and the
+`.apk` is there.
+
+It triggers on **published**, not on saving a draft — a draft you are still
+editing does not build. And anything you wrote in the notes is **kept**: the
+install instructions and the checksum are appended below your text, not put in
+place of it. Only a release with no notes at all gets the generated ones as
+its whole body.
+
+### From a terminal
+
 ```bash
 git tag v0.2.0
 git push origin v0.2.0
 ```
 
-That is all. The **Android release** workflow runs the unit tests, builds the
-APK, names it after the tag, and publishes a GitHub Release with the file and
-its SHA-256 attached. If the tests fail, no release is published.
+Either route ends in the same place. The workflow runs the unit tests, builds
+the APK, names it after the tag, and publishes it with its SHA-256. If the
+tests fail, no release is published.
+
+**Note.** Publishing from the web form can deliver both a `release` event and
+a tag `push` for the same tag, which would start two builds racing to upload
+the same asset. A concurrency group keyed on the tag allows one at a time and
+lets the newest win.
 
 It can also be run from the Actions tab (**Android release → Run workflow**)
 against a tag that already exists — useful for re-cutting one whose build

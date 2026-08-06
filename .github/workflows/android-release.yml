@@ -12,7 +12,14 @@ on:
   push:
     tags:
       - "v*"
-  # So a release can be cut, or re-cut, from a phone.
+  # Cutting a release from the Releases page, which is the only route that
+  # needs no terminal at all: the web form creates the tag and the release
+  # together, and this picks it up and attaches the APK. `published` rather
+  # than `created` so a draft release does not build until it is actually
+  # published.
+  release:
+    types: [published]
+  # So a release can be re-cut, or one built for a tag that already exists.
   workflow_dispatch:
     inputs:
       tag:
@@ -23,6 +30,17 @@ on:
 permissions:
   contents: write   # the only job here that writes anything: the release
 
+# Publishing from the Releases page can arrive as both a `release` and a tag
+# `push`, so the same tag can start two builds. They would race on the asset
+# upload. One at a time per tag, newest wins: the runs are identical, and the
+# upload is the last step, so cancelling an older one cannot leave a
+# half-published release behind.
+concurrency:
+  group: >-
+    android-release-${{ github.event.release.tag_name || inputs.tag ||
+    github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -31,7 +49,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          # On a `release` event github.ref is already the tag, but naming the
+          # tag explicitly means the three triggers cannot disagree about
+          # which commit is being released.
+          ref: ${{ inputs.tag || github.event.release.tag_name || github.ref }}
           # The version code is the commit count, so the whole history is
           # needed. A shallow clone would produce versionCode 1 on every
           # release, and Android would install any of them over any other
@@ -50,7 +71,7 @@ jobs:
       - name: Work out the version
         id: version
         run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
+          TAG="${{ inputs.tag || github.event.release.tag_name || github.ref_name }}"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "APK_VERSION_NAME=${TAG#v}" >> "$GITHUB_ENV"
           echo "APK_VERSION_CODE=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
@@ -133,10 +154,31 @@ jobs:
           # advertised as the right one. So replace in place instead, and say
           # in the log which of the two happened.
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists -- replacing its asset and notes."
+            echo "Release $TAG already exists -- replacing its asset."
             gh release upload "$TAG" "android/out/$APK" --clobber
+
+            # A release published from the Releases page may carry notes
+            # somebody wrote by hand, or GitHub's generated changelog. Those
+            # are not ours to throw away, so keep them and add the install
+            # instructions underneath. Only a release with no notes at all
+            # gets ours as the whole body.
+            EXISTING=$(gh release view "$TAG" --json body --jq .body)
+            if [ -n "${EXISTING//[$' \t\n\r']/}" ]; then
+              if printf '%s' "$EXISTING" | grep -qF 'Install this on the phone'; then
+                echo "Notes already carry the install section -- rewriting it."
+                BODY=$(printf '%s' "$EXISTING" \
+                  | sed '/^Install this on the phone:/,$d')
+                printf '%s\n\n%s\n' "$BODY" "$(cat notes.md)" > merged.md
+              else
+                echo "Keeping the existing notes and appending the install section."
+                printf '%s\n\n---\n\n%s\n' "$EXISTING" "$(cat notes.md)" > merged.md
+              fi
+              mv merged.md notes.md
+            else
+              echo "The release had no notes -- using the generated ones."
+            fi
+
             gh release edit "$TAG" \
-              --title "Jordan Tenders $TAG" \
               --notes-file notes.md
           else
             echo "Creating release $TAG."
