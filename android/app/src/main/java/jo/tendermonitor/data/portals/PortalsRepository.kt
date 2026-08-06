@@ -3,6 +3,9 @@ package jo.tendermonitor.data.portals
 import jo.tendermonitor.data.Kind
 import jo.tendermonitor.data.Outcome
 import jo.tendermonitor.data.Problem
+// A top-level extension in the parent package, so it needs naming here even
+// though Outcome itself is imported.
+import jo.tendermonitor.data.map
 import jo.tendermonitor.data.github.DispatchRequest
 import jo.tendermonitor.data.github.GitHubClient
 import jo.tendermonitor.data.github.PutFileRequest
