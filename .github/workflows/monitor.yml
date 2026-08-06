@@ -105,9 +105,7 @@ jobs:
           # to the file, and "diagnose everything" that skips the newest portal
           # is the one case where it is least true.
           if [ -z "$targets" ]; then
-            targets=$(python -c "
-from jordan_tender_monitor import portals
-print(' '.join(portals.html_portals()))")
+            targets=$(python -c "from jordan_tender_monitor import portals; print(' '.join(portals.html_portals()))")
           fi
           for p in $targets; do
             echo "=============================================================="
@@ -137,7 +135,12 @@ print(' '.join(portals.html_portals()))")
                 && '1' || '0' }}
           # markdown is not a deliverable; it is rendered into the run page so
           # results are readable on a phone without downloading a .docx.
-          JTM_OUTPUT_FORMATS: "docx,excel,markdown"
+          #
+          # json is not a deliverable either: it is how the Android app reads a
+          # run. GitHub's REST API does not expose a job's step summary, so the
+          # markdown above is unreachable from a client and the app downloads
+          # this artifact instead.
+          JTM_OUTPUT_FORMATS: "docx,excel,markdown,json"
           SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
         run: |
           python jordan_tender_monitor/run.py --run --fail-on-alert \
@@ -156,7 +159,7 @@ print(' '.join(portals.html_portals()))")
               >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload the Word and Excel reports
+      - name: Upload the Word and Excel reports, and the app's JSON
         if: always() && github.event.inputs.mode != 'diagnose portals (--capture)' 
         uses: actions/upload-artifact@v4
         with:
@@ -164,5 +167,6 @@ print(' '.join(portals.html_portals()))")
           path: |
             jordan_tender_monitor/output/*.docx
             jordan_tender_monitor/output/*.xlsx
+            jordan_tender_monitor/output/*.json
           if-no-files-found: warn
           retention-days: 90

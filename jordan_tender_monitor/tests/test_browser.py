@@ -631,6 +631,67 @@ def test_ungm_declares_its_source_and_filters_to_jordan():
 # The environment this actually runs in
 # ---------------------------------------------------------------------------
 
+def test_every_workflow_file_is_structurally_valid_yaml():
+    """A workflow GitHub cannot parse does not run, and nothing says so.
+
+    There is no red cross for an unparseable workflow: it simply stops being
+    scheduled, which is the one failure mode this whole system is built to
+    make impossible. It was shipped once already -- an embedded `python -c`
+    whose continuation lines started at column 1, which ends the YAML block
+    scalar and makes the rest of the file nonsense.
+
+    PyYAML is not a dependency of this project and is not worth becoming one
+    for this, so the check is structural rather than a full parse: inside a
+    block scalar (`run: |`), every non-blank line must be indented further
+    than the key that opened it. That is exactly the mistake that was made,
+    and it costs nothing to keep out.
+    """
+    import re
+
+    workflows = sorted((ROOT.parent / ".github" / "workflows").glob("*.yml"))
+    check(len(workflows) >= 2, "workflows: the workflow directory was found",
+          f"got {[w.name for w in workflows]}")
+
+    block_re = re.compile(r"^(\s*)[\w-]+:\s*[|>][-+]?\s*$")
+    for path in workflows:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        index = 0
+        while index < len(lines):
+            match = block_re.match(lines[index])
+            if not match:
+                index += 1
+                continue
+            opener_indent = len(match.group(1))
+            index += 1
+            body = 0
+            while index < len(lines):
+                line = lines[index]
+                if not line.strip():
+                    index += 1
+                    continue
+                indent = len(line) - len(line.lstrip())
+                if indent <= opener_indent:
+                    break
+                body += 1
+                index += 1
+            check(body > 0,
+                  f"workflows: {path.name} has content under every block scalar",
+                  f"empty block ending at line {index}")
+
+    # And the specific shape that broke: a bare `from`/`import`/`print` at the
+    # start of a line anywhere in a workflow is a continuation that escaped its
+    # block. Reported once per file rather than once per line -- a check count
+    # that grows with the length of a YAML file measures nothing.
+    for path in workflows:
+        escaped = [f"line {n}: {line!r}"
+                   for n, line in enumerate(path.read_text(encoding="utf-8")
+                                            .splitlines(), 1)
+                   if re.match(r"^(from|import|print)\b", line)]
+        check(not escaped,
+              f"workflows: {path.name} has no unindented Python continuation",
+              "; ".join(escaped))
+
+
 def test_the_workflow_installs_the_browser_only_for_diagnosis():
     """The scheduled run must not pay for a browser it does not use.
 
@@ -713,6 +774,7 @@ TESTS = [
     test_ungm_routes_its_rendered_html_through_the_cascade,
     test_ungm_selectors_come_from_the_rendered_dom,
     test_ungm_declares_its_source_and_filters_to_jordan,
+    test_every_workflow_file_is_structurally_valid_yaml,
     test_the_workflow_installs_the_browser_only_for_diagnosis,
     test_the_schedule_is_weekday_mornings_and_not_on_the_hour,
     test_giz_dropped_the_page_that_carried_no_listing,

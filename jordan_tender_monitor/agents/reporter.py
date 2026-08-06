@@ -533,22 +533,105 @@ def write_docx(tenders: list[dict], health: list, result: dict, path: Path) -> P
     return path
 
 
-def write_json(tenders: list[dict], health: list, path: Path) -> Path:
+# The report schema the Android app reads. Bump it when a field changes
+# meaning or disappears -- never when one is added, since an older app ignores
+# what it does not know. The app refuses to render a schema it was not written
+# for, which is a worse experience than guessing exactly once and a better one
+# than a screen of half-parsed nonsense every day after that.
+REPORT_SCHEMA = 1
+
+
+def run_status(reported: int, health: list) -> str:
+    """The run's outcome as one machine-readable word.
+
+    The same four cases the filename slug and the status line already
+    distinguish, named rather than re-derived: an app that re-implemented
+    "which of these is a bad run" would eventually disagree with the documents,
+    and the disagreement would be invisible.
+    """
+    broken = [h for h in health if getattr(h, "broken", False)]
+    total = len([h for h in health
+                 if getattr(h, "status", "") not in ("unconfigured", "no listing")])
+    if total and len(broken) == total:
+        return "action_needed"
+    if broken:
+        return "partial"
+    if reported == 0:
+        return "quiet"
+    return "ok"
+
+
+# Display-only fields whose "unknown" value is an empty string, because that
+# is what belongs in a Word table. JSON is typed and a client is not a table:
+# "" would have to be special-cased at every call site on the phone, and the
+# one that got missed would render as a real value.
+_JSON_EMPTY_TO_NULL = ("days_left",)
+
+
+def _json_tender(tender: dict) -> dict:
+    out = {k: v for k, v in tender.items() if not k.startswith("_")}
+    for key in _JSON_EMPTY_TO_NULL:
+        if out.get(key) == "":
+            out[key] = None
+    return out
+
+
+def write_json(tenders: list[dict], health: list, path: Path,
+               result: dict | None = None) -> Path:
+    """The whole report as structured data, for the Android app.
+
+    NOT a deliverable and not a convenience dump: it is the app's only way to
+    read a run. GitHub's REST API does not expose a job's step summary --
+    summaries live in an internal container the artifacts API does not list --
+    so the markdown rendered onto the run page is unreachable from a client.
+    This file is uploaded as an artifact alongside the Word and Excel packs,
+    and the app downloads and parses it.
+
+    Every field the report shows on paper is here, including the ones that make
+    a quiet run distinguishable from a broken one. In particular `scanned` is
+    null when a portal never filters, and MUST NOT be rendered as 0: "read
+    nothing" and "read 500 and none were Jordan" are the two diagnoses that
+    number exists to separate.
+    """
     def encode(obj):
         if isinstance(obj, date):
             return obj.isoformat()
         raise TypeError(type(obj))
 
+    result = result or {}
+    considered = [h for h in health
+                  if getattr(h, "status", "") not in ("unconfigured", "no listing")]
+    broken = [h for h in health if getattr(h, "broken", False)]
+
     payload = {
+        "schema": REPORT_SCHEMA,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "run": {
+            "status": run_status(len(tenders), health),
+            "status_line": status_line(len(tenders), health),
+            "slug": run_slug(len(tenders), health),
+            "opportunity_count": len(tenders),
+            # Notices read before filtering, across every portal. The
+            # difference between this and opportunity_count is the pipeline
+            # working, not notices going missing.
+            "scanned": result.get("scanned", 0),
+            "merged_duplicates": result.get("merged_duplicates", 0),
+            "dropped": dict(result.get("dropped") or {}),
+            "portals_total": len(considered),
+            "portals_ok": len(considered) - len(broken),
+            "portals_broken": len(broken),
+            "new_only": config.NEW_ONLY_MODE,
+        },
         "tender_count": len(tenders),
-        "tenders": [
-            {k: v for k, v in t.items() if not k.startswith("_")}
-            for t in tenders
-        ],
+        "tenders": [_json_tender(t) for t in tenders],
         "portals": [
-            {"key": h.key, "name": h.name, "tier": h.tier, "status": h.status,
-             "count": h.count, "reason": h.reason, "urls": h.urls}
+            {"key": h.key, "name": h.name, "tier": h.tier,
+             "tier_label": config.TIER_LABELS.get(h.tier, ""),
+             "status": h.status, "count": h.count,
+             # null, not 0. See the docstring.
+             "scanned": h.scanned,
+             "reason": h.reason, "urls": list(h.urls),
+             "layer": h.layer, "quality": h.quality}
             for h in health
         ],
     }
@@ -662,7 +745,11 @@ def write_outputs(result: dict, health: list, body_html: str,
                 written["docx"] = write_docx(tenders, health, result,
                                              output_dir / f"{base}.docx")
             elif fmt_name == "json":
-                written["json"] = write_json(tenders, health, output_dir / f"{base}.json")
+                # The app reads this one. It is given `result` as well, so the
+                # run's own counts travel with it rather than being recomputed
+                # on a handset from a list that has already been filtered.
+                written["json"] = write_json(tenders, health,
+                                             output_dir / f"{base}.json", result)
             elif fmt_name == "csv":
                 written["csv"] = write_csv(tenders, output_dir / f"{base}.csv")
             elif fmt_name == "html":
