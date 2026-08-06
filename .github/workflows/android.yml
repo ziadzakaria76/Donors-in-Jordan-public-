@@ -64,8 +64,44 @@ jobs:
         run: ./gradlew --no-daemon testDebugUnitTest
 
       - name: Lint
+        id: lint
         run: ./gradlew --no-daemon lintDebug
         continue-on-error: true
+
+      # Lint does not fail the build -- a warning about a deprecated Compose
+      # overload should not stop an APK reaching the phone. But a step that
+      # goes green while hiding what it found is exactly the silent failure
+      # this project keeps refusing to ship, so print the findings into the log
+      # and the summary where they cannot be missed.
+      - name: Say what lint found
+        if: always()
+        run: |
+          REPORT=app/build/reports/lint-results-debug.xml
+          {
+            echo "### Android lint"
+            if [ ! -f "$REPORT" ]; then
+              echo ""
+              echo 'Lint produced no report. Its step outcome was'
+              echo '"${{ steps.lint.outcome }}". Nothing was checked, so treat'
+              echo 'this build as unlinted rather than clean.'
+              exit 0
+            fi
+            FATAL=$(grep -c 'severity="Fatal"' "$REPORT" || true)
+            ERROR=$(grep -c 'severity="Error"' "$REPORT" || true)
+            WARN=$(grep -c 'severity="Warning"' "$REPORT" || true)
+            echo ""
+            echo "$FATAL fatal, $ERROR error, $WARN warning."
+            echo ""
+            if [ "$FATAL" != "0" ] || [ "$ERROR" != "0" ]; then
+              echo '```'
+              grep -o 'id="[^"]*" severity="\(Fatal\|Error\)" message="[^"]*"' \
+                "$REPORT" | head -40
+              echo '```'
+              echo ""
+              echo "These did NOT fail the build. The APK above was built anyway."
+            fi
+            echo 'Full report: the "android-test-report" artifact on this run.'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Build the debug APK
         run: ./gradlew --no-daemon assembleDebug
