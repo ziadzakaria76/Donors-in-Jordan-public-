@@ -32,11 +32,40 @@ The site is a folder of static files. Publish `website/` as the site root.
 
 | Host | What to do |
 | --- | --- |
-| **Cloudflare Pages** | The domain is already at Cloudflare, so this is the shortest path. Connect the repo, framework preset **None**, **no build command**, output directory `website`. The domain attaches from the same dashboard and DNS is written for you. |
+| **Cloudflare Pages** | The domain is already at Cloudflare, so this is the shortest path — see below. |
 | **Netlify** | Drag the `website/` folder onto the Netlify dashboard, or connect the repo and set **base directory** `website`, **publish directory** `website`, and leave the build command empty. `netlify.toml` already sets caching and the 404 page. |
 | **Vercel** | Import the repo, set **root directory** to `website`, framework preset **Other**, no build command. `vercel.json` sets the caching headers. |
 | **cPanel / any shared host** | Upload the contents of `website/` into `public_html/` over FTP. Nothing else to configure. |
 | **GitHub Pages** | Push, then set Pages to serve from the branch and the `/website` folder. |
+
+### Cloudflare Pages
+
+**Workers & Pages → Create → Pages → Connect to Git**, pick the repo, then:
+
+| Setting | Value |
+| --- | --- |
+| Framework preset | **None** |
+| Build command | *(empty)* |
+| Build output directory | `website` |
+
+**Save and Deploy.** Every push to the branch redeploys; pull requests get their
+own preview URL.
+
+Then **Custom domains → Set up a custom domain**, add `generalshermanhousing.com`
+and `www.generalshermanhousing.com`. Cloudflare writes the DNS itself, since it
+is also the registrar, and issues the certificate.
+
+`_headers` in this folder carries the cache and security headers — it is the
+Pages equivalent of `netlify.toml` and `vercel.json`, and Pages reads it with no
+configuration. Pages serves `404.html` for unmatched paths on its own.
+
+**The `www` redirect is not in this repo and cannot be.** Pages serves both
+hostnames identically, which splits ranking between two addresses, and a
+`_redirects` file cannot match on hostname. Do it in the dashboard:
+**Rules → Redirect Rules → Create rule** — when `Hostname equals
+www.generalshermanhousing.com`, redirect to
+`concat("https://generalshermanhousing.com", http.request.uri.path)`, status
+**301**, preserve query string.
 
 ### The domain
 
@@ -280,6 +309,15 @@ To add more, drop files into `assets/img/` named `<name>-480.webp`,
 `<name>-800.webp`, `<name>-1280.webp`, `<name>-1920.webp` and reference `<name>`
 from `data.js` (`image:` and `gallery:`). The markup builds the `srcset` from
 those widths automatically. Floor plans need only `-800` and `-1280`.
+
+`sherman2-interior-2`, `-4` and `-6` are in the folder but not placed on any
+page — they are real brochure photographs held back from the gallery, kept so
+they can be dropped into `data.js` later without going back to the PDF.
+
+The generated artwork that stood in before the brochure arrived — `gallery-*`,
+`hero-*`, `project-*` and the old `plan-2br`-style drawings, 2.3 MB in all — is
+deleted. It depicted buildings that do not exist, and on a live domain those
+files stay publicly fetchable whether or not a page links to them.
 
 `tools/generate-assets.mjs` still generates the Open Graph card and the favicon
 from the logo, and can render abstract architectural artwork if a project has no
