@@ -132,10 +132,11 @@ change its twin in `i18n.js`.**
 
 ## Removed sections
 
-Four things were cut rather than filled, because their content was invented
-and the site now carries the real name and logo: the **stats band**, the
-**testimonials**, and the About page's **company story**. No page now claims a
-track record or a founding year.
+Four things were cut rather than filled, because their content was invented and
+the site now carries the real name and logo: the **stats band**, the
+**testimonials**, the About page's **company story**, and the **office
+address**. No page now claims a track record, a founding year, or a location
+beyond Amman.
 
 The About page runs hero → four commitments → process → CTA. To add a story
 section back, write it into `i18n.js` and add a `split split--wide` section to
@@ -161,9 +162,10 @@ Set `COMPANY.address` and `COMPANY.mapQuery` in `data.js`, re-add a
 The map renderer removes `#contact-map` whenever `mapQuery` is empty, so the
 map can never show a location the company has not given.
 
-### Restoring the stats and testimonials `COMPANY.stats` and `TESTIMONIALS` in
-`data.js` are now empty arrays, and the markup is gone from `index.html` and
-`about.html`.
+### Restoring the stats and testimonials
+
+`COMPANY.stats` and `TESTIMONIALS` in `data.js` are now empty arrays, and the
+markup is gone from `index.html` and `about.html`.
 
 To bring either back, add the data **and** restore its section. The renderers
 in `pages.js` delete their own section when the array is empty, so data alone
