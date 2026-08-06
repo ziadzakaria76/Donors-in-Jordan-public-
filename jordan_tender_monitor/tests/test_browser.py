@@ -849,6 +849,100 @@ def test_the_release_workflow_cannot_silently_skip_a_release():
               f"release: {name} checks out enough history for it to be right")
 
 
+def test_the_emulator_workflow_covers_what_no_jvm_test_can():
+    """The instrumented suite is the only place three things are exercised.
+
+    The Keystore-backed token store, Room's generated SQL, and whether a screen
+    draws at all. None of them exist on a JVM, so the unit suite is silent
+    about all three -- and silence there reads exactly like coverage.
+
+    This checks the workflow that runs them still does the things that make it
+    meaningful, because an emulator job that boots and runs nothing is the most
+    convincing green tick in the repository.
+    """
+    import io
+    import yaml
+
+    workflows = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
+    emulator = io.open(workflows / "android-emulator.yml", encoding="utf-8").read()
+    document = yaml.safe_load(emulator)
+    job = document["jobs"]["instrumented"]
+
+    check("connectedDebugAndroidTest" in emulator,
+          "emulator: it actually runs the instrumented tests")
+
+    # Without the KVM permissions the emulator falls back to software
+    # rendering and the job HANGS rather than failing -- a timeout, six times
+    # over, with no explanation.
+    check("/dev/kvm" in emulator or "99-kvm4all" in emulator,
+          "emulator: KVM is enabled, or the job hangs instead of running")
+
+    levels = job["strategy"]["matrix"]["api-level"]
+    check(26 in levels,
+          "emulator: minSdk is tested -- the Keystore differs on older images",
+          f"levels are {levels}")
+    check(35 in levels,
+          "emulator: and so is the target the app is built against",
+          f"levels are {levels}")
+
+    steps = job["steps"]
+    uploads = [s for s in steps if "upload-artifact" in str(s.get("uses", ""))]
+    check(uploads, "emulator: the reports are kept")
+    check(all(str(s.get("if", "")).strip() == "always()" for s in uploads),
+          "emulator: and kept ON FAILURE, which is when they are the evidence")
+
+    # The summary script is a file for a reason -- a Python heredoc inside a
+    # block scalar terminates at column 1 and ends the scalar, which is how
+    # this repository once shipped a monitor.yml GitHub could not parse.
+    summary = workflows.parent / "scripts" / "android_test_summary.py"
+    check(summary.exists(),
+          "emulator: the summariser the workflow calls exists",
+          f"missing {summary}")
+    source = io.open(summary, encoding="utf-8").read()
+    check("UNTESTED" in source,
+          "emulator: an absent report is reported as untested, not as a pass")
+    check("altogether" in source,
+          "emulator: and a trimmed failure list says both numbers")
+
+
+def test_the_instrumented_tests_exist_and_cover_the_untestable_three():
+    """A workflow that runs an empty suite is worse than no workflow.
+
+    It produces a green tick for a thing nobody checked. So the tests the
+    emulator exists to run have to be present, and have to be the ones that
+    cannot run anywhere else.
+    """
+    root = (Path(__file__).resolve().parent.parent.parent / "android" / "app"
+            / "src" / "androidTest")
+    check(root.is_dir(), "emulator: there is an instrumented source set",
+          f"missing {root}")
+
+    sources = {path.name: path.read_text(encoding="utf-8")
+               for path in root.rglob("*.kt")}
+    check(sources, "emulator: and it contains tests", f"found {sorted(sources)}")
+
+    joined = "\n".join(sources.values())
+    for subject, needle in (
+        ("the Keystore token store", "KeystoreSettings"),
+        ("Room against real SQLite", "TenderDatabase"),
+        ("the screens rendering", "createAndroidComposeRule"),
+        ("notification channels", "CHANNEL_ATTENTION"),
+    ):
+        check(needle in joined,
+              f"emulator: {subject} is covered on the device")
+
+    # The security claim, not just the round trip. A plain unencrypted file
+    # round-trips perfectly, so a test that only stores and reads back would
+    # pass with EncryptedSharedPreferences removed entirely.
+    check("walkTopDown" in joined,
+          "emulator: the token is searched for in plaintext across app storage")
+
+    total = sum(text.count("@Test") for text in sources.values())
+    check(total >= 20,
+          "emulator: the suite is worth booting an emulator for",
+          f"only {total} tests")
+
+
 def test_the_workflow_installs_the_browser_only_for_diagnosis():
     """The scheduled run must not pay for a browser it does not use.
 
@@ -934,6 +1028,8 @@ TESTS = [
     test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at,
     test_every_workflow_file_is_structurally_valid_yaml,
     test_the_release_workflow_cannot_silently_skip_a_release,
+    test_the_emulator_workflow_covers_what_no_jvm_test_can,
+    test_the_instrumented_tests_exist_and_cover_the_untestable_three,
     test_the_workflow_installs_the_browser_only_for_diagnosis,
     test_the_schedule_is_weekday_mornings_and_not_on_the_hour,
     test_giz_dropped_the_page_that_carried_no_listing,

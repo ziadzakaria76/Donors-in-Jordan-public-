@@ -18,11 +18,54 @@ Be clear about this before relying on any of it.
 |---|---|
 | **Compiles** | Yes — CI builds it on every push. That is the only place it is compiled; it is developed in an environment with no Android SDK |
 | **Unit tested** | Token redaction, the API client's failure paths (401 / 403-permission / 403-rate-limit / 404 / 410 / 5xx / offline), report parsing and schema refusal, the artifact zip reader, editing `portals.json` without destroying the prose in it, and the notification and retry policies |
-| **NOT tested end to end** | The background worker itself, and the probe round-trip. Their decision logic is tested; the sequences — WorkManager firing, dispatch, poll, download — have never run |
-| **NOT tested** | The Keystore-backed token store — `EncryptedSharedPreferences` needs a real Android Keystore and cannot run on a JVM. It is two AndroidX calls, deliberately with no logic around them |
-| **NOT run on a device by anyone** | Every screen. No emulator, no handset. The first person to install this is the first person to see it render |
+| **Tested on an emulator** | The Keystore-backed token store, Room against real SQLite, the notification channels, and every screen rendering and navigating. Run on API 26 and API 35 by **Android emulator tests** — see below |
+| **NOT tested end to end** | The background worker itself, and the probe round-trip. Their decision logic is tested and their pieces are exercised on the device; the full sequences — WorkManager firing, dispatch, poll, download — have never run against real GitHub |
+| **NOT run on a handset by anyone** | No physical device. An emulator is not a phone: it says nothing about a real manufacturer's "install unknown apps" flow, battery-optimisation killing background work, or how anything looks on a real screen |
 
 If something behaves differently from this document, this document is wrong.
+
+---
+
+## Testing it on an emulator
+
+`.github/workflows/android-emulator.yml` boots a real Android system image on CI
+and runs `app/src/androidTest` against it, on **API 26** (the app's minSdk) and
+**API 35** (its target).
+
+That workflow exists because three things cannot be checked anywhere else, and
+silence about them reads exactly like coverage:
+
+- **The token store.** `EncryptedSharedPreferences` needs the Android Keystore,
+  and there is no Keystore on a JVM. The test does not merely round-trip the
+  token — a plain unencrypted file round-trips perfectly. It writes the token,
+  then searches **every file the app owns** for it as plaintext. If encryption
+  were removed entirely, that is the test that would notice.
+- **Room's SQL.** Room writes the queries at build time and does not check them
+  until they run. A `LIMIT` that trims the wrong end compiles fine and quietly
+  caches the oldest reports while discarding the current one.
+- **Whether a screen draws.** A Compose screen can compile and still throw on
+  first composition. The tests run with **no token and no data**, which is the
+  state a phone is in thirty seconds after install and the one most likely to
+  be broken.
+
+On failure the run keeps the test reports, the device log, and a screenshot of
+whatever was on screen — the only evidence available for a device nobody can
+attach a debugger to. An absent report is reported as **untested**, never as a
+pass.
+
+**Running it yourself**, if you have the Android SDK and a machine with KVM:
+
+```bash
+cd android
+./gradlew connectedDebugAndroidTest     # with an emulator or handset attached
+```
+
+**Reusing the workflow for another Android project.** Change
+`working-directory` and the API-level matrix; nothing else in it is specific to
+this app. Two settings do the real work: the **Enable KVM** step, without which
+the emulator falls back to software rendering and the job *hangs* rather than
+failing, and `emulator-options`, which turns off the animations, audio and
+cameras that make a headless emulator flaky.
 
 ---
 
