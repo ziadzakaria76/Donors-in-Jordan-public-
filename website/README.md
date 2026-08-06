@@ -32,15 +32,26 @@ The site is a folder of static files. Publish `website/` as the site root.
 
 | Host | What to do |
 | --- | --- |
+| **Cloudflare Pages** | The domain is already at Cloudflare, so this is the shortest path. Connect the repo, framework preset **None**, **no build command**, output directory `website`. The domain attaches from the same dashboard and DNS is written for you. |
 | **Netlify** | Drag the `website/` folder onto the Netlify dashboard, or connect the repo and set **base directory** `website`, **publish directory** `website`, and leave the build command empty. `netlify.toml` already sets caching and the 404 page. |
 | **Vercel** | Import the repo, set **root directory** to `website`, framework preset **Other**, no build command. `vercel.json` sets the caching headers. |
 | **cPanel / any shared host** | Upload the contents of `website/` into `public_html/` over FTP. Nothing else to configure. |
 | **GitHub Pages** | Push, then set Pages to serve from the branch and the `/website` folder. |
 
-After deploying, replace `https://www.generalsherman.jo` with the real domain in:
-`sitemap.xml`, `robots.txt`, and the `<link rel="canonical">` / `og:url` /
-`hreflang` tags in each page's `<head>` (or in `tools/build-pages.mjs`, then
-re-run `npm run pages`).
+### The domain
+
+`https://generalshermanhousing.com` — registered with Cloudflare. It is already
+written into `COMPANY.domain`, `sitemap.xml`, `robots.txt`, `SITE` in
+`tools/build-pages.mjs`, and the `<link rel="canonical">` / `og:url` /
+`hreflang` tags in every page's `<head>`.
+
+The site uses the **apex** (no `www`). Point `www` at the apex with a 301 so
+search engines see one address: on Cloudflare that is a Redirect Rule, on
+Netlify and Vercel it is the default once the apex is set as primary.
+
+If the domain ever changes, edit `SITE` in `tools/build-pages.mjs`, run
+`npm run pages`, then update `COMPANY.domain`, `sitemap.xml` and `robots.txt`
+by hand — the scaffolder does not touch those three.
 
 ---
 
@@ -59,7 +70,6 @@ Everything below is invented placeholder content. Search for `«REPLACE»` in
   are empty, so the footer's address line, the contact page's office row and
   the office map are all absent. Filling either field in is not enough on its
   own — the markup was removed too (see *Removed sections*).
-- **Domain** — `COMPANY.domain` plus the SEO tags noted above.
 - **Projects and units** — see below.
 - **Logo** — `assets/img/logo-mark.png` (house mark) and `assets/img/logo.png`
   (full stacked lockup) were extracted from the supplied artwork and keyed to
@@ -231,6 +241,22 @@ Add real terms in the same shape to bring the section back:
   steps: [{ pct: 40, label: { ar, en } }, …],
   notes: [{ ar, en }], availableFor: { ar, en } }
 ```
+
+The plan cards on the project page were markup, not just data, so they need
+restoring too — in `tools/build-pages.mjs`, inside `PROJECT_BODY`, where the
+calculator section now sits. Then run `npm run pages`:
+
+```html
+<div class="section-head">
+  <p class="eyebrow" data-i18n="nav.plans">خطط الدفع</p>
+  <h2 data-i18n="project.paymentTitle">خطط الدفع المتاحة لهذا المشروع</h2>
+</div>
+<div class="grid grid--3" id="p-payment"></div>
+```
+
+`project.paymentTitle` is still in `i18n.js`, and `renderPayment` in
+`project.js` already looks for `#p-payment` — it just returns early while the
+element is absent.
 
 ### Project status badges
 

@@ -261,6 +261,12 @@ const T = {
   },
   "project.legend": { ar: "دليل الغرف", en: "Room key" },
   "project.paymentTitle": { ar: "خطط الدفع المتاحة لهذا المشروع", en: "Payment plans available here" },
+  "project.calcEyebrow": { ar: "الدفع", en: "Paying for it" },
+  "project.calcTitle": { ar: "احسب قسطك الشهري على وحدة من هذا المشروع", en: "Work out the monthly instalment on a unit here" },
+  "project.calcBody": {
+    ar: "أداة تقديرية تعطيك القسط التقريبي خلال ثوانٍ. لمعرفة خطط الدفع المتاحة على وحدة بعينها، تواصل مع فريق المبيعات.",
+    en: "An estimate that gives you the approximate instalment in seconds. For the payment plans available on a specific unit, talk to the sales team.",
+  },
   "project.calcLink": { ar: "احسب قسطك الشهري", en: "Work out your monthly instalment" },
   "project.mapTitle": { ar: "أين يقع المشروع", en: "Where the project is" },
   "project.openMap": { ar: "افتح في خرائط جوجل", en: "Open in Google Maps" },

@@ -21,8 +21,11 @@ const COMPANY = {
   whatsapp: "962790730903",           // same mobile as `phone` — change if WhatsApp is on another line
   email: "Mohammed.Zakaria90@hotmail.com",
   salesEmail: "Mohammed.Zakaria90@hotmail.com",   // one address for both for now
-  domain: "https://www.generalsherman.jo",// «REPLACE» — no domain registered yet;
-                                      // this feeds canonical/og:url and the sitemap
+  /* Registered with Cloudflare. Apex, no `www` — the www host should 301 here
+     so Google sees one address, not two. This string must stay in step with
+     SITE in tools/build-pages.mjs, which stamps the canonical, og:url and
+     hreflang tags into every page, and with sitemap.xml and robots.txt. */
+  domain: "https://generalshermanhousing.com",
   /* Deliberately blank. The footer's address line, the contact page's office
      row and the office map are all removed while these are empty; fill either
      one in and restore the markup (README → "Removed sections") to bring the

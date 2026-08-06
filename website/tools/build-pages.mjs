@@ -44,7 +44,7 @@ const LIGHTBOX = `<div class="modal modal--lightbox" id="lightbox" role="dialog"
   </div>
 </div>`;
 
-const SITE = "https://www.generalsherman.jo";
+const SITE = "https://generalshermanhousing.com";
 
 function head({ file, title, desc, keywords = "", noindex = false }) {
   const url = `${SITE}/${file === "index.html" ? "" : file}`;
@@ -131,7 +131,7 @@ ${pageHero({
 PAGES.push({
   file: "project.html",
   title: "تفاصيل المشروع | شركة جنرال شيرمان للإسكان",
-  desc: "تفاصيل المشروع: المخططات، الوحدات المتاحة، جدول التوفّر، خطط الدفع، والموقع على الخريطة.",
+  desc: "تفاصيل المشروع: المخططات، الوحدات المتاحة، جدول التوفّر، والموقع على الخريطة.",
   scripts: ["pages.js", "project.js"],
   modals: [ENQUIRY, LIGHTBOX],
   main: `
@@ -226,14 +226,17 @@ PAGES.push({
     </div>
   </section>
 
+  <!-- The plan cards that sat here (#p-payment) are gone with PAYMENT_PLANS;
+       what is left is the calculator link, which stands on its own. README →
+       "Restoring the payment plans" has the markup to put back. -->
   <section class="section section--stone">
-    <div class="wrap">
+    <div class="wrap wrap--narrow">
       <div class="section-head">
-        <p class="eyebrow" data-i18n="nav.plans">خطط الدفع</p>
-        <h2 data-i18n="project.paymentTitle">خطط الدفع المتاحة لهذا المشروع</h2>
+        <p class="eyebrow" data-i18n="project.calcEyebrow">الدفع</p>
+        <h2 data-i18n="project.calcTitle">احسب قسطك الشهري على وحدة من هذا المشروع</h2>
+        <p class="lead" data-i18n="project.calcBody">أداة تقديرية تعطيك القسط التقريبي خلال ثوانٍ. لمعرفة خطط الدفع المتاحة على وحدة بعينها، تواصل مع فريق المبيعات.</p>
       </div>
-      <div class="grid grid--3" id="p-payment"></div>
-      <p style="margin-block-start:2.5rem">
+      <p>
         <a class="link-arrow" href="payment-plans.html"><span data-i18n="project.calcLink">احسب قسطك الشهري</span> <span data-icon="arrow" class="icon icon--dir"></span></a>
       </p>
     </div>
