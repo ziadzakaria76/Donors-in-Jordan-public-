@@ -453,6 +453,31 @@ def test_the_app_can_find_the_files_the_run_actually_produces():
         check(f"output/*{extension}" in workflow,
               f"contract: monitor.yml uploads {extension} files")
 
+    # One level up: the app picks the ARTIFACT by name before it opens the zip
+    # at all. Both prefixes are bare strings on each side, and a run's artifact
+    # list contains more than one artifact, so a stale prefix does not fail --
+    # it selects nothing, or the wrong one.
+    uploads = [s for s in steps if "upload-artifact" in str(s.get("uses", ""))]
+    published = [s.get("with", {}).get("name", "") for s in uploads]
+    check(published, "contract: monitor.yml uploads at least one artifact")
+
+    repository = (APP / "data" / "ReportRepository.kt").read_text(encoding="utf-8")
+    portals_repo = (APP / "data" / "portals" / "PortalsRepository.kt").read_text(
+        encoding="utf-8")
+
+    for label, source_text, pattern in (
+        ("the report", repository, r'name\.startsWith\("([^"]+)"\)'),
+        ("the probe", portals_repo, r'name\.startsWith\("([^"]+)"\)'),
+    ):
+        prefix = re.search(pattern, source_text)
+        check(prefix is not None,
+              f"contract: the artifact prefix the app uses for {label} was found")
+        if prefix:
+            check(any(name.startswith(prefix.group(1)) for name in published),
+                  f"contract: an artifact for {label} really starts with "
+                  f"{prefix.group(1)!r}",
+                  f"monitor.yml publishes {published}")
+
 
 def test_the_apps_workflow_inputs_match_the_workflow():
     """A choice input is matched literally. A typo is a 422 at the moment you tap Run."""
