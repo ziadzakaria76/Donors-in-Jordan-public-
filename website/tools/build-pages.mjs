@@ -109,7 +109,7 @@ PAGES.push({
   modals: [ENQUIRY],
   main: `
 ${pageHero({
-    image: "hero-about",
+    image: "sherman2-exterior-day",
     crumb: '<span data-i18n="nav.projects">مشاريعنا</span>',
     eyebrow: '<span data-i18n="projects.eyebrow">المشاريع</span>',
     title: '<span data-i18n="projects.title">منهج واحد في كل مشروع</span>',
@@ -120,8 +120,9 @@ ${pageHero({
     <div class="wrap">
       <div class="tabs" id="project-filters" role="tablist">
         <button class="tab" role="tab" aria-selected="true" data-status="" data-i18n="projects.all">جميع المشاريع</button>
-        <button class="tab" role="tab" aria-selected="false" data-status="ready" data-i18n="status.ready">جاهز للسكن</button>
-        <button class="tab" role="tab" aria-selected="false" data-status="construction" data-i18n="status.construction">قيد الإنشاء</button>
+        <button class="tab" role="tab" aria-selected="false" data-status="selling" data-i18n="status.selling">متاح للبيع</button>
+        <button class="tab" role="tab" aria-selected="false" data-status="delivered" data-i18n="status.delivered">مُسلَّم</button>
+        <button class="tab" role="tab" aria-selected="false" data-status="upcoming" data-i18n="status.upcoming">مشروع قادم</button>
       </div>
       <h2 class="sr-only" data-i18n="projects.eyebrow">المشاريع</h2>
       <div class="grid grid--3" id="projects-grid"></div>
@@ -244,6 +245,17 @@ PAGES.push({
     </div>
   </section>
 
+  <section class="section section--paper" id="p-nearby-section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow" data-i18n="project.nearbyEyebrow">الموقع والخدمات</p>
+        <h2 data-i18n="project.nearbyTitle">ما حول المشروع</h2>
+        <p class="lead" data-i18n="project.nearbyLead">أزمنة الوصول بالسيارة كما وردت في كتيّب المشروع.</p>
+      </div>
+      <div class="grid grid--3" id="p-nearby"></div>
+    </div>
+  </section>
+
   <section class="section">
     <div class="wrap">
       <div class="section-head">
@@ -285,13 +297,13 @@ PAGES.push({
 PAGES.push({
   file: "units.html",
   title: "الوحدات المتاحة — شقق للبيع في عمّان بالمساحة والسعر | جنرال شيرمان",
-  desc: "الوحدات المتاحة للبيع في مشاريع شركة جنرال شيرمان للإسكان، بمساحاتها وأسعارها.",
+  desc: "الوحدات المتاحة للبيع في مشاريع شركة جنرال شيرمان للإسكان في مرج الحمام، بمساحاتها وأسعارها وطوابقها.",
   keywords: "شقق للبيع في عمان, أسعار الشقق في عمان, شقق 3 غرف عمان, شقق بحديقة عمان",
   scripts: ["pages.js", "units.js"],
   modals: [ENQUIRY],
   main: `
 ${pageHero({
-    image: "hero-contact",
+    image: "sherman1-3",
     crumb: '<span data-i18n="nav.units">الوحدات المتاحة</span>',
     eyebrow: '<span data-i18n="units.eyebrow">المخزون الحالي</span>',
     title: '<span data-i18n="units.title">كل وحدة متاحة، بسعرها ومساحتها</span>',
@@ -338,7 +350,7 @@ PAGES.push({
   modals: [],
   main: `
 ${pageHero({
-    image: "hero-about",
+    image: "sherman2-exterior-day",
     crumb: '<span data-i18n="nav.plans">خطط الدفع</span>',
     eyebrow: '<span data-i18n="plans.eyebrow">الدفع والتمويل</span>',
     title: '<span data-i18n="plans.title">ثلاث طرق لتملّك وحدتك</span>',
@@ -450,7 +462,7 @@ PAGES.push({
   modals: [LIGHTBOX],
   main: `
 ${pageHero({
-    image: "gallery-skyline-2",
+    image: "sherman3-1",
     crumb: '<span data-i18n="nav.gallery">معرض الصور</span>',
     eyebrow: '<span data-i18n="gallery.eyebrow">المعرض</span>',
     title: '<span data-i18n="gallery.title">الواجهات والمساحات والتفاصيل</span>',
@@ -461,10 +473,10 @@ ${pageHero({
     <div class="wrap">
       <div class="tabs" id="gallery-filters" role="tablist">
         <button class="tab" role="tab" aria-selected="true" data-filter="" data-i18n="gallery.all">الكل</button>
-        <button class="tab" role="tab" aria-selected="false" data-filter="project-" data-i18n="gallery.projects">المشاريع</button>
-        <button class="tab" role="tab" aria-selected="false" data-filter="facade" data-i18n="gallery.facades">الواجهات</button>
+        <button class="tab" role="tab" aria-selected="false" data-filter="sherman2" data-i18n="gallery.sherman2">جنرال شيرمان ٢</button>
+        <button class="tab" role="tab" aria-selected="false" data-filter="exterior" data-i18n="gallery.exteriors">الواجهات</button>
+        <button class="tab" role="tab" aria-selected="false" data-filter="lobby" data-i18n="gallery.lobbies">المداخل</button>
         <button class="tab" role="tab" aria-selected="false" data-filter="interior" data-i18n="gallery.interiors">المساحات الداخلية</button>
-        <button class="tab" role="tab" aria-selected="false" data-filter="courtyard" data-i18n="gallery.amenities">المرافق</button>
       </div>
       <div class="gallery-grid" id="gallery-grid"></div>
       <p class="form-note" style="margin-block-start:2.5rem" data-i18n="gallery.note">جميع الصور معالجات معمارية توضيحية أعدّها فريق التصميم، وقد تختلف عن التنفيذ النهائي في بعض التفاصيل.</p>
@@ -482,7 +494,7 @@ PAGES.push({
   modals: [],
   main: `
 ${pageHero({
-    image: "hero-about",
+    image: "sherman2-exterior-day",
     crumb: '<span data-i18n="nav.about">عن الشركة</span>',
     eyebrow: '<span data-i18n="about.eyebrow">من نحن</span>',
     title: '<span data-i18n="about.title">مبنى واحد في كل مرة</span>',
@@ -554,7 +566,7 @@ PAGES.push({
   modals: [],
   main: `
 ${pageHero({
-    image: "hero-contact",
+    image: "sherman1-3",
     crumb: '<span data-i18n="nav.contact">اتصل بنا</span>',
     eyebrow: '<span data-i18n="contact.eyebrow">تواصل معنا</span>',
     title: '<span data-i18n="contact.title">تحدّث مع من يعرف المبنى</span>',

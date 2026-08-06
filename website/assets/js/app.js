@@ -71,6 +71,15 @@ function picture(name, alt, { sizes = "100vw", cls = "", eager = false, ratio = 
     loading="${eager ? "eager" : "lazy"}" decoding="async" ${eager ? 'fetchpriority="high"' : ""} width="1280" height="720">`;
 }
 
+/**
+ * Remove the section a renderer feeds, given its container's selector.
+ * Renderers re-run on every language change, by which time the section they
+ * dropped is already gone — so a missing element is success, not an error.
+ */
+function dropSection(sel) {
+  document.querySelector(sel)?.closest("section")?.remove();
+}
+
 const t = (k) => window.I18N.t(k);
 const tx = (obj) => window.I18N.t(obj);
 
@@ -392,56 +401,52 @@ function initCurrentNav() {
 function projectCard(project) {
   const { UNITS, DISTRICTS, PROJECT_STATUS } = window.DATA;
   const units = UNITS.filter((u) => u.projectId === project.id);
-  const available = units.filter((u) => u.status === "available");
-  const from = available.length ? Math.min(...available.map((u) => u.price)) : Math.min(...units.map((u) => u.price));
-  const status = available.length ? project.status : "soldout";
+  const available = units.filter((u) => u.status === "available" && u.price);
+  const status = units.length && !available.length && project.status === "selling" ? "soldout" : project.status;
+  const priced = available.length ? Math.min(...available.map((u) => u.price)) : null;
+
+  const facts = [];
+  if (units.length) facts.push(`${iconSvg("building")} ${units.length} ${t("project.units")}`);
+  if (available.length) facts.push(`${iconSvg("key")} ${available.length} ${t("project.available")}`);
+  if (project.delivery) facts.push(`${iconSvg("calendar")} ${tx(project.delivery)}`);
+
   return `
   <article class="card reveal">
     <a class="card__media" href="${BASE}project.html?id=${project.id}" aria-label="${esc(tx(project.name))}">
-      ${picture(`project-${project.image}`, tx(project.name), { sizes: "(max-width: 700px) 92vw, (max-width: 1100px) 45vw, 400px" })}
+      ${picture(project.image, tx(project.name), { sizes: "(max-width: 700px) 92vw, (max-width: 1100px) 45vw, 400px" })}
       <span class="badge badge--${status} badge--on-media">${tx(PROJECT_STATUS[status])}</span>
     </a>
     <div class="card__body">
-      <p class="card__meta">${iconSvg("pin")} ${tx(DISTRICTS[project.district])} · ${tx(project.delivery)}</p>
+      ${project.district ? `<p class="card__meta">${iconSvg("pin")} ${tx(DISTRICTS[project.district])}</p>` : ""}
       <h3 class="card__title"><a href="${BASE}project.html?id=${project.id}">${tx(project.name)}</a></h3>
       <p class="card__text">${tx(project.tagline)}</p>
-      <ul class="specs">
-        <li>${iconSvg("building")} ${units.length} ${t("project.units")}</li>
-        <li>${iconSvg("floor")} ${project.floors} ${t("project.floors")}</li>
-        <li>${iconSvg("key")} ${available.length} ${t("project.available")}</li>
-      </ul>
+      ${facts.length ? `<ul class="specs">${facts.map((f) => `<li>${f}</li>`).join("")}</ul>` : ""}
       <div class="card__foot">
-        <p class="card__price num">${I18N.price(from)} <small>${t("unit.priceFrom")}</small></p>
+        ${priced
+          ? `<p class="card__price num">${window.I18N.price(priced)} <small>${t("unit.priceFrom")}</small></p>`
+          : `<p class="card__price" style="font-size:var(--fs-sm);font-weight:600">${tx(PROJECT_STATUS[status])}</p>`}
         <a class="link-arrow" href="${BASE}project.html?id=${project.id}">${t("cta.viewProject")} ${iconSvg("arrow", "icon icon--dir")}</a>
       </div>
     </div>
   </article>`;
 }
 
-/* A wall of identical building shots reads as a template, so each unit gets a
-   view that suits its type — and always the same one, so nothing jumps around. */
-const UNIT_IMAGES = {
-  garden: ["gallery-courtyard-1", "gallery-courtyard-2"],
-  duplex: ["gallery-interior-3", "gallery-skyline-2"],
-  penthouse: ["gallery-interior-3", "gallery-skyline-1"],
-  apartment: ["gallery-interior-1", "gallery-interior-2", "gallery-facade-1", "gallery-facade-3"],
-};
-
-function unitImage(unit, project) {
-  if (unit.floor % 3 === 0) return `project-${project.image}`;
-  const pool = UNIT_IMAGES[unit.type] || UNIT_IMAGES.apartment;
-  // Floor + line, so neighbouring cards in the grid never repeat an image.
-  return pool[(unit.floor + unit.line.charCodeAt(0)) % pool.length];
+/** Each unit card shows a photograph from its own project, varied by unit. */
+function unitImage(unit) {
+  const { PROJECTS } = window.DATA;
+  const project = PROJECTS.find((p) => p.id === unit.projectId);
+  const pool = project.gallery && project.gallery.length ? project.gallery : [project.image];
+  return pool[(Number(unit.code) || 0) % pool.length];
 }
 
 function unitCard(unit) {
   const { PROJECTS, UNIT_TYPES, ORIENTATIONS } = window.DATA;
   const project = PROJECTS.find((p) => p.id === unit.projectId);
-  const disabled = unit.status !== "available";
+  const sold = unit.status !== "available" || !unit.price;
   return `
   <article class="card reveal">
     <a class="card__media" href="${BASE}project.html?id=${project.id}#unit-${unit.id}" aria-label="${esc(tx(project.name))} ${unit.code}">
-      ${picture(unitImage(unit, project), `${tx(project.name)} — ${tx(UNIT_TYPES[unit.type])}`, { sizes: "(max-width: 700px) 92vw, (max-width: 1100px) 45vw, 380px" })}
+      ${picture(unitImage(unit), `${tx(project.name)} — ${tx(UNIT_TYPES[unit.type])}`, { sizes: "(max-width: 700px) 92vw, (max-width: 1100px) 45vw, 380px" })}
       <span class="badge badge--${unit.status} badge--on-media">${t(`status.${unit.status}`)}</span>
     </a>
     <div class="card__body">
@@ -450,14 +455,18 @@ function unitCard(unit) {
       <div class="unit-card__grid">
         <div><span>${t("unit.beds")}</span><strong>${unit.beds}</strong></div>
         <div><span>${t("unit.baths")}</span><strong>${unit.baths}</strong></div>
-        <div><span>${t("unit.area")}</span><strong class="num">${I18N.area(unit.area)}</strong></div>
+        <div><span>${t("unit.area")}</span><strong class="num">${window.I18N.area(unit.area)}</strong></div>
         <div><span>${t("unit.floor")}</span><strong>${tx(unit.floorLabel)}</strong></div>
       </div>
-      <p class="card__meta">${iconSvg("area")} ${t("unit.outdoor")}: <span class="num">${I18N.area(unit.outdoor)}</span> · ${tx(ORIENTATIONS[unit.orientation])}</p>
+      <p class="card__meta">${iconSvg("area")} ${unit.outdoor
+        ? `${t("unit.outdoor")}: <span class="num">${window.I18N.area(unit.outdoor)}</span> · `
+        : ""}${tx(ORIENTATIONS[unit.orientation])}</p>
       <div class="card__foot">
-        <p class="card__price num">${I18N.price(unit.price)}<small>${I18N.num(Math.round(unit.price / unit.area))} ${t("unit.jod")} / ${t("unit.sqm")}</small></p>
-        <button class="btn btn--sm ${disabled ? "btn--ghost" : "btn--brass"}" data-enquire="${unit.id}" ${disabled ? "disabled" : ""}>
-          ${disabled ? t(`status.${unit.status}`) : t("cta.enquire")}
+        ${unit.price
+          ? `<p class="card__price num">${window.I18N.price(unit.price)}<small>${window.I18N.num(Math.round(unit.price / unit.area))} ${t("unit.jod")} / ${t("unit.sqm")}</small></p>`
+          : `<p class="card__price" style="font-size:var(--fs-sm)">${t(`status.${unit.status}`)}</p>`}
+        <button class="btn btn--sm ${sold ? "btn--ghost" : "btn--brass"}" data-enquire="${unit.id}" ${sold ? "disabled" : ""}>
+          ${sold ? t(`status.${unit.status}`) : t("cta.enquire")}
         </button>
       </div>
     </div>
@@ -474,7 +483,8 @@ function initEnquiry() {
     if (!unit) return;
     const project = PROJECTS.find((p) => p.id === unit.projectId);
     const title = `${tx(project.name)} — ${t("unit.unit")} ${unit.code}`;
-    const summary = `${tx(UNIT_TYPES[unit.type])} · ${unit.beds} ${t("unit.beds")} · ${I18N.area(unit.area)} · ${I18N.price(unit.price)}`;
+    const summary = [tx(UNIT_TYPES[unit.type]), `${unit.beds} ${t("unit.beds")}`, window.I18N.area(unit.area),
+      unit.price ? window.I18N.price(unit.price) : t(`status.${unit.status}`)].join(" · ");
     $("#enquiry-unit-title").textContent = title;
     $("#enquiry-unit-summary").textContent = summary;
     const form = $("#enquiry-form");
@@ -509,5 +519,5 @@ else boot();
 
 window.APP = {
   $, $$, esc, picture, iconSvg, hydrateIcons, projectCard, unitCard,
-  openModal, closeModal, openLightbox, initReveals, waLink, BASE, t, tx,
+  openModal, closeModal, openLightbox, initReveals, waLink, BASE, t, tx, dropSection,
 };

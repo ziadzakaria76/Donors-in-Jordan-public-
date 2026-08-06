@@ -4,7 +4,7 @@
    ========================================================================== */
 
 (function () {
-  const { $, $$, picture, iconSvg, projectCard, unitCard, initReveals, openLightbox, esc, t, tx, BASE } = window.APP;
+  const { $, $$, picture, iconSvg, projectCard, unitCard, initReveals, openLightbox, esc, t, tx, BASE, dropSection } = window.APP;
   const { COMPANY, PROJECTS, UNITS, DISTRICTS, TESTIMONIALS, PROCESS, UNIT_TYPES } = window.DATA;
   const I18N = window.I18N;
 
@@ -137,16 +137,25 @@
     if (!box) return;
 
     const CAPTIONS = {
-      "gallery-facade-1": { ar: "دراسة الواجهة — إيقاع الشرفات والحجر", en: "Facade study — balcony rhythm and stone" },
-      "gallery-facade-2": { ar: "دراسة الواجهة — الزجاج والظل في ضوء العصر", en: "Facade study — glass and shadow in afternoon light" },
-      "gallery-facade-3": { ar: "دراسة الواجهة — الوحدات المتكررة", en: "Facade study — the repeating module" },
-      "gallery-interior-1": { ar: "المعيشة — الإطلالة من الطابق السابع", en: "Living room — the view from the seventh floor" },
-      "gallery-interior-2": { ar: "المعيشة — تشطيبات البلوط الطبيعي", en: "Living room — natural oak finishes" },
-      "gallery-interior-3": { ar: "المعيشة — الضوء الجنوبي بعد الظهر", en: "Living room — southern light in the afternoon" },
-      "gallery-courtyard-1": { ar: "المرافق المشتركة — المسبح عند المغيب", en: "Shared amenities — the pool at sunset" },
-      "gallery-courtyard-2": { ar: "المرافق المشتركة — الفناء صباحاً", en: "Shared amenities — the courtyard in the morning" },
-      "gallery-skyline-1": { ar: "السياق العمراني — غرب عمّان", en: "Urban context — West Amman" },
-      "gallery-skyline-2": { ar: "السياق العمراني — المدينة ليلاً", en: "Urban context — the city at night" },
+      "sherman2-exterior-day": { ar: "جنرال شيرمان ٢ — الواجهة من الشارع", en: "General Sherman 2 — the building from the street" },
+      "sherman2-exterior-dusk": { ar: "جنرال شيرمان ٢ — المبنى عند المغيب", en: "General Sherman 2 — the building at dusk" },
+      "sherman2-entrance": { ar: "جنرال شيرمان ٢ — المدخل الرئيسي", en: "General Sherman 2 — the main entrance" },
+      "sherman2-lobby-1": { ar: "جنرال شيرمان ٢ — المدخل بارتفاع طابقين", en: "General Sherman 2 — the double-height lobby" },
+      "sherman2-lobby-2": { ar: "جنرال شيرمان ٢ — بهو المدخل", en: "General Sherman 2 — entrance hall" },
+      "sherman2-lobby-3": { ar: "جنرال شيرمان ٢ — المصعد والمداخل", en: "General Sherman 2 — lift and apartment doors" },
+      "sherman2-lobby-4": { ar: "جنرال شيرمان ٢ — تفاصيل المدخل", en: "General Sherman 2 — entrance detail" },
+      "sherman2-living-1": { ar: "جنرال شيرمان ٢ — الصالون وأرضيات الرخام", en: "General Sherman 2 — reception room with marble floors" },
+      "sherman2-living-2": { ar: "جنرال شيرمان ٢ — المعيشة", en: "General Sherman 2 — living area" },
+      "sherman2-living-3": { ar: "جنرال شيرمان ٢ — مساحة الاستقبال", en: "General Sherman 2 — reception space" },
+      "sherman2-interior-1": { ar: "جنرال شيرمان ٢ — غرفة نوم", en: "General Sherman 2 — bedroom" },
+      "sherman2-interior-3": { ar: "جنرال شيرمان ٢ — الحمّام", en: "General Sherman 2 — bathroom" },
+      "sherman2-interior-5": { ar: "جنرال شيرمان ٢ — الممر الداخلي", en: "General Sherman 2 — internal corridor" },
+      "sherman2-interior-7": { ar: "جنرال شيرمان ٢ — تشطيبات الأبواب", en: "General Sherman 2 — door finishes" },
+      "sherman1-1": { ar: "جنرال شيرمان ١ — المشروع المُسلَّم", en: "General Sherman 1 — the delivered scheme" },
+      "sherman1-3": { ar: "جنرال شيرمان ١ — الواجهة", en: "General Sherman 1 — elevation" },
+      "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع القادم", en: "General Sherman 3 — design of the coming scheme" },
+      "sherman3-2": { ar: "جنرال شيرمان ٣ — تصميم الواجهة", en: "General Sherman 3 — elevation design" },
+      "sherman3-4": { ar: "جنرال شيرمان ٣ — المشروع ليلاً", en: "General Sherman 3 — the scheme at night" },
     };
 
     const build = (filter = "") => {

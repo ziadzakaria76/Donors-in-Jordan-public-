@@ -13,19 +13,19 @@ const T = {
   "brand.tagline": { ar: "نبني مستقبلك", en: "We build your future" },
 
   /* home page */
-  "home.eyebrow": { ar: "تطوير عقاري في غرب عمّان", en: "Residential development in West Amman" },
+  "home.eyebrow": { ar: "تطوير عقاري في مرج الحمام", en: "Residential development in Marj Al-Hamam" },
   "home.heroTitle": { ar: "شققٌ مبنيّة لتُسكن، لا لتُباع فقط.", en: "Apartments built to be lived in, not only sold." },
   "home.heroSub": {
-    ar: "شققٌ سكنية في غرب عمّان — تصميم هادئ، تشطيبات نعرف مصدرها، وعقود تحدد موعد التسليم بوضوح.",
-    en: "Residential apartments across West Amman — restrained design, finishes we can trace, and contracts that state the handover date plainly.",
+    ar: "ثلاثة مشاريع في مرج الحمام: واحد مُسلَّم، وواحد متاح للبيع الآن، وثالث قادم. تشطيبات مذكورة بالاسم، ومواصفات مكتوبة.",
+    en: "Three schemes in Marj Al-Hamam: one delivered, one selling now, a third on the way. Finishes named, specifications written down.",
   },
   "home.searchBtn": { ar: "اعرض الوحدات", en: "Show units" },
   "home.scroll": { ar: "تابع", en: "Scroll" },
   "home.projectsEyebrow": { ar: "المشاريع", en: "Projects" },
-  "home.projectsTitle": { ar: "ثلاثة عناوين في غرب عمّان", en: "Three addresses in West Amman" },
+  "home.projectsTitle": { ar: "ثلاثة مشاريع في مرج الحمام", en: "Three schemes in Marj Al-Hamam" },
   "home.projectsLead": {
-    ar: "مشروع جاهز للسكن ومشروعان قيد الإنشاء. كل مشروع صُمِّم لأرضه ولمن سيسكنه، لا نسخةً مكررة عن سابقه.",
-    en: "One building ready to move into and two under construction. Each one is designed for its own plot and its own buyers, not copied from the last.",
+    ar: "مشروعٌ مُسلَّم، ومشروعٌ متاح للبيع الآن، وثالثٌ قيد التصميم.",
+    en: "One scheme delivered, one selling now, and a third in design.",
   },
   "home.whyEyebrow": { ar: "لماذا جنرال شيرمان", en: "Why General Sherman" },
   "home.whyTitle": { ar: "ما نعد به مكتوبٌ في العقد", en: "What we promise is written into the contract" },
@@ -58,16 +58,16 @@ const T = {
 
   /* footer */
   "footer.about": {
-    ar: "شركة أردنية متخصصة في الشقق السكنية الفاخرة في غرب عمّان.",
-    en: "A Jordanian developer specialising in luxury apartments across West Amman.",
+    ar: "شركة أردنية متخصصة في الشقق السكنية الفاخرة في مرج الحمام، عمّان.",
+    en: "A Jordanian developer specialising in luxury apartments in Marj Al-Hamam, Amman.",
   },
   "footer.explore": { ar: "تصفّح", en: "Explore" },
   "footer.contact": { ar: "تواصل معنا", en: "Contact" },
   "footer.hours": { ar: "السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً", en: "Saturday – Thursday, 9:00 – 18:00" },
   "footer.rights": { ar: "شركة جنرال شيرمان للإسكان. جميع الحقوق محفوظة.", en: "General Sherman Housing. All rights reserved." },
   "footer.note": {
-    ar: "الصور معالجات معمارية توضيحية، والأسعار قابلة للتغيير دون إشعار مسبق.",
-    en: "Images are illustrative architectural studies. Prices are subject to change without notice.",
+    ar: "الأسعار والتوفّر قابلة للتغيير دون إشعار مسبق.",
+    en: "Prices and availability are subject to change without notice.",
   },
 
   /* nav + chrome */
@@ -125,6 +125,10 @@ const T = {
   "project.delivery": { ar: "التسليم", en: "Delivery" },
   "project.amenities": { ar: "مرافق المشروع", en: "Building amenities" },
   "project.highlights": { ar: "أبرز ما يميّزه", en: "What sets it apart" },
+  "project.nearbyEyebrow": { ar: "الموقع والخدمات", en: "Location and services" },
+  "project.nearbyTitle": { ar: "ما حول المشروع", en: "What is around the project" },
+  "project.nearbyLead": { ar: "أزمنة الوصول بالسيارة كما وردت في كتيّب المشروع.", en: "Drive times as published in the project brochure." },
+  "unit.mins": { ar: "دقائق", en: "min" },
   "project.location": { ar: "الموقع", en: "Location" },
   "project.soldOut": { ar: "بيعت بالكامل", en: "Fully sold" },
 
@@ -241,8 +245,9 @@ const T = {
     en: "We keep only a few schemes running at once, so each one stays under our own engineers' direct supervision through to handover.",
   },
   "projects.all": { ar: "جميع المشاريع", en: "All projects" },
-  "status.ready": { ar: "جاهز للسكن", en: "Ready to move in" },
-  "status.construction": { ar: "قيد الإنشاء", en: "Under construction" },
+  "status.selling": { ar: "متاح للبيع", en: "Now selling" },
+  "status.delivered": { ar: "مُسلَّم", en: "Delivered" },
+  "status.upcoming": { ar: "مشروع قادم", en: "Coming soon" },
   "project.seeGrid": { ar: "جدول التوفّر", en: "Availability grid" },
   "project.aboutEyebrow": { ar: "عن المشروع", en: "About the scheme" },
   "project.facts": { ar: "أرقام المشروع", en: "Project at a glance" },
@@ -323,13 +328,13 @@ const T = {
     en: "Architectural studies showing the design intent: how the light enters, how the balconies are arranged, and how the building reads at different hours.",
   },
   "gallery.all": { ar: "الكل", en: "All" },
-  "gallery.projects": { ar: "المشاريع", en: "Projects" },
-  "gallery.facades": { ar: "الواجهات", en: "Elevations" },
+  "gallery.sherman2": { ar: "جنرال شيرمان ٢", en: "General Sherman 2" },
+  "gallery.exteriors": { ar: "الواجهات", en: "Exteriors" },
+  "gallery.lobbies": { ar: "المداخل", en: "Lobbies" },
   "gallery.interiors": { ar: "المساحات الداخلية", en: "Interiors" },
-  "gallery.amenities": { ar: "المرافق", en: "Amenities" },
   "gallery.note": {
-    ar: "جميع الصور معالجات معمارية توضيحية أعدّها فريق التصميم، وقد تختلف عن التنفيذ النهائي في بعض التفاصيل.",
-    en: "All images are illustrative architectural studies prepared by the design team, and may differ from the built result in some details.",
+    ar: "صور المشاريع المُسلَّمة فوتوغرافية. صور مشروع جنرال شيرمان ٣ تصاميم ثلاثية الأبعاد وقد تختلف عن التنفيذ النهائي.",
+    en: "Photographs are of the delivered schemes. Images of General Sherman 3 are 3D design studies and may differ from the built result.",
   },
 
   /* about */

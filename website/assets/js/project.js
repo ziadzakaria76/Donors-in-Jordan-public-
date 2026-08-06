@@ -4,11 +4,11 @@
    ========================================================================== */
 
 (function () {
-  const { $, $$, picture, iconSvg, unitCard, initReveals, openLightbox, esc, t, tx, BASE } = window.APP;
+  const { $, $$, picture, iconSvg, unitCard, initReveals, openLightbox, esc, t, tx, BASE, dropSection } = window.APP;
   const root = $("#project-page");
   if (!root) return;
 
-  const { PROJECTS, UNITS, DISTRICTS, AMENITIES, PAYMENT_PLANS, PROJECT_STATUS, UNIT_TYPES, PLAN_LEGEND } = window.DATA;
+  const { PROJECTS, UNITS, DISTRICTS, AMENITIES, PAYMENT_PLANS, PROJECT_STATUS, UNIT_TYPES } = window.DATA;
 
   const id = new URLSearchParams(location.search).get("id");
   const project = id ? PROJECTS.find((p) => p.id === id) : PROJECTS[0];
@@ -24,69 +24,89 @@
   /* --------------------------------------------------------------- header */
 
   function renderHero() {
-    const status = available.length ? project.status : "soldout";
+    const status = units.length && !available.length && project.status === "selling" ? "soldout" : project.status;
     document.title = `${tx(project.name)} — ${tx(window.DATA.COMPANY.short)}`;
-    $("#p-hero-media").innerHTML = picture(`project-${project.image}`, tx(project.name), { sizes: "100vw", eager: true });
+    $("#p-hero-media").innerHTML = picture(project.image, tx(project.name), { sizes: "100vw", eager: true });
     $("#p-crumb").textContent = tx(project.name);
     $("#p-badge").className = `badge badge--${status}`;
     $("#p-badge").textContent = tx(PROJECT_STATUS[status]);
     $("#p-title").textContent = tx(project.name);
     $("#p-tagline").textContent = tx(project.tagline);
-    $("#p-meta").innerHTML = [
-      `${iconSvg("pin")} ${tx(project.address)}, ${tx(DISTRICTS[project.district])}`,
-      `${iconSvg("calendar")} ${tx(project.delivery)}`,
-      `${iconSvg("building")} ${units.length} ${t("project.units")} · ${project.floors} ${t("project.floors")}`,
-    ].map((s) => `<li>${s}</li>`).join("");
+    const meta = [];
+    if (project.address) meta.push(`${iconSvg("pin")} ${tx(project.address)}`);
+    else if (project.district) meta.push(`${iconSvg("pin")} ${tx(DISTRICTS[project.district])}`);
+    if (project.delivery) meta.push(`${iconSvg("calendar")} ${tx(project.delivery)}`);
+    if (units.length) meta.push(`${iconSvg("building")} ${units.length} ${t("project.units")}`);
+    $("#p-meta").innerHTML = meta.map((s) => `<li>${s}</li>`).join("");
+    // A project with no schedule has nothing to jump to.
+    $$("[href='#availability']").forEach((a) => { if (!units.length) a.remove(); });
   }
 
   /* ---------------------------------------------------------------- about */
 
   function renderAbout() {
+    if (!$("#p-description")) return;
     $("#p-description").textContent = tx(project.description);
-    $("#p-highlights").innerHTML = project.highlights
-      .map((h) => `<li>${iconSvg("check")}<span>${tx(h)}</span></li>`).join("");
-    $("#p-amenities").innerHTML = project.amenities
-      .map((a) => `<li class="pill">${iconSvg(a in AMENITIES ? a : "check")} ${tx(AMENITIES[a])}</li>`).join("");
 
-    const prices = units.map((u) => u.price);
+    // Each of these removes itself when the project has nothing to put in it,
+    // and this runs again on every language change — so nothing may be there.
+    const fill = (sel, items, render) => {
+      const box = $(sel);
+      if (!box) return;
+      if (!items?.length) { box.previousElementSibling?.remove(); box.remove(); return; }
+      box.innerHTML = items.map(render).join("");
+    };
+    fill("#p-highlights", project.highlights, (h) => `<li>${iconSvg("check")}<span>${tx(h)}</span></li>`);
+    fill("#p-amenities", project.amenities,
+      (a) => `<li class="pill">${iconSvg(a in AMENITIES ? a : "check")} ${tx(AMENITIES[a])}</li>`);
+
+    // The numbers card shares this section with the description, so an
+    // inventory-less project loses the card, not the whole section.
+    if (!units.length) { $("#p-facts")?.closest(".card")?.remove(); return; }
+    const priced = available.filter((u) => u.price).map((u) => u.price);
     const areas = units.map((u) => u.area);
-    $("#p-facts").innerHTML = [
-      [t("unit.priceFrom"), window.I18N.price(Math.min(...prices))],
-      [t("unit.area"), `${window.I18N.num(Math.min(...areas))} – ${window.I18N.area(Math.max(...areas))}`],
-      [t("project.available"), `${available.length} ${t("project.units")}`],
-      [t("project.delivery"), tx(project.delivery)],
-    ].map(([k, v]) => `<div><span>${k}</span><strong class="num">${v}</strong></div>`).join("");
+    const facts = [];
+    if (priced.length) facts.push([t("unit.priceFrom"), window.I18N.price(Math.min(...priced))]);
+    facts.push([t("unit.area"), `${window.I18N.num(Math.min(...areas))} – ${window.I18N.area(Math.max(...areas))}`]);
+    facts.push([t("unit.unit"), String(units.length)]);
+    facts.push([t("project.available"), `${available.length} ${t("project.units")}`]);
+    if (project.delivery) facts.push([t("project.delivery"), tx(project.delivery)]);
+    $("#p-facts").innerHTML = facts
+      .map(([k, v]) => `<div><span>${k}</span><strong class="num">${v}</strong></div>`).join("");
   }
 
   /* --------------------------------------------------- availability matrix */
 
   function renderMatrix() {
-    const lines = project.lines.map((l) => l.code);
+    if (!$("#p-matrix")) return;
+    if (!units.length) { $("#availability")?.remove(); return; }
+    // Grouped by floor, top down, exactly as the schedule is published.
     const floors = [...new Set(units.map((u) => u.floor))].sort((a, b) => b - a);
-    const head = `<tr><th scope="col">${t("unit.floor")}</th>${lines.map((c) => `<th scope="col">${t("grid.line")} ${c}</th>`).join("")}</tr>`;
     const rows = floors.map((f) => {
-      const cells = lines.map((code) => {
-        const unit = units.find((u) => u.floor === f && u.line === code);
-        if (!unit) return "<td></td>";
-        const sold = unit.status === "sold";
+      const onFloor = units.filter((u) => u.floor === f);
+      const cells = onFloor.map((unit) => {
+        const sold = unit.status !== "available" || !unit.price;
         return `<td><button class="cell cell--${unit.status}" ${sold ? "disabled" : ""}
           data-enquire="${unit.id}" title="${esc(`${tx(UNIT_TYPES[unit.type])} · ${window.I18N.area(unit.area)}`)}">
-          <strong>${unit.code}</strong>
-          <span class="num">${sold ? t("status.sold") : window.I18N.price(unit.price)}</span>
+          <strong>${t("unit.unit")} ${unit.code}</strong>
+          <span class="num">${unit.price ? window.I18N.price(unit.price) : t(`status.${unit.status}`)}</span>
+          <span class="num">${window.I18N.area(unit.area)}</span>
         </button></td>`;
       }).join("");
-      const label = window.DATA.floorMeta(project, f);
-      return `<tr><th scope="row">${tx(label)}</th>${cells}</tr>`;
+      return `<tr><th scope="row">${tx(onFloor[0].floorLabel)}</th>${cells}</tr>`;
     }).join("");
-    $("#p-matrix").innerHTML = `<thead>${head}</thead><tbody>${rows}</tbody>`;
-    $("#p-legend").innerHTML = ["available", "reserved", "sold"].map((s) =>
-      `<li><i class="cell--${s}"></i> ${t(`status.${s}`)}</li>`).join("");
+    $("#p-matrix").innerHTML = `<tbody>${rows}</tbody>`;
+    $("#p-legend").innerHTML = ["available", "sold"].map((st) =>
+      `<li><i class="cell--${st}"></i> ${t(`status.${st}`)}</li>`).join("");
   }
 
   /* ---------------------------------------------------------------- units */
 
   function renderUnits() {
-    const list = [...units].sort((a, b) => (a.status === "sold") - (b.status === "sold") || a.price - b.price);
+    if (!$("#p-units")) return;
+    if (!units.length) { dropSection("#p-units"); return; }
+    const list = [...units].sort((a, b) =>
+      (a.status === "sold") - (b.status === "sold") || (a.price || 0) - (b.price || 0));
     $("#p-units").innerHTML = list.slice(0, 9).map(unitCard).join("");
     const more = $("#p-units-more");
     if (list.length > 9) {
@@ -98,42 +118,42 @@
   /* ----------------------------------------------------------- floorplans */
 
   function renderPlans() {
-    const plans = [...new Set(project.lines.map((l) => l.plan))];
+    if (!$("#p-plan-tabs")) return;
+    // One tab per distinct plan drawing, labelled by the units that use it.
+    const plans = [...new Set(units.map((u) => u.plan).filter(Boolean))];
+    if (!plans.length) { dropSection("#p-plan-tabs"); return; }
     $("#p-plan-tabs").innerHTML = plans.map((plan, i) => {
-      const line = project.lines.find((l) => l.plan === plan);
+      const on = units.filter((u) => u.plan === plan);
       return `<button class="tab" role="tab" aria-selected="${i === 0}" data-plan="${plan}">
-        ${line.beds} ${t("unit.beds")} · ${window.I18N.area(line.area)}</button>`;
+        ${t("unit.unit")} ${on.map((u) => u.code).join("، ")} · ${window.I18N.area(on[0].area)}</button>`;
     }).join("");
     showPlan(plans[0]);
   }
 
   function showPlan(plan) {
-    const line = project.lines.find((l) => l.plan === plan);
-    $("#p-plan-img").innerHTML = `<img src="${BASE}assets/img/${plan}.svg" alt="${esc(`${tx(project.name)} — ${line.beds} ${t("unit.beds")}`)}" loading="lazy" width="1200" height="900">`;
-    $("#p-plan-legend").innerHTML = Object.entries(PLAN_LEGEND)
-      .filter(([num]) => document.querySelector("#p-plan-img") && planUses(plan, Number(num)))
-      .map(([num, label]) => `<li><i>${num}</i> ${tx(label)}</li>`).join("");
+    const on = units.filter((u) => u.plan === plan);
+    const u = on[0];
+    $("#p-plan-img").innerHTML = `<img src="${BASE}assets/img/${plan}-1280.webp"
+      srcset="${BASE}assets/img/${plan}-800.webp 800w, ${BASE}assets/img/${plan}-1280.webp 1280w"
+      sizes="(max-width: 860px) 92vw, 46vw"
+      alt="${esc(`${tx(project.name)} — ${t("unit.unit")} ${on.map((x) => x.code).join("، ")}`)}"
+      loading="lazy" style="border-radius:var(--radius)">`;
+    $("#p-plan-legend").innerHTML = on.map((x) =>
+      `<li><i>${x.code}</i> ${tx(x.floorLabel)} — ${tx(window.DATA.ORIENTATIONS[x.orientation])}</li>`).join("");
     $("#p-plan-meta").innerHTML = `
-      <li>${iconSvg("bed")} ${line.beds} ${t("unit.beds")}</li>
-      <li>${iconSvg("bath")} ${line.baths} ${t("unit.baths")}</li>
-      <li>${iconSvg("area")} <span class="num">${window.I18N.area(line.area)}</span></li>
-      <li>${iconSvg("floor")} ${t("grid.line")} ${line.code}</li>`;
-    $("#p-plan-dl").href = `${BASE}assets/img/${plan}.svg`;
-    $("#p-plan-dl").setAttribute("download", `${project.id}-${plan}.svg`);
+      <li>${iconSvg("bed")} ${u.beds} ${t("unit.beds")}</li>
+      <li>${iconSvg("bath")} ${u.baths} ${t("unit.baths")}</li>
+      <li>${iconSvg("area")} <span class="num">${window.I18N.area(u.area)}</span></li>
+      ${u.outdoor ? `<li>${iconSvg("floor")} ${t("unit.outdoor")} <span class="num">${window.I18N.area(u.outdoor)}</span></li>` : ""}`;
+    $("#p-plan-dl").href = `${BASE}assets/img/${plan}-1280.webp`;
+    $("#p-plan-dl").setAttribute("download", `${project.id}-${plan}.webp`);
   }
-
-  /** Which legend numbers actually appear on a given plan drawing. */
-  const PLAN_ROOMS = {
-    "plan-2br": [1, 2, 3, 4, 5, 6, 7],
-    "plan-3br": [1, 2, 3, 4, 5, 6, 8, 9],
-    "plan-4br": [1, 2, 3, 4, 5, 6, 7, 9, 10],
-    "plan-duplex": [1, 2, 4, 5, 6, 11, 12],
-  };
-  const planUses = (plan, num) => (PLAN_ROOMS[plan] || []).includes(num);
 
   /* --------------------------------------------------------- plans + map */
 
   function renderPayment() {
+    if (!$("#p-payment")) return;
+    if (!project.plans?.length) { dropSection("#p-payment"); return; }
     $("#p-payment").innerHTML = project.plans.map((pid) => {
       const plan = PAYMENT_PLANS.find((p) => p.id === pid);
       return `<article class="card" style="padding:clamp(1.25rem,2.4vw,1.75rem);gap:.85rem">
@@ -147,7 +167,22 @@
     }).join("");
   }
 
+  function renderNearby() {
+    if (!$("#p-nearby")) return;
+    if (!project.nearby?.length) { $("#p-nearby-section")?.remove(); return; }
+    $("#p-nearby").innerHTML = project.nearby.map((g) => `
+      <article class="card reveal" style="padding:clamp(1.25rem,2.4vw,1.75rem);gap:1rem">
+        <h3 class="card__title" style="font-size:1.1rem">${tx(g.group)}</h3>
+        <ul class="tick-list">
+          ${g.items.map((it) => `<li>${iconSvg("clock")}<span>${tx(it.name)}
+            <strong class="num" style="color:var(--brass)"> · ${it.mins} ${t("unit.mins")}</strong></span></li>`).join("")}
+        </ul>
+      </article>`).join("");
+  }
+
   function renderMap() {
+    if (!$("#p-map")) return;
+    if (!project.mapQuery) { dropSection("#p-map"); return; }
     const q = encodeURIComponent(project.mapQuery);
     $("#p-map").innerHTML = `<iframe title="${esc(tx(project.name))} — ${t("project.location")}"
       src="https://www.google.com/maps?q=${q}&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
@@ -155,9 +190,10 @@
   }
 
   function renderGallery() {
+    if (!$("#p-gallery")) return;
+    if (!project.gallery?.length) { dropSection("#p-gallery"); return; }
     const items = project.gallery.map((name, i) => ({
-      name,
-      caption: `${tx(project.name)} — ${window.I18N.lang === "ar" ? "معالجة معمارية" : "architectural study"} ${i + 1}`,
+      name, caption: `${tx(project.name)} — ${i + 1}`,
     }));
     $("#p-gallery").innerHTML = items.map((item, i) => `
       <button class="gallery-item" data-lb="${i}">
@@ -171,6 +207,7 @@
   }
 
   function renderRelated() {
+    if (!$("#p-related")) return;
     const others = PROJECTS.filter((p) => p.id !== project.id).slice(0, 3);
     $("#p-related").innerHTML = others.map(window.APP.projectCard).join("");
   }
@@ -179,7 +216,7 @@
 
   function renderAll() {
     renderHero(); renderAbout(); renderMatrix(); renderUnits(); renderPlans();
-    renderPayment(); renderMap(); renderGallery(); renderRelated();
+    renderPayment(); renderNearby(); renderMap(); renderGallery(); renderRelated();
     // Deep links from the units page: ?id=…#unit-<id>
     const hash = location.hash.slice(1);
     if (hash.startsWith("unit-")) {

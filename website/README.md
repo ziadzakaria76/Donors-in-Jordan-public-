@@ -93,32 +93,34 @@ of text is a `{ ar, en }` pair.
 
 ### Projects and units
 
-Units are **not** listed one by one. Each project declares its floors and its
-unit *lines* — the layout that repeats on every floor, which is how these
-buildings are actually planned and priced:
+Each project carries its own schedule of units, stated one by one, exactly as
+the sales brochure publishes them:
 
 ```js
-floors: 8,
-pricePerM2: 1450,
-floorPremium: 0.022,        // each floor up costs 2.2% more
-lines: [
-  { code: "A", beds: 4, baths: 4, area: 292, type: "apartment", plan: "plan-4br", … },
-],
-sold:     ["0-A", "1-A", "1-B"],   // "<floor>-<line>", floor 0 = ground floor
-reserved: ["2-A"],
+units: [
+  { code: "1", floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" },
+    orientation: "west", area: 154, outdoor: 50, beds: 3, baths: 3,
+    type: "apartment", plan: "plan-b", price: 105000, status: "available" },
+  { code: "2", floor: 0, …, status: "sold" },     // sold units carry no price
+]
 ```
 
-The site expands that into the full inventory at load time, and computes each
-price as `area × pricePerM2 × (1 + floorPremium × floor)`, rounded to JOD 500.
-So:
+**Prices are stated, not calculated.** An earlier version derived them from a
+rate per m² and a per-floor premium, which real schedules do not follow: in
+General Sherman 2 the same 152 m² layout is 88,000 on the first floor and
+88,000 again on the third, while a 190 m² lower-ground unit is 117,000. A unit
+with no `price` is treated as unavailable and shows its status instead of a
+figure — the brochure does not publish prices for sold units, so neither does
+the site.
 
-- **A unit sold?** Add its `"<floor>-<line>"` key to `sold`.
-- **Price change?** Edit `pricePerM2` for the whole building, or `area` for one line.
-- **New project?** Copy a whole project object and change the fields. Add a hero
-  image named `project-<image>` (see *Images* below).
+- **A unit sold?** Set its `status` to `"sold"` and drop its `price`.
+- **Price change?** Edit that unit's `price`.
+- **New project?** Copy a project object. `units: []` is fine — a project with
+  no schedule still gets a page, showing its description and gallery without an
+  availability grid, unit list or floor plans.
 
-Ground floors become garden apartments when `groundFloorIsGarden` is set; top
-floors become a duplex or penthouse with `topFloorIsDuplex` / `topFloorIsPenthouse`.
+`floor` is a number used for sorting and filtering (`-1` for a lower ground
+floor, `0` for ground); `floorLabel` is what the page displays.
 
 ### Interface text
 
@@ -215,25 +217,25 @@ are still in the stylesheet, so nothing else needs changing.
 
 ## Images
 
-There are no stock photos. Every image is generated from code as an
-architectural study — massing renders, elevation studies, interiors in one-point
-perspective, floor plans — and rasterised to WebP at four widths.
+Every photograph on the site is the company's own, lifted out of the General
+Sherman 2 sales brochure (PDF) along with the nine unit floor plans, and
+converted to WebP at several widths. `sherman1-*`, `sherman2-*` and `sherman3-*`
+are photographs and 3D studies of the three schemes; `plan-a` … `plan-i` are the
+architect's drawings for each unit model.
 
-The rendered images are committed, so you do not need to run anything. To change
-the artwork (palettes, massing, framing) edit `tools/generate-assets.mjs` and:
+To add more, drop files into `assets/img/` named `<name>-480.webp`,
+`<name>-800.webp`, `<name>-1280.webp`, `<name>-1920.webp` and reference `<name>`
+from `data.js` (`image:` and `gallery:`). The markup builds the `srcset` from
+those widths automatically. Floor plans need only `-800` and `-1280`.
+
+`tools/generate-assets.mjs` still generates the Open Graph card and the favicon
+from the logo, and can render abstract architectural artwork if a project has no
+photography yet:
 
 ```bash
 npm install        # installs sharp, the only dev dependency
 npm run assets
 ```
-
-To use **real photographs** instead, drop them into `assets/img/` named
-`<name>-480.webp`, `<name>-800.webp`, `<name>-1280.webp`, `<name>-1920.webp` and
-reference `<name>` from `data.js` (`image:` and `gallery:`). The markup builds
-the `srcset` from those four widths automatically.
-
-Floor plans are unlabelled SVG line drawings; the room numbers are explained by
-`PLAN_LEGEND` in `data.js`, so the key translates with the rest of the site.
 
 ---
 
