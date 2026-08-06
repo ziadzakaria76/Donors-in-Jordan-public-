@@ -21,7 +21,7 @@ from __future__ import annotations
 import io
 from pathlib import Path
 
-from jordan_tender_monitor import config, portals
+from jordan_tender_monitor import config, portal_config, portals
 from jordan_tender_monitor.portals import base, harvester
 from jordan_tender_monitor.portals.base import PortalError
 from jordan_tender_monitor.portals.harvester import HtmlSpec
@@ -301,26 +301,30 @@ def test_jica_reports_no_listing_rather_than_failing():
     Reporting it as UNAVAILABLE puts a permanent red line in every report,
     which teaches the reader to ignore the status table -- and the status table
     is the alarm.
-    """
-    from jordan_tender_monitor.portals import jica
 
-    original = harvester.harvest
+    This used to be a hand-written wrapper in portals/jica.py. It is now the
+    `no_listing_reason` field, so the same guarantee is available to any portal
+    -- including one added from the phone -- and is exercised here through the
+    real entry rather than a stand-in.
+    """
+    portal = portal_config.get("jica")
+    check(bool(portal and portal.no_listing_reason),
+          "jica: portals.json states why this source has no listing")
+
+    spec = harvester.spec_for("jica",
+                              fetcher=_unreachable("HTTP 404 - the URL has moved"))
     try:
-        def fail(spec):
-            raise PortalError("HTTP 404 - the URL has moved", spec.urls[0])
-        harvester.harvest = fail
-        try:
-            jica.fetch_tenders()
-            check(False, "jica: a total failure must still raise")
-        except PortalError as exc:
-            check(exc.reason.startswith("no listing published"),
-                  "jica: the reason is classified as no-listing, not a failure",
-                  f"got {exc.reason!r}")
-            check("404" in exc.reason,
-                  "jica: and the underlying detail is preserved, so a genuine "
-                  "change is still visible")
-    finally:
-        harvester.harvest = original
+        harvester.harvest(spec)
+        check(False, "jica: a total failure must still raise")
+    except PortalError as exc:
+        check(exc.reason.startswith("no listing published"),
+              "jica: the reason is classified as no-listing, not a failure",
+              f"got {exc.reason!r}")
+        check("404" in exc.reason,
+              "jica: and the underlying detail is preserved, so a genuine "
+              "change is still visible")
+        check("procurement page" in exc.reason,
+              "jica: the file's explanation reaches the status table")
 
     # And the scraper classifies it apart from broken.
     from jordan_tender_monitor.agents.scraper import PortalHealth
@@ -350,15 +354,15 @@ def test_adfd_points_at_the_tenders_page_not_only_the_news_page():
     check(not any(".aspx" in u for u in urls),
           "adfd: the legacy .aspx paths are gone", f"got {urls}")
 
-    from jordan_tender_monitor.portals import adfd
-    check(adfd.SPEC.fetcher is None,
+    spec = portals.MODULES["adfd"].SPEC
+    check(spec.fetcher is None,
           "adfd: no headless browser -- rendering was tried and changed nothing")
-    check(adfd.SPEC.anchor_hint != "/News/",
+    check(spec.anchor_hint != "/News/",
           "adfd: the anchor hint no longer excludes every tender link")
 
-    import inspect
-    source = inspect.getsource(adfd)
-    check("has NO procurement database" not in source,
+    portal = portal_config.get("adfd")
+    text = f"{portal.notes} {portal.no_listing_reason}"
+    check("has NO procurement database" not in text,
           "adfd: the claim that contradicted the live site is gone")
 
 
@@ -370,26 +374,21 @@ def test_adfd_reports_no_listing_rather_than_failing():
     scraper. A permanent red line in the status table teaches the reader to
     stop looking at it.
     """
-    from jordan_tender_monitor.portals import adfd
-
-    original = harvester.harvest
+    spec = harvester.spec_for(
+        "adfd", fetcher=_unreachable("layout change - the page loaded but no "
+                                     "layer found a listing"))
     try:
-        def fail(spec):
-            raise PortalError("layout change - the page loaded but no layer "
-                              "found a listing", spec.urls[0])
-        harvester.harvest = fail
-        try:
-            adfd.fetch_tenders()
-            check(False, "adfd: a total failure must still raise")
-        except PortalError as exc:
-            check(exc.reason.startswith("no listing published"),
-                  "adfd: classified as no-listing, not as a failure",
-                  f"got {exc.reason!r}")
-            check("layout change" in exc.reason,
-                  "adfd: the underlying detail survives, so a genuine change "
-                  "is still visible")
-    finally:
-        harvester.harvest = original
+        harvester.harvest(spec)
+        check(False, "adfd: a total failure must still raise")
+    except PortalError as exc:
+        check(exc.reason.startswith("no listing published"),
+              "adfd: classified as no-listing, not as a failure",
+              f"got {exc.reason!r}")
+        check("layout change" in exc.reason,
+              "adfd: the underlying detail survives, so a genuine change "
+              "is still visible")
+        check("beneficiary government" in exc.reason,
+              "adfd: with the file's explanation of why it is empty")
 
 
 def test_politeness_delay_is_enforced_per_host():

@@ -15,7 +15,7 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD — 4,012 notices scanned, 119 Jordan. UK Find a Tender (500 read), IsDB (144), GIZ (20) and KfW/GTAI (3) all read cleanly and had no open Jordan notices on the day. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience — **853 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience, the portal list and its validation — **1,521 checks** |
 | **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
 | **Confirmed live** | UNGM — reads its Jordan-filtered listing from the site's own JSON search endpoint, paged to the end: 69 notices in ~12s, no browser. Was 3 notices from 388 rows of a worldwide list in ~5 minutes. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
@@ -78,6 +78,13 @@ with a tappable Run button, a weekday schedule, results rendered on the run page
 and the files attached as artifacts. Nothing to install, and a failed run is the
 alert.
 
+**[The Android app](../android/ANDROID.md)** — the same thing with fewer taps:
+the last report offline, a Run button, the portal health table, and the Word and
+Excel packs. It reads the `*.json` artifact each run writes, because GitHub's
+API does not expose the run page's summary to any client. Compiled by CI and
+**never run on a device** — the app's own README says which parts that leaves
+unverified.
+
 **[Windows Server deployment guide](DEPLOYMENT-WINDOWS.md)** — Python setup,
 Azure app registration with mailbox scoping, portal verification, and Task
 Scheduler including the Amman/UTC offset table.
@@ -93,6 +100,7 @@ running service, and no email is sent until `--send` is scheduled.
 | `--dry-run` | Full pipeline, printed. Writes the files but records nothing as seen |
 | `--run` (alias `--send`) | The real run: writes the Word and Excel files into `output/` and records what was reported |
 | `--capture PORTAL` | Fetches a portal's live pages, saves them under `tests/fixtures/live/`, and reports per-layer row counts and quality, which layer won, and the selectors the page actually uses |
+| `--probe JSON` | Tries a portal that is **not** in `portals.json` yet. Takes one entry as JSON (`-` reads stdin), fetches its pages, and writes `probe_<key>.json` saying what every layer found. Commits nothing and touches no state — this is what the phone app's "test it before saving" runs |
 | `--self-test` | Runs the whole pipeline on offline fixtures in a temp directory |
 | `--reset-db` | Forgets every reported tender, so the next run reports in full once |
 | `--schedule` | Runs continuously on the configured schedule |
@@ -100,8 +108,9 @@ running service, and no email is sent until `--send` is scheduled.
 
 ## How it is configured
 
-Everything is in [`config.py`](config.py), with each setting labelled by the
-interview question it answers.
+Behaviour is in [`config.py`](config.py), with each setting labelled by the
+interview question it answers. The portal list is not: it is data, in
+[`portals.json`](portals.json).
 
 | | Setting |
 |---|---|
@@ -114,10 +123,10 @@ interview question it answers.
 | New-only | On, SQLite-backed |
 | Language | Arabic included in the original, flagged for manual review |
 | Eligibility | National-only flagged and penalised 25 points, never excluded |
-| Portals | All 13, tiered by reliability |
+| Portals | All 13, tiered by reliability. **The list is data — [`portals.json`](portals.json)**, not `config.py` |
 | Delivery | **Files on disk.** Email is off (`EMAIL_METHOD = "none"`) |
 | Report | Full detail, top 50 inline, the rest tabled |
-| Outputs | **Word and Excel**, written to `output/` |
+| Outputs | **Word and Excel**, written to `output/`. CI adds markdown for the run page and JSON for the app — neither is a deliverable |
 | Schedule | Weekdays 07:17, pinned to `Asia/Amman` |
 | Alerting | Portal health in the **filename** + a status page in both documents, plus an optional ACTION NEEDED email on total failure |
 
@@ -177,6 +186,39 @@ Failures are diagnosed apart, because each needs a different fix:
 | transport error | wrong URL, or the host is blocked |
 
 ## Portals
+
+**The portal list is data.** [`portals.json`](portals.json) holds every
+portal — key, name, enabled, tier, URLs, and for an HTML portal its selector
+hints — and [`PORTALS.md`](PORTALS.md) holds the reasoning that goes with each
+entry, because JSON cannot carry a comment and every one of those notes was
+written after getting it wrong once.
+
+Eight of the thirteen are **data alone**: no module, no code, read through the
+same six-layer cascade as everything else. Adding one is an entry in that file:
+
+```json
+{ "key": "example", "name": "Example Donor", "tier": 2,
+  "urls": ["https://example.org/tenders"] }
+```
+
+Five keep a module because their source is not a page — a POST search endpoint
+(UNGM) or a REST API (World Bank, TED, SAM.gov, Find a Tender). Those name
+their module in the file and list the fields it owns under `code_owned`;
+setting one of those in the file is **rejected rather than ignored**, because a
+value that is read, accepted and then overridden looks applied and is not.
+
+**A URL alone is best-effort, not a promise.** The cascade reads many listings
+from nothing but an address, and the run reports the winning layer, the quality
+score and the row count so you can see whether it did. It cannot read a portal
+that builds its listing in JavaScript from a private endpoint (UNGM), one with
+its own query grammar (TED), or one that publishes no listing at all (JICA,
+ADFD). A portal added by URL that returns nothing says so, with which kind of
+nothing.
+
+**A malformed entry names itself, is skipped, and is reported** as unavailable
+in the portal status table — never a traceback, and never a silent
+disappearance. A file that cannot be parsed at all fails the whole run rather
+than quietly reporting nothing, and the failure names the line and column.
 
 **Tier 1 — REST APIs.** World Bank · EU TED · SAM.gov · UK Find a Tender.
 
@@ -273,7 +315,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 853 checks, no network, no credentials
+python tests/run_all.py    # 1,521 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

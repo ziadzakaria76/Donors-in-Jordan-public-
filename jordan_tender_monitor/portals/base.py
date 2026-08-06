@@ -46,6 +46,22 @@ class PortalError(RuntimeError):
         self.url = url
 
 
+def require_url(url: str, key: str) -> str:
+    """The endpoint a portal reads, or a diagnosed failure saying it has none.
+
+    The API portals resolve their endpoint from portals.json at import time,
+    and an entry that was rejected on load leaves it empty. Raising here rather
+    than at import keeps one bad entry from turning into an ImportError that
+    costs the other twelve portals their run -- and names the file, so the
+    reason points at what to fix rather than at the site.
+    """
+    if not url:
+        raise PortalError(
+            f"portals.json declares no source URL for '{key}' -- the entry is "
+            f"missing or was rejected on load", "")
+    return url
+
+
 # ---------------------------------------------------------------------------
 # Polite fetching
 # ---------------------------------------------------------------------------

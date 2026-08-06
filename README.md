@@ -51,6 +51,14 @@ returned a clean listing. Run `python run.py --capture PORTAL` against those.
 (via Germany Trade & Invest) and IsDB (HTML); Saudi Fund, ADFD and JICA
 (announcements only).
 
+The list is data, in
+[`jordan_tender_monitor/portals.json`](jordan_tender_monitor/portals.json), so
+a portal can be added, disabled or repointed without touching code. Eight of
+the thirteen are data alone and go through the generic extraction cascade; five
+keep a module because their source is a search endpoint or an API rather than a
+page. Why each is configured as it is:
+[`PORTALS.md`](jordan_tender_monitor/PORTALS.md).
+
 A failing portal is skipped with a diagnosed reason and reported as unavailable
 with the URL to check by hand. It never aborts the run, and a broken run never
 looks like a quiet one — portal health is in the output filename, and an
@@ -98,6 +106,31 @@ with the Word and Excel files attached as artifacts.
 A total portal outage makes the run exit non-zero, so GitHub marks it failed and
 notifies you. That is the failure alert, with no mail credentials involved.
 
+### The Android app
+
+**[`android/ANDROID.md`](android/ANDROID.md)** — the same thing with fewer taps.
+The last report offline, a Run button with the workflow's real inputs, the full
+portal health table, and the Word and Excel packs downloaded and opened on the
+phone. Install it from the phone: the APK is built by CI and attached to the run.
+
+It does not scrape — it is a client to the pipeline that already runs on
+GitHub's servers. It reads the `*.json` artifact each run writes, because
+GitHub's REST API does not expose the run page's summary to any client.
+
+It also **manages the portal list**: switch a portal on or off, add one by URL,
+or remove one, each as a real commit to `portals.json`. Adding one tests the
+page first — a `--probe` run fetches it on GitHub's runner and reports what
+every extraction layer found, rows included — because committing a URL nobody
+has looked at is how a portal ends up reporting "unavailable" forever while
+looking like an honest failure.
+
+Install it from the repository's **Releases** page — a plain `.apk`, no sign-in
+needed. `git tag v0.4.0 && git push origin v0.4.0` cuts one: the workflow runs
+the tests, builds the APK and publishes it with its SHA-256.
+
+**Compiled by CI, never run on a device.** `ANDROID.md` opens with a table of
+what that leaves unverified, and the generated release notes repeat it.
+
 ## Deploying
 
 Step-by-step setup for a Windows Server, including Azure app registration and
@@ -110,7 +143,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 853 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 1,521 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

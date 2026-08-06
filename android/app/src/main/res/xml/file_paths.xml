@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Where downloaded artifacts land. Shared out by intent so Word and
+         Excel can open them; nothing else in the app's storage is exposed. -->
+    <files-path name="artifacts" path="artifacts/" />
+</paths>

@@ -30,7 +30,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r jordan_tender_monitor/requirements.txt
-          pip install pyflakes
+          # Test-only: the YAML parser the workflow checks need, and the
+          # linter. Kept out of requirements.txt so a deployment does not
+          # install them. Dropping this line makes several checks fail with a
+          # missing module rather than skipping silently -- see harness.yaml().
+          pip install -r jordan_tender_monitor/requirements-dev.txt
 
       - name: Lint
         run: python -m pyflakes jordan_tender_monitor/

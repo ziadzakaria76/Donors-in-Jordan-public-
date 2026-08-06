@@ -43,15 +43,27 @@ from collections import Counter
 
 from bs4 import BeautifulSoup
 
+from .. import portal_config
 from ..utils import text as textutil
 from . import base, browser, harvester
-from .harvester import HtmlSpec
 
 log = logging.getLogger(__name__)
 
 KEY = "ungm"
-LISTING = "https://www.ungm.org/Public/Notice"
-SEARCH = "https://www.ungm.org/Public/Notice/Search"
+# The listing page comes from portals.json so it can be corrected without a
+# code change. The search endpoint is derived from it rather than declared
+# separately: they are one address, and letting the file set them
+# independently would allow a pair that cannot both be right.
+LISTING = portal_config.primary_url(KEY)
+SEARCH = (LISTING.rstrip("/") + "/Search") if LISTING else ""
+
+# The fields this module sets in code, which portals.json therefore must not.
+# The selectors and field selectors below were derived from the live DOM and
+# carry their reasoning here; a value in the file would be read, accepted and
+# then overridden, which looks applied and is not. The loader rejects the
+# entry instead, and a test keeps this list and the file's `code_owned` in
+# step.
+CODE_OWNED = ("selectors", "field_selectors", "filter_to_jordan")
 
 # From the page's own selNoticeCountry dropdown (234 options), read by
 # --capture rather than guessed. UNGM uses its own numeric ids, not ISO codes,
@@ -182,9 +194,10 @@ def _fetch_search(url: str) -> str:
     return "<html><body>" + "".join(pages) + "</body></html>"
 
 
-SPEC = HtmlSpec(
-    key=KEY,
-    urls=[LISTING],
+# The URL, currency and anchor hint come from portals.json; everything below
+# is CODE_OWNED and set here, next to the evidence for it.
+SPEC = harvester.spec_for(
+    KEY,
     # DERIVED FROM THE RENDERED DOM, not guessed: --capture on the browser
     # output reported div.dataRow.notice-table with 15 matching blocks, and the
     # structural and anchor layers independently found the same 15 rows.
@@ -228,14 +241,11 @@ SPEC = HtmlSpec(
         # .remainingDays is present.
         "posted": "span.remainingDaysToDeadline ~ span",
     },
-    anchor_hint="/Public/Notice/",
-    currency="USD",
     # Filtering happens in _is_jordan() instead: the generic text filter reads
     # the country cell, and for UNGM the majority of Jordan notices print
     # "Multiple destinations" there rather than a country name.
     filter_to_jordan=False,
     fetcher=_fetch_search,
-    notes="Jordan-filtered search endpoint",
 )
 
 
