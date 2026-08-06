@@ -25,11 +25,14 @@
 
   function renderHero() {
     const status = units.length && !available.length && project.status === "selling" ? "soldout" : project.status;
+    if (!status || !PROJECT_STATUS[status]) $("#p-badge")?.parentElement?.remove();
     document.title = `${tx(project.name)} — ${tx(window.DATA.COMPANY.short)}`;
     $("#p-hero-media").innerHTML = picture(project.image, tx(project.name), { sizes: "100vw", eager: true });
     $("#p-crumb").textContent = tx(project.name);
-    $("#p-badge").className = `badge badge--${status}`;
-    $("#p-badge").textContent = tx(PROJECT_STATUS[status]);
+    if ($("#p-badge")) {
+      $("#p-badge").className = `badge badge--${status}`;
+      $("#p-badge").textContent = tx(PROJECT_STATUS[status]);
+    }
     $("#p-title").textContent = tx(project.name);
     $("#p-tagline").textContent = tx(project.tagline);
     const meta = [];

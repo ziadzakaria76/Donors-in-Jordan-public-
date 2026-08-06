@@ -118,12 +118,6 @@ ${pageHero({
 
   <section class="section">
     <div class="wrap">
-      <div class="tabs" id="project-filters" role="tablist">
-        <button class="tab" role="tab" aria-selected="true" data-status="" data-i18n="projects.all">جميع المشاريع</button>
-        <button class="tab" role="tab" aria-selected="false" data-status="selling" data-i18n="status.selling">متاح للبيع</button>
-        <button class="tab" role="tab" aria-selected="false" data-status="delivered" data-i18n="status.delivered">مُسلَّم</button>
-        <button class="tab" role="tab" aria-selected="false" data-status="upcoming" data-i18n="status.upcoming">مشروع قادم</button>
-      </div>
       <h2 class="sr-only" data-i18n="projects.eyebrow">المشاريع</h2>
       <div class="grid grid--3" id="projects-grid"></div>
     </div>
@@ -343,9 +337,9 @@ ${pageHero({
 
 PAGES.push({
   file: "payment-plans.html",
-  title: "خطط الدفع وحاسبة الأقساط — شركة جنرال شيرمان للإسكان",
-  desc: "ثلاث خطط دفع: الحجز المبكر بخصم ٣٪، التسليم المريح بأقساط شهرية بدون فوائد، والتمويل البنكي حتى ٢٥ سنة. احسب قسطك الشهري على أي وحدة متاحة.",
-  keywords: "خطط دفع شقق الأردن, تقسيط شقق عمان, حاسبة قرض سكني الأردن",
+  title: "حاسبة الأقساط — شركة جنرال شيرمان للإسكان",
+  desc: "احسب القسط الشهري التقريبي لأي وحدة من وحدات شركة جنرال شيرمان للإسكان، أو لأي سعر تدخله.",
+  keywords: "حاسبة أقساط, تقسيط شقق عمان, حاسبة قرض سكني الأردن",
   scripts: ["pages.js", "plans.js"],
   modals: [],
   main: `
@@ -353,8 +347,8 @@ ${pageHero({
     image: "sherman2-exterior-day",
     crumb: '<span data-i18n="nav.plans">خطط الدفع</span>',
     eyebrow: '<span data-i18n="plans.eyebrow">الدفع والتمويل</span>',
-    title: '<span data-i18n="plans.title">ثلاث طرق لتملّك وحدتك</span>',
-    lead: '<span data-i18n="plans.lead">اختر الخطة التي تناسب سيولتك، لا التي تناسبنا. جميع الأقساط الداخلية بدون فوائد أو رسوم إدارية.</span>',
+    title: '<span data-i18n="plans.title">احسب قسطك الشهري</span>',
+    lead: '<span data-i18n="plans.lead">أداة تقديرية تساعدك على تقدير القسط قبل الحديث مع فريق المبيعات. لمعرفة خطط الدفع المتاحة لكل وحدة، تواصل معنا مباشرةً.</span>',
   })}
 
   <section class="section">
@@ -424,32 +418,7 @@ ${pageHero({
     </div>
   </section>
 
-  <section class="section">
-    <div class="wrap wrap--narrow">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="plans.faqEyebrow">أسئلة شائعة</p>
-        <h2 data-i18n="plans.faqTitle">أسئلة عن الدفع والتملّك</h2>
-      </div>
-      <div class="accordion">
-        <details>
-          <summary data-i18n="plans.q1">هل يمكن تغيير خطة الدفع بعد التوقيع؟</summary>
-          <div class="accordion__body" data-i18n="plans.a1">نعم، يمكن الانتقال من خطة إلى أخرى قبل التسليم بموافقة الطرفين وبإعادة جدولة مكتوبة تُلحق بالعقد. الانتقال إلى التمويل البنكي شائع عند اقتراب موعد التسليم.</div>
-        </details>
-        <details>
-          <summary data-i18n="plans.q2">ماذا يحدث إذا تأخرت عن قسط؟</summary>
-          <div class="accordion__body" data-i18n="plans.a2">هناك مهلة سماح ثلاثين يوماً بدون أي غرامة. بعدها نتواصل معك لإعادة الجدولة قبل اتخاذ أي إجراء تعاقدي — فسخ العقد هو الخيار الأخير لا الأول.</div>
-        </details>
-        <details>
-          <summary data-i18n="plans.q3">هل يمكن السداد المبكر؟</summary>
-          <div class="accordion__body" data-i18n="plans.a3">نعم، ودون أي رسوم على أقساط الشركة. أما في التمويل البنكي فتطبَّق شروط البنك المتعلقة بالسداد المبكر.</div>
-        </details>
-        <details>
-          <summary data-i18n="plans.q4">ما هي الرسوم الحكومية المتوقعة؟</summary>
-          <div class="accordion__body" data-i18n="plans.a4">رسوم التسجيل في دائرة الأراضي والمساحة تُحتسب كنسبة من قيمة العقد وتخضع للتشريعات النافذة وقت التسجيل. نوضح لك الرقم التقديري كتابةً قبل التوقيع، وخطة الحجز المبكر تشملها.</div>
-        </details>
-      </div>
-    </div>
-  </section>`,
+`,
 });
 
 /* ---------------------------------------------------------------- gallery */

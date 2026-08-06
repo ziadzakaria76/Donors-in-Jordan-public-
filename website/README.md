@@ -2,8 +2,8 @@
 
 A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential
 developer: project showcases, a live unit inventory with filters, a per-building
-availability grid, floor plans, payment plans with an instalment calculator, a
-gallery, and lead capture through WhatsApp, phone and forms.
+availability grid, floor plans, an instalment calculator, a gallery, and lead
+capture through WhatsApp, phone and forms.
 
 Plain HTML, CSS and JavaScript. **No build step, no framework, no runtime
 dependencies.** Every file in this folder is the file that gets deployed.
@@ -133,11 +133,12 @@ change its twin in `i18n.js`.**
 
 ## Removed sections
 
-Five things were cut rather than filled, because they were invented or do not
+Six things were cut rather than filled, because they were invented or do not
 exist: the **stats band**, the **testimonials**, the About page's **company
-story**, the **office address**, and the **social links**. No page claims a
-track record, a founding year, a location beyond Amman, or an account the
-company does not have.
+story**, the **office address**, the **social links**, and the **payment
+plans**. No page claims a track record, a founding year, a location beyond
+Amman, an account the company does not have, or payment terms nobody has
+stated.
 
 The site is built to tolerate absent data generally — a project with no unit
 schedule, a unit with no price, a scheme with no map — so sections remove
@@ -212,6 +213,33 @@ rendering a heading over nothing.
 The `home.quotes*` keys are still in `i18n.js`, and `.stat-row` / `.quote-grid`
 are still in the stylesheet, so nothing else needs changing.
 
+### Restoring the payment plans
+
+`PAYMENT_PLANS` in `data.js` is an empty array: nothing in the brochure states
+payment terms, and the plans that were here — deposit percentages, instalment
+schedules, a grace period, a no-early-settlement-fee promise — were written as
+demo content. With the array empty, the plans section removes itself from
+`payment-plans.html` and from every project page, and the page runs hero →
+calculator only. The calculator does not depend on the plans; it works off the
+unit prices.
+
+Add real terms in the same shape to bring the section back:
+
+```js
+{ id: "…", name: { ar, en }, summary: { ar, en }, badge: { ar, en },
+  downPayment: 20,                                    // percent
+  steps: [{ pct: 40, label: { ar, en } }, …],
+  notes: [{ ar, en }], availableFor: { ar, en } }
+```
+
+### Project status badges
+
+`status` is optional on a project. General Sherman 2 has none, because the
+brochure does not say whether the building is delivered or still under
+construction — so its card and hero show no badge at all rather than a guess.
+Add `status: "selling" | "delivered" | "upcoming"` to a project to show one; a
+`"selling"` project whose every unit is sold flips to `"soldout"` on its own.
+
 ---
 
 ## Images
@@ -260,13 +288,13 @@ SEO tags.
 
 ```
 website/
-├── index.html               Home — hero, quick search, projects, units, process, quotes
-├── projects.html            Project index with status tabs
-├── project.html             Project detail (?id=residence-76) — grid, plans, map, gallery
+├── index.html               Home — hero, quick search, projects, units, process, CTA
+├── projects.html            Project index
+├── project.html             Project detail (?id=sherman-2) — grid, plans, map, gallery
 ├── units.html               Full inventory with filters, sorting and shareable URLs
-├── payment-plans.html       The three payment plans + instalment calculator
+├── payment-plans.html       Instalment calculator
 ├── gallery.html             Filterable gallery with lightbox
-├── about.html               Company story, commitments, process, testimonials
+├── about.html               Commitments and process
 ├── contact.html             Contact form, direct channels, map, FAQ
 ├── 404.html
 ├── assets/

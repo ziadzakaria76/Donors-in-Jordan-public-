@@ -402,7 +402,9 @@ function projectCard(project) {
   const { UNITS, DISTRICTS, PROJECT_STATUS } = window.DATA;
   const units = UNITS.filter((u) => u.projectId === project.id);
   const available = units.filter((u) => u.status === "available" && u.price);
+  // Sold out is inferred only for a project that says it is selling.
   const status = units.length && !available.length && project.status === "selling" ? "soldout" : project.status;
+  const badge = status && PROJECT_STATUS[status] ? `<span class="badge badge--${status} badge--on-media">${tx(PROJECT_STATUS[status])}</span>` : "";
   const priced = available.length ? Math.min(...available.map((u) => u.price)) : null;
 
   const facts = [];
@@ -414,7 +416,7 @@ function projectCard(project) {
   <article class="card reveal">
     <a class="card__media" href="${BASE}project.html?id=${project.id}" aria-label="${esc(tx(project.name))}">
       ${picture(project.image, tx(project.name), { sizes: "(max-width: 700px) 92vw, (max-width: 1100px) 45vw, 400px" })}
-      <span class="badge badge--${status} badge--on-media">${tx(PROJECT_STATUS[status])}</span>
+      ${badge}
     </a>
     <div class="card__body">
       ${project.district ? `<p class="card__meta">${iconSvg("pin")} ${tx(DISTRICTS[project.district])}</p>` : ""}
@@ -424,7 +426,7 @@ function projectCard(project) {
       <div class="card__foot">
         ${priced
           ? `<p class="card__price num">${window.I18N.price(priced)} <small>${t("unit.priceFrom")}</small></p>`
-          : `<p class="card__price" style="font-size:var(--fs-sm);font-weight:600">${tx(PROJECT_STATUS[status])}</p>`}
+          : `<p class="card__price" style="font-size:var(--fs-sm);font-weight:600">${status && PROJECT_STATUS[status] ? tx(PROJECT_STATUS[status]) : ""}</p>`}
         <a class="link-arrow" href="${BASE}project.html?id=${project.id}">${t("cta.viewProject")} ${iconSvg("arrow", "icon icon--dir")}</a>
       </div>
     </div>
