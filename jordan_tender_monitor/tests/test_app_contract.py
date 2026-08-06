@@ -266,6 +266,49 @@ def test_the_app_reads_the_portal_fields_the_loader_accepts():
              "contract: the app commits to the path the loader reads")
 
 
+def test_the_forms_rules_are_the_rules_the_loader_enforces():
+    """The Add form rejects early so a bad entry never becomes a commit.
+
+    If its rules are looser than the loader's, the form says yes, the commit
+    lands, and the portal is silently dropped on the next run -- from a screen
+    that had just said "Committed". If they are tighter, it refuses entries
+    that would have worked. Either way the two have to agree, and nothing else
+    checks that they do.
+    """
+    from jordan_tender_monitor import portal_config
+
+    source = (APP / "data" / "portals" / "PortalsFile.kt").read_text(encoding="utf-8")
+
+    kotlin_key = re.search(r'val KEY = Regex\("([^"]+)"\)', source)
+    check(kotlin_key is not None, "contract: the form's key rule was found")
+    if kotlin_key:
+        check_eq(kotlin_key.group(1), portal_config.KEY_RE.pattern,
+                 "contract: the form's key rule is the loader's key rule")
+
+    # Exercised rather than compared as text: a regex can be spelled two ways.
+    for candidate, allowed in (("undp", True), ("world-bank_2", True),
+                               ("_leading", False), ("Upper", False),
+                               ("has space", False), ("", False),
+                               ("x" * 40, True), ("x" * 41, False)):
+        check_eq(bool(portal_config.KEY_RE.match(candidate)), allowed,
+                 f"contract: the loader treats {candidate[:12]!r} as "
+                 f"{'valid' if allowed else 'invalid'}")
+
+    tiers = re.search(r'if \(tier in (\d)\.\.(\d)\)', source)
+    check(tiers is not None, "contract: the form's tier rule was found")
+    if tiers:
+        allowed_by_form = set(range(int(tiers.group(1)), int(tiers.group(2)) + 1))
+        allowed_by_loader = set()
+        for tier in range(0, 6):
+            entry = {"key": "probe_tier", "name": "T", "tier": tier,
+                     "urls": ["https://example.org/x"]}
+            definition, _problem = portal_config._validate(entry, 0, set())
+            if definition is not None:
+                allowed_by_loader.add(tier)
+        check_eq(allowed_by_form, allowed_by_loader,
+                 "contract: the form accepts exactly the tiers the loader does")
+
+
 def test_the_apps_workflow_inputs_match_the_workflow():
     """A choice input is matched literally. A typo is a 422 at the moment you tap Run."""
     import io
@@ -304,5 +347,6 @@ TESTS = [
     test_the_app_reads_every_field_the_probe_writes,
     test_the_probe_schema_constant_matches_on_both_sides,
     test_the_app_reads_the_portal_fields_the_loader_accepts,
+    test_the_forms_rules_are_the_rules_the_loader_enforces,
     test_the_apps_workflow_inputs_match_the_workflow,
 ]
