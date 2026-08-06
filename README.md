@@ -124,8 +124,12 @@ every extraction layer found, rows included — because committing a URL nobody
 has looked at is how a portal ends up reporting "unavailable" forever while
 looking like an honest failure.
 
+Install it from the repository's **Releases** page — a plain `.apk`, no sign-in
+needed. `git tag v0.4.0 && git push origin v0.4.0` cuts one: the workflow runs
+the tests, builds the APK and publishes it with its SHA-256.
+
 **Compiled by CI, never run on a device.** `ANDROID.md` opens with a table of
-what that leaves unverified.
+what that leaves unverified, and the generated release notes repeat it.
 
 ## Deploying
 
@@ -139,7 +143,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 1,502 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 1,521 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

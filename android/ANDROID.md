@@ -28,26 +28,55 @@ If something behaves differently from this document, this document is wrong.
 
 ## Installing it on the phone
 
-No Android Studio, no laptop.
+No Android Studio, no laptop. Two routes; **use the first one.**
+
+### From a Release (easier)
 
 1. **Allow your browser to install apps.** Android blocks this by default.
    **Settings → Apps → (your browser) → Install unknown apps → Allow.** Exact
    wording varies by manufacturer; search settings for "unknown apps".
-2. Open the repository's **Actions** tab on the phone, in a **mobile browser,
-   not the GitHub app** — the app's run view does not show artifacts at all.
-3. Choose the **Android app** workflow and open the newest green run.
-4. Scroll to the **bottom**, to **Artifacts**, and tap
+2. Open the repository's **Releases** page on the phone and tap the newest
+   `jordan-tenders-vX.Y.Z.apk`.
+3. Tap the downloaded file. Android will warn you it is from an unknown
+   source. That is expected: it is not from the Play Store.
+
+**No sign-in needed**, and it is a plain `.apk` rather than a zip — which is
+the whole reason this route exists. Each release also prints the file's SHA-256
+so you can check the download if you want to.
+
+### From the latest build (newer, more friction)
+
+Every push that changes the app builds an APK and attaches it to the run. Use
+this when you want something that has not been released yet.
+
+1. Open the **Actions** tab in a **mobile browser, not the GitHub app** — the
+   app's run view does not show artifacts at all.
+2. Choose the **Android app** workflow and open the newest green run.
+3. Scroll to the **bottom**, to **Artifacts**, and tap
    `jordan-tenders-apk-<number>`.
-5. It downloads as a **zip**. Open it in Files or Downloads, extract the
+4. It downloads as a **zip**. Open it in Files or Downloads, extract the
    `.apk`, and tap it.
-6. Android will warn you the app is from an unknown source. That is expected:
-   it is not from the Play Store.
 
-**You have to be signed in to GitHub** to download an artifact, even on a
+**You have to be signed in to GitHub** to download a build artifact, even on a
 public repository. Signed out, the link bounces you to a sign-in page without
-saying why.
+saying why. Release assets have no such requirement.
 
-APKs are kept for 90 days, like the report artifacts.
+Build artifacts are kept for 90 days. Release assets are kept indefinitely.
+
+**A note on what triggers a build.** The APK is rebuilt on pushes that touch
+`android/`, not on every push to `main`. A commit that only changes the Python
+pipeline leaves the app unchanged, so the previous APK is still the current
+one — rebuilding it would produce a different file with identical behaviour.
+
+### Which build is on the phone
+
+**Settings → Apps → Jordan Tenders** shows the version. Released builds are
+`0.4.0`; builds from the Actions tab are `0.0.<commit-count>-<sha>`, which
+names the exact commit they came from.
+
+The version code is the repository's commit count, so it always increases and
+Android can tell a newer build from an older one. It will refuse to install an
+older APK over a newer one, which is the correct behaviour and not a fault.
 
 ---
 
@@ -107,6 +136,33 @@ new one and paste it in.
 
 ---
 
+## Cutting a release
+
+```bash
+git tag v0.4.0
+git push origin v0.4.0
+```
+
+That is all. The **Android release** workflow runs the unit tests, builds the
+APK, names it after the tag, and publishes a GitHub Release with the file and
+its SHA-256 attached. If the tests fail, no release is published.
+
+It can also be run from the Actions tab (**Android release → Run workflow**)
+against a tag that already exists — useful for re-cutting one whose build
+failed for a reason since fixed.
+
+The release notes are generated, and they say the APK is debug-signed and what
+that means. They also repeat that nothing has been run on a device, because a
+Releases page is exactly where that stops being obvious.
+
+**Why a separate workflow from the build.** `android.yml` has a `paths:` filter
+so it does not rebuild for a Python-only change — and a `paths:` filter applies
+to tag pushes too. Putting the tag trigger there would silently skip a release
+whenever the tagged commit touched nothing under `android/`, which is a release
+that quietly does not happen.
+
+---
+
 ## Signing
 
 The APK CI builds is **debug-signed**. That is fine for installing on your own
@@ -116,11 +172,17 @@ phone and is what this repository does today.
 repository secrets, never in the repository. `.gitignore` covers `*.jks`,
 `*.keystore` and `local.properties`.
 
-And know what you are taking on: **if you lose the release keystore, you can
-never update that install again.** Android identifies an app by its signature,
-so a differently-signed APK is a different app — the only route is uninstall
-and reinstall, losing the app's data. Back it up somewhere you will still have
-in two years.
+Two things to know before you do:
+
+**Switching to release signing breaks the upgrade path once.** Android
+identifies an app by its signature, so a release-signed APK will not install
+over the debug-signed one already on the phone. You will have to uninstall
+first, which loses the stored token and the cached report. Do it deliberately,
+not on the morning you need a report.
+
+**If you lose the release keystore, you can never update that install again.**
+Same reason, permanently. Back it up somewhere you will still have in two
+years.
 
 ---
 

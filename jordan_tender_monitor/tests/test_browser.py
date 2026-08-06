@@ -743,6 +743,65 @@ def test_every_workflow_file_is_structurally_valid_yaml():
               "; ".join(escaped))
 
 
+def test_the_release_workflow_cannot_silently_skip_a_release():
+    """A release that quietly does not happen is the worst kind.
+
+    android.yml has a `paths:` filter so it does not rebuild for a Python-only
+    change, and a `paths:` filter applies to TAG pushes too. Putting the tag
+    trigger there would skip the release whenever the tagged commit touched
+    nothing under android/ -- and nothing would say so. Hence a separate file,
+    and this test, which fails if the two are ever merged.
+    """
+    import io
+
+    workflows = ROOT.parent / ".github" / "workflows"
+    build = io.open(workflows / "android.yml", encoding="utf-8").read()
+    release = io.open(workflows / "android-release.yml", encoding="utf-8").read()
+
+    def has_key(text: str, key: str) -> bool:
+        """A YAML key, not a mention of one.
+
+        Both files TALK about `paths:` in their comments -- explaining exactly
+        this trap -- so a substring search finds it in the file that must not
+        have it. The distinction is whether the line begins with it.
+        """
+        return any(line.strip().startswith(key) for line in text.splitlines())
+
+    check(has_key(build, "paths:"),
+          "release: the build workflow filters by path, as intended")
+    check(not has_key(build, "tags:"),
+          "release: and therefore must NOT carry the tag trigger")
+    check(has_key(release, "tags:"), "release: the release workflow has it")
+    check(not has_key(release, "paths:"),
+          "release: and no path filter that could suppress it")
+
+    check("testDebugUnitTest" in release,
+          "release: the tests run before anything is published")
+    check("gh release create" in release,
+          "release: it publishes a real Release, not just an artifact")
+    check("sha256sum" in release,
+          "release: with a checksum, so a download can be verified")
+    check("contents: write" in release,
+          "release: and asks for the one permission that needs")
+
+    check("debug-signed" in release,
+          "release: the notes say the APK is debug-signed")
+    # Whitespace-normalised: the notes are wrapped prose, and a sentence
+    # split across two lines is still the sentence.
+    flat = " ".join(release.split())
+    check("never been run on a device or an emulator" in flat,
+          "release: and repeat that nothing has been run on a device -- a "
+          "Releases page is where that stops being obvious")
+
+    # The version has to come from somewhere monotonic, in BOTH workflows, or
+    # Android cannot tell one build from another.
+    for name, text in (("android.yml", build), ("android-release.yml", release)):
+        check("git rev-list --count HEAD" in text,
+              f"release: {name} derives a version code from the commit count")
+        check("fetch-depth: 0" in text,
+              f"release: {name} checks out enough history for it to be right")
+
+
 def test_the_workflow_installs_the_browser_only_for_diagnosis():
     """The scheduled run must not pay for a browser it does not use.
 
@@ -827,6 +886,7 @@ TESTS = [
     test_ungm_declares_its_source_and_filters_to_jordan,
     test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at,
     test_every_workflow_file_is_structurally_valid_yaml,
+    test_the_release_workflow_cannot_silently_skip_a_release,
     test_the_workflow_installs_the_browser_only_for_diagnosis,
     test_the_schedule_is_weekday_mornings_and_not_on_the_hour,
     test_giz_dropped_the_page_that_carried_no_listing,

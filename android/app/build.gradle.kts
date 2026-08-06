@@ -6,6 +6,20 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+/**
+ * The version, from the build environment.
+ *
+ * A hard-coded versionCode means every APK ever built claims to be the same
+ * one: Android will install any of them over any other without a word, and
+ * there is no way to tell from the phone which build is on it. The commit
+ * count is monotonic on `main`, available to CI and to a local clone, and
+ * needs nothing kept in sync by hand.
+ *
+ * Falls back to 1 / "dev" so a checkout with no git history still builds.
+ */
+val apkVersionCode = (System.getenv("APK_VERSION_CODE") ?: "1").toIntOrNull() ?: 1
+val apkVersionName = System.getenv("APK_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "dev"
+
 android {
     namespace = "jo.tendermonitor"
     compileSdk = 35
@@ -18,8 +32,8 @@ android {
         // not a trade worth making for a handset the user already owns.
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = apkVersionCode
+        versionName = apkVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
