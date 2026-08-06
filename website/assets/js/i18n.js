@@ -16,8 +16,8 @@ const T = {
   "home.eyebrow": { ar: "تطوير عقاري في غرب عمّان", en: "Residential development in West Amman" },
   "home.heroTitle": { ar: "شققٌ مبنيّة لتُسكن، لا لتُباع فقط.", en: "Apartments built to be lived in, not only sold." },
   "home.heroSub": {
-    ar: "ثلاثة مشاريع سكنية في عبدون ودير غبار والرابية — تصميم هادئ، تشطيبات نعرف مصدرها، وعقود تحدد موعد التسليم بوضوح.",
-    en: "Three residential schemes across Abdoun, Deir Ghbar and Rabieh — restrained design, finishes we can trace, and contracts that state the handover date plainly.",
+    ar: "شققٌ سكنية في غرب عمّان — تصميم هادئ، تشطيبات نعرف مصدرها، وعقود تحدد موعد التسليم بوضوح.",
+    en: "Residential apartments across West Amman — restrained design, finishes we can trace, and contracts that state the handover date plainly.",
   },
   "home.searchBtn": { ar: "اعرض الوحدات", en: "Show units" },
   "home.scroll": { ar: "تابع", en: "Scroll" },
@@ -62,7 +62,6 @@ const T = {
     en: "A Jordanian developer specialising in luxury apartments across West Amman.",
   },
   "footer.explore": { ar: "تصفّح", en: "Explore" },
-  "footer.projects": { ar: "المشاريع", en: "Projects" },
   "footer.contact": { ar: "تواصل معنا", en: "Contact" },
   "footer.hours": { ar: "السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً", en: "Saturday – Thursday, 9:00 – 18:00" },
   "footer.rights": { ar: "شركة جنرال شيرمان للإسكان. جميع الحقوق محفوظة.", en: "General Sherman Housing. All rights reserved." },
@@ -148,6 +147,16 @@ const T = {
   "sort.areaDesc": { ar: "المساحة: الأكبر أولاً", en: "Area: largest first" },
   "sort.floorAsc": { ar: "الطابق: من الأسفل", en: "Floor: lowest first" },
   "results.count": { ar: "وحدة مطابقة", en: "matching units" },
+  "empty.projectsTitle": { ar: "لا توجد مشاريع معروضة حالياً", en: "No projects listed yet" },
+  "empty.projectsBody": {
+    ar: "سنعرض مشاريعنا وتفاصيل وحداتها على هذه الصفحة فور اعتمادها. للاستفسار عن المتاح الآن، تواصل معنا مباشرةً.",
+    en: "Our schemes and their unit details will appear here as soon as they are released. To ask what is available now, contact us directly.",
+  },
+  "empty.unitsTitle": { ar: "لا توجد وحدات معروضة حالياً", en: "No units listed yet" },
+  "empty.unitsBody": {
+    ar: "سيُنشر جدول الوحدات المتاحة بأسعارها ومساحاتها هنا. للاستفسار عن المتاح الآن، تواصل معنا مباشرةً.",
+    en: "The available units, with their prices and areas, will be published here. To ask what is available now, contact us directly.",
+  },
   "results.emptyTitle": { ar: "لا توجد وحدات مطابقة", en: "No units match those filters" },
   "results.emptyBody": {
     ar: "جرّب توسيع نطاق السعر أو المساحة، أو تواصل معنا مباشرةً — بعض الوحدات تُعرض قبل إدراجها هنا.",
@@ -226,7 +235,7 @@ const T = {
 
   /* projects index */
   "projects.eyebrow": { ar: "المشاريع", en: "Projects" },
-  "projects.title": { ar: "ثلاثة مشاريع، ثلاث مناطق، منهج واحد", en: "Three schemes, three districts, one method" },
+  "projects.title": { ar: "منهج واحد في كل مشروع", en: "One method, every scheme" },
   "projects.lead": {
     ar: "نبني عدداً محدوداً من المشاريع في الوقت نفسه حتى يبقى كل مشروع تحت إشراف مباشر من فريقنا الهندسي حتى التسليم.",
     en: "We keep only a few schemes running at once, so each one stays under our own engineers' direct supervision through to handover.",
@@ -234,29 +243,6 @@ const T = {
   "projects.all": { ar: "جميع المشاريع", en: "All projects" },
   "status.ready": { ar: "جاهز للسكن", en: "Ready to move in" },
   "status.construction": { ar: "قيد الإنشاء", en: "Under construction" },
-  "projects.mapEyebrow": { ar: "أين نبني", en: "Where we build" },
-  "projects.mapTitle": { ar: "مناطق نعرفها جيداً", en: "Districts we know well" },
-  "projects.mapLead": {
-    ar: "نعمل في نطاق جغرافي ضيق عمداً: ثلاث مناطق في غرب عمّان نعرف أسعار أراضيها وأنظمة البناء فيها وحركة الطلب عليها.",
-    en: "We work in a deliberately narrow area: three districts of West Amman whose land prices, building regulations and demand we know first-hand.",
-  },
-  "projects.d1Title": { ar: "عبدون", en: "Abdoun" },
-  "projects.d1Body": {
-    ar: "أعلى شريحة سعرية في عمّان، ومشترون يبحثون عن الخصوصية والمساحة الكبيرة أكثر من عدد الغرف.",
-    en: "Amman's highest price bracket, where buyers want privacy and generous space more than an extra bedroom.",
-  },
-  "projects.d2Title": { ar: "دير غبار", en: "Deir Ghbar" },
-  "projects.d2Body": {
-    ar: "أرض منحدرة تمنح إطلالات مفتوحة على الوادي، وهي الأنسب لمن يوازن بين السعر والموقع.",
-    en: "Ground that falls away and keeps the valley views open — the best balance of price and address.",
-  },
-  "projects.d3Title": { ar: "الرابية", en: "Rabieh" },
-  "projects.d3Body": {
-    ar: "كثافة بناء منخفضة ومساحات خارجية حقيقية، وهي الأنسب لمن يريد حديقة أو تراساً دون مغادرة عمّان.",
-    en: "Low building density and real outdoor space — the choice for buyers who want a garden or a terrace without leaving Amman.",
-  },
-
-  /* project detail */
   "project.seeGrid": { ar: "جدول التوفّر", en: "Availability grid" },
   "project.aboutEyebrow": { ar: "عن المشروع", en: "About the scheme" },
   "project.facts": { ar: "أرقام المشروع", en: "Project at a glance" },

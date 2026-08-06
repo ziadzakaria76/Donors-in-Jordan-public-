@@ -25,6 +25,7 @@
   function featuredProjects() {
     const box = $("#home-projects");
     if (!box) return;
+    if (!PROJECTS.length) { box.closest("section")?.remove(); return; }
     // Lead with what is actually sellable: most available units first.
     const ranked = [...PROJECTS].sort((a, b) =>
       UNITS.filter((u) => u.projectId === b.id && u.status === "available").length -
@@ -35,6 +36,7 @@
   function featuredUnits() {
     const box = $("#home-units");
     if (!box) return;
+    if (!UNITS.length) { box.closest("section")?.remove(); return; }
     const picks = UNITS.filter((u) => u.status === "available")
       .sort((a, b) => b.area / b.price - a.area / a.price)  // best area per dinar
       .slice(0, 3);
@@ -73,6 +75,7 @@
   function quickSearch() {
     const form = $("#quick-search");
     if (!form) return;
+    if (!UNITS.length) { form.remove(); return; }
     const anyLabel = () => t("filter.any");
     const fill = () => {
       $("#q-district").innerHTML = `<option value="">${anyLabel()}</option>` +
@@ -101,6 +104,15 @@
     const box = $("#projects-grid");
     if (!box) return;
     const render = (filter = "") => {
+      if (!PROJECTS.length) {
+        $("#project-filters")?.remove();
+        box.innerHTML = `<div class="empty" style="grid-column:1/-1">
+            <h3>${t("empty.projectsTitle")}</h3>
+            <p>${t("empty.projectsBody")}</p>
+            <p style="margin-block-start:1.5rem"><a class="btn btn--brass" href="${BASE}contact.html">${t("cta.contactUs")}</a></p>
+          </div>`;
+        return;
+      }
       const list = filter ? PROJECTS.filter((p) => p.status === filter) : PROJECTS;
       box.innerHTML = list.map(projectCard).join("");
       initReveals();
@@ -125,9 +137,6 @@
     if (!box) return;
 
     const CAPTIONS = {
-      "project-residence76": { ar: "ريزيدنس ٧٦ — الواجهة الغربية عند الغروب", en: "Residence 76 — west elevation at dusk" },
-      "project-crescent": { ar: "ذا كريسنت — الكتلة الرئيسية من جهة الوادي", en: "The Crescent — main massing from the valley side" },
-      "project-rabieh": { ar: "حدائق الرابية — المسبح والتراس المشترك", en: "Rabieh Gardens — pool and shared terrace" },
       "gallery-facade-1": { ar: "دراسة الواجهة — إيقاع الشرفات والحجر", en: "Facade study — balcony rhythm and stone" },
       "gallery-facade-2": { ar: "دراسة الواجهة — الزجاج والظل في ضوء العصر", en: "Facade study — glass and shadow in afternoon light" },
       "gallery-facade-3": { ar: "دراسة الواجهة — الوحدات المتكررة", en: "Facade study — the repeating module" },
@@ -180,7 +189,8 @@
         loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
     }
     const select = $("#contact-project");
-    if (select) {
+    if (select && !PROJECTS.length) select.closest(".field")?.remove();
+    else if (select) {
       const fill = () => {
         select.innerHTML = `<option value="">${t("filter.any")}</option>` +
           PROJECTS.map((p) => `<option value="${esc(tx(p.name))}">${esc(tx(p.name))}</option>`).join("");

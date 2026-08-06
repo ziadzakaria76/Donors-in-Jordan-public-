@@ -132,11 +132,29 @@ change its twin in `i18n.js`.**
 
 ## Removed sections
 
-Four things were cut rather than filled, because their content was invented and
+Five things were cut rather than filled, because their content was invented and
 the site now carries the real name and logo: the **stats band**, the
-**testimonials**, the About page's **company story**, and the **office
-address**. No page now claims a track record, a founding year, or a location
-beyond Amman.
+**testimonials**, the About page's **company story**, the **office address**,
+and the **three projects** with their entire inventory. No page now claims a
+track record, a founding year, a location beyond Amman, or a scheme that does
+not exist.
+
+### The projects
+
+`PROJECTS` and `DISTRICTS` in `data.js` are empty, and the site adapts rather
+than breaking. With no projects:
+
+- the home page drops its featured-projects and featured-units sections, and
+  the hero's quick search;
+- the project index and the units page show a stated empty state with a link to
+  contact, and the filter panel and status tabs are removed;
+- `project.html` redirects to the index for any id;
+- the calculator loses its unit picker but still works on a typed-in price;
+- the contact form loses its project dropdown;
+- the footer's projects column is gone.
+
+Adding real projects back to the array restores all of it — the markup and the
+renderers are untouched, and there is nothing else to switch on.
 
 The About page runs hero → four commitments → process → CTA. To add a story
 section back, write it into `i18n.js` and add a `split split--wide` section to

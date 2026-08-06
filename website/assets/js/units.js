@@ -22,6 +22,9 @@
   }
 
   function buildControls() {
+    // render() removes the panel when there is no inventory, and langchange
+    // calls this again afterwards — so there may be nothing left to populate.
+    if (!$("#filters")) return;
     const anyLabel = t("filter.any");
     const floors = [...new Set(UNITS.map((u) => u.floor))].sort((a, b) => a - b);
 
@@ -110,6 +113,16 @@
   /* ------------------------------------------------------------- render */
 
   function render() {
+    // Filtering an empty inventory is a control panel with nothing to control.
+    if (!UNITS.length) {
+      $("#filters")?.remove();
+      grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+          <h3>${t("empty.unitsTitle")}</h3>
+          <p>${t("empty.unitsBody")}</p>
+          <p style="margin-block-start:1.5rem"><a class="btn btn--brass" href="contact.html">${t("cta.contactUs")}</a></p>
+        </div>`;
+      return;
+    }
     const list = apply();
     $("#result-count").innerHTML = `<strong class="num">${list.length}</strong> ${t("results.count")}`;
     grid.innerHTML = list.length

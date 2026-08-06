@@ -102,9 +102,9 @@ const PAGES = [];
 
 PAGES.push({
   file: "projects.html",
-  title: "مشاريعنا — شقق سكنية في عبدون ودير غبار والرابية | جنرال شيرمان",
-  desc: "ثلاثة مشاريع سكنية من جنرال شيرمان في غرب عمّان: ريزيدنس ٧٦ في عبدون، ذا كريسنت في دير غبار، وحدائق الرابية.",
-  keywords: "مشاريع سكنية عمان, شقق عبدون, شقق دير غبار, شقق الرابية",
+  title: "مشاريعنا | شركة جنرال شيرمان للإسكان",
+  desc: "مشاريع شركة جنرال شيرمان للإسكان في غرب عمّان. تُنشر تفاصيل كل مشروع ووحداته على هذه الصفحة فور اعتمادها.",
+  keywords: "مشاريع سكنية عمان, شقق للبيع في عمان, شركة إسكان الأردن",
   scripts: ["pages.js"],
   modals: [ENQUIRY],
   main: `
@@ -112,7 +112,7 @@ ${pageHero({
     image: "hero-about",
     crumb: '<span data-i18n="nav.projects">مشاريعنا</span>',
     eyebrow: '<span data-i18n="projects.eyebrow">المشاريع</span>',
-    title: '<span data-i18n="projects.title">ثلاثة مشاريع، ثلاث مناطق، منهج واحد</span>',
+    title: '<span data-i18n="projects.title">منهج واحد في كل مشروع</span>',
     lead: '<span data-i18n="projects.lead">نبني عدداً محدوداً من المشاريع في الوقت نفسه حتى يبقى كل مشروع تحت إشراف مباشر من فريقنا الهندسي حتى التسليم.</span>',
   })}
 
@@ -128,29 +128,7 @@ ${pageHero({
     </div>
   </section>
 
-  <section class="section section--stone">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="projects.mapEyebrow">أين نبني</p>
-        <h2 data-i18n="projects.mapTitle">مناطق نعرفها جيداً</h2>
-        <p class="lead" data-i18n="projects.mapLead">نعمل في نطاق جغرافي ضيق عمداً: ثلاث مناطق في غرب عمّان نعرف أسعار أراضيها وأنظمة البناء فيها وحركة الطلب عليها.</p>
-      </div>
-      <div class="grid grid--3">
-        <article class="card reveal" style="padding:1.5rem">
-          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d1Title">عبدون</h3>
-          <p class="card__text" data-i18n="projects.d1Body">أعلى شريحة سعرية في عمّان، ومشترون يبحثون عن الخصوصية والمساحة الكبيرة أكثر من عدد الغرف.</p>
-        </article>
-        <article class="card reveal" style="padding:1.5rem">
-          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d2Title">دير غبار</h3>
-          <p class="card__text" data-i18n="projects.d2Body">أرض منحدرة تمنح إطلالات مفتوحة على الوادي، وهي الأنسب لمن يوازن بين السعر والموقع.</p>
-        </article>
-        <article class="card reveal" style="padding:1.5rem">
-          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d3Title">الرابية</h3>
-          <p class="card__text" data-i18n="projects.d3Body">كثافة بناء منخفضة ومساحات خارجية حقيقية، وهي الأنسب لمن يريد حديقة أو تراساً دون مغادرة عمّان.</p>
-        </article>
-      </div>
-    </div>
-  </section>`,
+`,
 });
 
 /* --------------------------------------------------------- project detail */
@@ -307,7 +285,7 @@ PAGES.push({
 PAGES.push({
   file: "units.html",
   title: "الوحدات المتاحة — شقق للبيع في عمّان بالمساحة والسعر | جنرال شيرمان",
-  desc: "تصفّح جميع الشقق المتاحة للبيع في مشاريع جنرال شيرمان مع فلاتر للمنطقة وعدد الغرف والمساحة والسعر والطابق.",
+  desc: "الوحدات المتاحة للبيع في مشاريع شركة جنرال شيرمان للإسكان، بمساحاتها وأسعارها.",
   keywords: "شقق للبيع في عمان, أسعار الشقق في عمان, شقق 3 غرف عمان, شقق بحديقة عمان",
   scripts: ["pages.js", "units.js"],
   modals: [ENQUIRY],
@@ -467,7 +445,7 @@ ${pageHero({
 PAGES.push({
   file: "gallery.html",
   title: "معرض الصور — مشاريع شركة جنرال شيرمان للإسكان في عمّان",
-  desc: "معالجات معمارية للواجهات والمساحات الداخلية والمرافق المشتركة في مشاريع جنرال شيرمان بعمّان.",
+  desc: "معالجات معمارية للواجهات والمساحات الداخلية والمرافق المشتركة من شركة جنرال شيرمان للإسكان.",
   scripts: ["pages.js"],
   modals: [LIGHTBOX],
   main: `

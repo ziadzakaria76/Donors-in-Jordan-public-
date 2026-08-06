@@ -56,11 +56,7 @@ const COMPANY = {
 
 /* --------------------------------------------------------------- districts */
 
-const DISTRICTS = {
-  abdoun: { ar: "عبدون", en: "Abdoun" },
-  "deir-ghbar": { ar: "دير غبار", en: "Deir Ghbar" },
-  rabieh: { ar: "الرابية", en: "Rabieh" },
-};
+const DISTRICTS = {};
 
 /* ---------------------------------------------------------------- projects
    Units are not listed one by one. Each project declares its floors and its
@@ -71,127 +67,14 @@ const DISTRICTS = {
    Price = area × pricePerM2 × (1 + floorPremium × floor), rounded to JOD 500.
    -------------------------------------------------------------------------- */
 
-const PROJECTS = [
-  {
-    id: "residence-76",
-    name: { ar: "ريزيدنس ٧٦", en: "Residence 76" },
-    district: "abdoun",
-    status: "ready",
-    image: "residence76",
-    year: 2025,
-    delivery: { ar: "جاهز للسكن", en: "Ready to move in" },
-    address: { ar: "شارع الأميرة بسمة، عبدون الشمالي", en: "Princess Basma Street, North Abdoun" },
-    mapQuery: "Abdoun, Amman, Jordan",
-    tagline: {
-      ar: "أربعٌ وعشرون شقة فوق أهدأ شوارع عبدون",
-      en: "Twenty-four apartments above Abdoun's quietest street",
-    },
-    description: {
-      ar: "مبنى سكني من ثمانية طوابق صُمِّم حول فناء داخلي يفتح كل شقة على واجهتين، فيدخل الضوء من الشرق صباحاً ومن الغرب عند الغروب. الواجهات من حجر البازلت الأردني والزجاج المعزول حرارياً، والمداخل بارتفاع طابقين مع استقبال على مدار الساعة. المشروع مُسلَّم بالكامل ومسكون منذ ربيع ٢٠٢٥.",
-      en: "An eight-storey building planned around an internal courtyard, so every apartment opens onto two elevations — morning light from the east, evening light from the west. Elevations are Jordanian basalt and thermally broken glazing; the lobby is double height with 24-hour reception. Delivered and occupied since spring 2025.",
-    },
-    highlights: [
-      { ar: "تشطيب كامل مع مطابخ إيطالية مركّبة", en: "Fully finished with fitted Italian kitchens" },
-      { ar: "تدفئة أرضية مائية في كامل الشقة", en: "Hydronic underfloor heating throughout" },
-      { ar: "موقفان مغطّيان لكل شقة ومستودع خاص", en: "Two covered parking bays and a private store per home" },
-      { ar: "مولّد كهربائي يغطي المبنى بالكامل", en: "Standby generator covering the whole building" },
-    ],
-    amenities: ["gym", "reception", "generator", "parking", "security", "elevator", "storage", "garden"],
-    floors: 8,
-    groundFloorIsGarden: true,
-    pricePerM2: 1450,
-    floorPremium: 0.022,
-    lines: [
-      { code: "A", beds: 4, baths: 4, area: 292, type: "apartment", plan: "plan-4br", orientation: "west", balcony: 34 },
-      { code: "B", beds: 3, baths: 3, area: 214, type: "apartment", plan: "plan-3br", orientation: "east", balcony: 22 },
-      { code: "C", beds: 3, baths: 3, area: 196, type: "apartment", plan: "plan-3br", orientation: "north", balcony: 18 },
-    ],
-    sold: ["0-A", "0-B", "1-A", "1-B", "1-C", "2-B", "2-C", "3-A", "3-C", "4-A", "4-B", "5-C", "6-A", "7-A", "7-B"],
-    reserved: ["2-A", "5-A"],
-    plans: ["early", "handover", "bank"],
-    gallery: ["project-residence76", "gallery-interior-1", "gallery-facade-1", "gallery-courtyard-1"],
-  },
-  {
-    id: "the-crescent",
-    name: { ar: "ذا كريسنت", en: "The Crescent" },
-    district: "deir-ghbar",
-    status: "construction",
-    image: "crescent",
-    year: 2028,
-    delivery: { ar: "التسليم: الربع الثاني ٢٠٢٨", en: "Delivery: Q2 2028" },
-    address: { ar: "شارع الملكة رانيا الفرعي، دير غبار", en: "Off Queen Rania Street, Deir Ghbar" },
-    mapQuery: "Deir Ghbar, Amman, Jordan",
-    tagline: {
-      ar: "أكبر مشاريعنا: أربعون شقة على منحدر دير غبار",
-      en: "Our largest scheme: forty apartments on the Deir Ghbar slope",
-    },
-    description: {
-      ar: "يستفيد المشروع من انحدار الأرض ليمنح كل طابق إطلالة مفتوحة على وادي دير غبار دون أن يحجب أحدهم الآخر. عشرة طوابق فوق طابقي مواقف، بأربعة نماذج سكنية تبدأ من شقق الغرفتين المناسبة للأزواج الشابين وتصل إلى شقق الثلاث غرف العائلية. العمل الإنشائي مكتمل حتى الطابق السادس.",
-      en: "The scheme uses the fall of the site so that every floor keeps an open view over the Deir Ghbar valley rather than the building below it. Ten residential storeys above two parking levels, in four layouts — from two-bedroom apartments suited to younger couples up to family three-bedrooms. Structure is complete to the sixth floor.",
-    },
-    highlights: [
-      { ar: "إطلالة مفتوحة على الوادي من كل طابق", en: "Open valley view from every floor" },
-      { ar: "طابقا مواقف تحت الأرض", en: "Two levels of underground parking" },
-      { ar: "نادٍ رياضي ومسبح مشترك للسكان", en: "Residents' gym and shared pool" },
-      { ar: "عزل حراري وصوتي بمواصفات أوروبية", en: "Thermal and acoustic insulation to European specification" },
-    ],
-    amenities: ["gym", "pool", "reception", "generator", "parking", "security", "elevator", "playground"],
-    floors: 10,
-    groundFloorIsGarden: true,
-    pricePerM2: 1080,
-    floorPremium: 0.018,
-    lines: [
-      { code: "A", beds: 3, baths: 3, area: 232, type: "apartment", plan: "plan-3br", orientation: "west", balcony: 26 },
-      { code: "B", beds: 2, baths: 2, area: 158, type: "apartment", plan: "plan-2br", orientation: "west", balcony: 16 },
-      { code: "C", beds: 2, baths: 2, area: 146, type: "apartment", plan: "plan-2br", orientation: "east", balcony: 14 },
-      { code: "D", beds: 3, baths: 3, area: 205, type: "apartment", plan: "plan-3br", orientation: "east", balcony: 20 },
-    ],
-    sold: ["0-B", "0-C", "1-B", "1-C", "2-C", "3-B", "4-D", "5-B", "5-C"],
-    reserved: ["1-A", "2-A", "3-D", "6-B"],
-    plans: ["early", "handover", "bank"],
-    gallery: ["project-crescent", "gallery-facade-2", "gallery-interior-2", "gallery-skyline-1"],
-  },
-  {
-    id: "rabieh-gardens",
-    name: { ar: "حدائق الرابية", en: "Rabieh Gardens" },
-    district: "rabieh",
-    status: "construction",
-    image: "rabieh",
-    year: 2027,
-    delivery: { ar: "التسليم: الربع الأول ٢٠٢٧", en: "Delivery: Q1 2027" },
-    address: { ar: "شارع الأمير هاشم، الرابية", en: "Prince Hashem Street, Rabieh" },
-    mapQuery: "Rabieh, Amman, Jordan",
-    tagline: {
-      ar: "شقق بحدائق خاصة ودوبلكسات على السطح",
-      en: "Garden apartments below, roof duplexes above",
-    },
-    description: {
-      ar: "أربعة طوابق فقط على أرض واسعة، ما سمح بتخصيص حديقة خاصة لكل شقة أرضية ودوبلكس بتراس مفتوح في الطابق الأخير. المساحات المشتركة تضم مسبحاً وممشى بين الأشجار المعمّرة التي حافظنا عليها. مناسب لمن يريد مساحة خارجية حقيقية دون الخروج من عمّان.",
-      en: "Only four storeys on a generous plot, which is what makes a private garden possible for each ground-floor apartment and a roof duplex with an open terrace at the top. Shared space includes a pool and a walk among the mature trees we kept on site. For buyers who want real outdoor space without leaving Amman.",
-    },
-    highlights: [
-      { ar: "حديقة خاصة لكل شقة أرضية", en: "Private garden with every ground-floor home" },
-      { ar: "دوبلكسات بتراس مفتوح على السطح", en: "Roof duplexes with open terraces" },
-      { ar: "مسبح وممشى بين الأشجار المعمّرة", en: "Pool and walkway among mature trees" },
-      { ar: "أربعة طوابق فقط — كثافة منخفضة", en: "Four storeys only — low density" },
-    ],
-    amenities: ["pool", "garden", "reception", "generator", "parking", "security", "elevator", "playground"],
-    floors: 4,
-    groundFloorIsGarden: true,
-    topFloorIsDuplex: true,
-    pricePerM2: 1020,
-    floorPremium: 0.02,
-    lines: [
-      { code: "A", beds: 3, baths: 3, area: 216, type: "apartment", plan: "plan-3br", orientation: "south", balcony: 28 },
-      { code: "B", beds: 4, baths: 4, area: 268, type: "apartment", plan: "plan-4br", orientation: "west", balcony: 32 },
-      { code: "C", beds: 4, baths: 4, area: 340, type: "apartment", plan: "plan-duplex", orientation: "north", balcony: 46 },
-    ],
-    sold: ["0-B", "1-C", "2-A"],
-    reserved: ["0-A", "3-C"],
-    plans: ["early", "handover", "bank"],
-    gallery: ["project-rabieh", "gallery-courtyard-1", "gallery-interior-1", "gallery-facade-2"],
-  },
-];
+const PROJECTS = [];
+/* Empty: the three schemes here were invented for the build. Add the real ones
+   as objects of the shape documented above — floors, lines, sold/reserved —
+   and the whole site comes back with them: the project index, the detail
+   pages, the inventory and its filters, the availability grids, the home
+   page's featured sections and the calculator's unit picker all render from
+   this array. Nothing else needs restoring. */
+
 
 /* ----------------------------------------------------------- payment plans */
 

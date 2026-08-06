@@ -48,6 +48,8 @@
 
   function renderUnitPicker() {
     const list = UNITS.filter((u) => u.status === "available").sort((a, b) => a.price - b.price);
+    // With no inventory the calculator still works on a typed-in price.
+    if (!list.length) { $("#c-unit")?.closest(".field")?.remove(); return; }
     $("#c-unit").innerHTML = `<option value="">${t("calc.custom")}</option>` + list.map((u) => {
       const p = PROJECTS.find((x) => x.id === u.projectId);
       return `<option value="${u.id}" ${state.unitId === u.id ? "selected" : ""}>
