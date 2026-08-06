@@ -6,9 +6,12 @@
     <!-- A document with two lines on it. Monochrome and solid: Android masks a
          notification icon to its alpha channel, so anything with colour or
          detail arrives as a white blob.
-         No android:tint. ?attr/colorControlNormal is the reflex here and it is
-         an AppCompat attribute this app does not depend on -- and the tint
-         would never be drawn anyway, for the reason above. -->
+         No android:tint here. ?attr/colorControlNormal is the reflex, it is an
+         AppCompat attribute this app does not depend on, and the tint would
+         never be drawn anyway for the reason above.
+         (Nor a double hyphen anywhere in this comment: XML forbids one inside
+         a comment, which is how the previous attempt at this note failed the
+         build.) -->
     <path
         android:fillColor="#FFFFFFFF"
         android:pathData="M7,2h7l5,5v13a2,2 0,0 1,-2 2H7a2,2 0,0 1,-2 -2V4a2,2 0,0 1,2 -2zM13,3.5V8h4.5L13,3.5zM8,11h8v1.6H8V11zM8,14h5v1.6H8V14z" />
