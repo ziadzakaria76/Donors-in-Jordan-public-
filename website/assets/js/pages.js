@@ -172,7 +172,9 @@
 
   function contactBits() {
     const box = $("#contact-map");
-    if (box) {
+    // No address means no office map — never a map of somewhere else.
+    if (box && !COMPANY.mapQuery) box.remove();
+    else if (box) {
       const q = encodeURIComponent(COMPANY.mapQuery);
       box.innerHTML = `<iframe title="${esc(tx(COMPANY.name))}" src="https://www.google.com/maps?q=${q}&output=embed"
         loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>`;

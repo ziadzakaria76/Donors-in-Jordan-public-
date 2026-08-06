@@ -632,13 +632,10 @@ ${pageHero({
               <a data-wa href="#" target="_blank" rel="noopener" class="link-arrow" data-i18n="contact.waLink">ابدأ محادثة</a></span></li>
             <li><span data-icon="mail"></span><span><strong data-i18n="form.email">البريد الإلكتروني</strong><br>
               <a data-mail="sales" href="#" data-company-email class="link-arrow">Mohammed.Zakaria90@hotmail.com</a></span></li>
-            <li><span data-icon="pin"></span><span><strong data-i18n="contact.office">مكتب المبيعات</strong><br>
-              <span data-i18n="footer.address">شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن</span></span></li>
             <li><span data-icon="clock"></span><span><strong data-i18n="contact.hours">ساعات العمل</strong><br>
               <span data-i18n="footer.hours">السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً</span></span></li>
           </ul>
         </div>
-        <div class="map-frame" id="contact-map" style="margin-block-start:1.5rem"></div>
       </div>
     </div>
   </section>

@@ -54,8 +54,11 @@ Everything below is invented placeholder content. Search for `«REPLACE»` in
 - **Founding year and registration** — `COMPANY.founded` is `null` and no page
   states a founding year, because the one here was invented. `registration` is
   likewise a placeholder and is not rendered anywhere yet.
-- **Contact details** — phone, WhatsApp number (digits only, no `+` or spaces),
-  both email addresses, the office address and `mapQuery`.
+- **Contact details** — the phone, WhatsApp number and email are real. The
+  **office address is deliberately blank**: `COMPANY.address` and `mapQuery`
+  are empty, so the footer's address line, the contact page's office row and
+  the office map are all absent. Filling either field in is not enough on its
+  own — the markup was removed too (see *Removed sections*).
 - **Social links** — the four `href: "#"` entries.
 - **Domain** — `COMPANY.domain` plus the SEO tags noted above.
 - **Projects and units** — see below.
@@ -129,7 +132,7 @@ change its twin in `i18n.js`.**
 
 ## Removed sections
 
-Three things were cut rather than filled, because their content was invented
+Four things were cut rather than filled, because their content was invented
 and the site now carries the real name and logo: the **stats band**, the
 **testimonials**, and the About page's **company story**. No page now claims a
 track record or a founding year.
@@ -137,6 +140,26 @@ track record or a founding year.
 The About page runs hero → four commitments → process → CTA. To add a story
 section back, write it into `i18n.js` and add a `split split--wide` section to
 `about.html`; the four commitments section is the nearest pattern to copy.
+
+### Restoring the office address
+
+Set `COMPANY.address` and `COMPANY.mapQuery` in `data.js`, re-add a
+`"footer.address"` key to `i18n.js`, then restore the markup:
+
+```html
+<!-- footer, in the .footer__contact list on every page -->
+<li><span data-icon="pin"></span><span data-i18n="footer.address">…</span></li>
+
+<!-- contact.html, in the "تواصل مباشر" card -->
+<li><span data-icon="pin"></span><span><strong data-i18n="contact.office">مكتب المبيعات</strong><br>
+  <span data-i18n="footer.address">…</span></span></li>
+
+<!-- contact.html, after that card -->
+<div class="map-frame" id="contact-map" style="margin-block-start:1.5rem"></div>
+```
+
+The map renderer removes `#contact-map` whenever `mapQuery` is empty, so the
+map can never show a location the company has not given.
 
 ### Restoring the stats and testimonials `COMPANY.stats` and `TESTIMONIALS` in
 `data.js` are now empty arrays, and the markup is gone from `index.html` and

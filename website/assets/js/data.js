@@ -23,15 +23,16 @@ const COMPANY = {
   salesEmail: "Mohammed.Zakaria90@hotmail.com",   // one address for both for now
   domain: "https://www.generalsherman.jo",// «REPLACE» — no domain registered yet;
                                       // this feeds canonical/og:url and the sitemap
-  address: {
-    ar: "شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن",
-    en: "46 Abdullah Ghosheh Street, 3rd Floor, Amman 11194, Jordan",
-  },
+  /* Deliberately blank. The footer's address line, the contact page's office
+     row and the office map are all removed while these are empty; fill either
+     one in and restore the markup (README → "Removed sections") to bring the
+     office back. */
+  address: { ar: "", en: "" },
   hours: {
     ar: "السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً",
     en: "Saturday – Thursday, 9:00 – 18:00",
   },
-  mapQuery: "Abdullah Ghosheh Street, Amman, Jordan",
+  mapQuery: "",
   /* Where forms go. Leave empty and every form hands the enquiry to WhatsApp
      with an email fallback — no backend required. Paste a Formspree/Web3Forms
      endpoint here and the forms POST to it instead. */

@@ -64,7 +64,6 @@ const T = {
   "footer.explore": { ar: "تصفّح", en: "Explore" },
   "footer.projects": { ar: "المشاريع", en: "Projects" },
   "footer.contact": { ar: "تواصل معنا", en: "Contact" },
-  "footer.address": { ar: "شارع عبد الله غوشة، مبنى ٤٦، الطابق الثالث، عمّان ١١١٩٤، الأردن", en: "46 Abdullah Ghosheh Street, 3rd Floor, Amman 11194, Jordan" },
   "footer.hours": { ar: "السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً", en: "Saturday – Thursday, 9:00 – 18:00" },
   "footer.rights": { ar: "شركة جنرال شيرمان للإسكان. جميع الحقوق محفوظة.", en: "General Sherman Housing. All rights reserved." },
   "footer.note": {
