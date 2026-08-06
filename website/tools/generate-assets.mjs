@@ -690,7 +690,7 @@ const icon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width=
   <path d="M 18 48 L 18 27 A 14 14 0 0 1 46 27 L 46 48" fill="none" stroke="url(#b)" stroke-width="5"/>
   <path d="M 32 48 L 32 15" stroke="url(#b)" stroke-width="5"/>
 </svg>`;
-await writeFile(resolve(IMG, "../favicon.svg"), icon);
-await sharp(Buffer.from(icon), { density: 400 }).resize(180, 180).png().toFile(resolve(IMG, "../apple-touch-icon.png"));
+await writeFile(resolve(ROOT, "favicon.svg"), icon);
+await sharp(Buffer.from(icon), { density: 400 }).resize(180, 180).png().toFile(resolve(ROOT, "apple-touch-icon.png"));
 console.log("  ✓ icons");
 console.log("Done.");
