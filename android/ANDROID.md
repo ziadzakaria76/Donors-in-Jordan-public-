@@ -17,7 +17,7 @@ Be clear about this before relying on any of it.
 | | |
 |---|---|
 | **Compiles** | Yes — CI builds it on every push. That is the only place it is compiled; it is developed in an environment with no Android SDK |
-| **Unit tested** | Token redaction, the API client's failure paths (401 / 403-permission / 403-rate-limit / 404 / 410 / 5xx / offline), report parsing and schema refusal, the artifact zip reader |
+| **Unit tested** | Token redaction, the API client's failure paths (401 / 403-permission / 403-rate-limit / 404 / 410 / 5xx / offline), report parsing and schema refusal, the artifact zip reader, and editing `portals.json` without destroying the prose in it |
 | **NOT tested** | The Keystore-backed token store — `EncryptedSharedPreferences` needs a real Android Keystore and cannot run on a JVM. It is two AndroidX calls, deliberately with no logic around them |
 | **NOT run on a device by anyone** | Every screen. No emulator, no handset. The first person to install this is the first person to see it render |
 
@@ -72,9 +72,11 @@ That is the minimum that works, and here is what each one buys:
 - **Actions: write** — `POST .../dispatches`, which is the Run button. There is
   no narrower permission for it; read alone cannot start a run.
 - **Contents: read** — read `portals.json`.
-- **Contents: write** — commit a change to `portals.json`. **Phase 2 only.** If
-  you never intend to add or disable a portal from the phone, set Contents to
-  **Read-only** and everything except the Portals screen still works.
+- **Contents: write** — commit a change to `portals.json`: switching a portal
+  on or off, adding one, removing one. If you never intend to manage portals
+  from the phone, set Contents to **Read-only** and everything except the
+  Portals screen still works — the app will report the 403 in those words
+  rather than as a mystery.
 
 No organisation permissions. No other repositories. No `repo` classic scope —
 a classic token is all-or-nothing across every repository you can see, which
@@ -130,11 +132,30 @@ it downloaded, with no network at all.
 
 **Run** — the workflow's real inputs. Scope (everything open / only what is
 new), a portal filter, and mode (report / diagnose). Live status while it runs.
+`workflow_dispatch` answers 204 with no body — it does not say which run it
+started — so the app watches for a new run to appear and says so while it does,
+rather than showing the previous run as though it were the new one.
 
-**Portals** — every portal, in full: read, unavailable, not set up, or no
-listing; how many notices it read, how many were Jordan, and the failure
-reason with the URL to check by hand. This table is the honesty mechanism and
-it is never summarised away.
+**Health** — every portal, in full: read, unavailable, not set up, or no
+listing; how many notices it read, how many were Jordan, and the failure reason
+with the URL to check by hand. This table is the honesty mechanism and it is
+never summarised away.
+
+**Portals** — the list itself. Switch a portal on or off, add one by URL, or
+remove one. **Every change is a commit to `portals.json`**, with a message
+saying what changed and why, and the resulting commit sha is shown back —
+"saved" is a claim, a sha is evidence.
+
+Adding a portal has a **Test it** step, and Save is not available until it has
+run. It dispatches a `--probe` run that fetches the page on GitHub's runner and
+reports what every extraction layer found, including the rows. That is there
+because committing a URL nobody has looked at is exactly how a portal ends up
+reporting "unavailable" forever while looking like an honest failure — which is
+what happened with KfW, and with ADFD.
+
+Read the sample rows before saving. A high quality score means the page *looks
+like* a listing; it cannot see a single column being wrong. GIZ once scored 1.00
+with every deadline on the portal garbage.
 
 **Files** — download the run's Word and Excel packs and open or share them.
 
@@ -158,6 +179,16 @@ available.
 
 **Recover an expired artifact.** Run artifacts are deleted after 90 days. The
 app says "expired", not "download failed", because there is nothing to retry.
+
+**Edit how a coded portal reads.** UNGM and the four REST APIs keep their fetch
+logic in Python, and `portals.json` declares which fields those modules own.
+The app shows them as read-only and says so; setting one in the file is
+*rejected* by the loader rather than quietly ignored, so an edit that looked
+applied and was not is impossible.
+
+**Overwrite someone else's change.** A commit carries the file's sha as loaded.
+If the file moved in between, GitHub refuses the write and the app says the
+list changed rather than clobbering it.
 
 ---
 

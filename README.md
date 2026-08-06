@@ -117,6 +117,13 @@ It does not scrape — it is a client to the pipeline that already runs on
 GitHub's servers. It reads the `*.json` artifact each run writes, because
 GitHub's REST API does not expose the run page's summary to any client.
 
+It also **manages the portal list**: switch a portal on or off, add one by URL,
+or remove one, each as a real commit to `portals.json`. Adding one tests the
+page first — a `--probe` run fetches it on GitHub's runner and reports what
+every extraction layer found, rows included — because committing a URL nobody
+has looked at is how a portal ends up reporting "unavailable" forever while
+looking like an honest failure.
+
 **Compiled by CI, never run on a device.** `ANDROID.md` opens with a table of
 what that leaves unverified.
 
@@ -132,7 +139,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 1,435 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 1,502 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

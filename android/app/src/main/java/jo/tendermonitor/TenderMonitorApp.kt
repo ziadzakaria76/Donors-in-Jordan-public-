@@ -6,6 +6,7 @@ import androidx.room.Room
 import jo.tendermonitor.data.ReportRepository
 import jo.tendermonitor.data.db.TenderDatabase
 import jo.tendermonitor.data.github.GitHubClient
+import jo.tendermonitor.data.portals.PortalsRepository
 import jo.tendermonitor.data.settings.KeystoreSettings
 import java.io.File
 
@@ -44,5 +45,7 @@ class TenderMonitorApp : Application() {
             settings = settings,
             artifactDir = artifactDir,
         )
+
+        val portals = PortalsRepository(client = client, settings = settings)
     }
 }

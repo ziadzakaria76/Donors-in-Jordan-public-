@@ -30,6 +30,12 @@ on:
         options:
           - "produce the report"
           - "diagnose portals (--capture)"
+          - "test a candidate portal (--probe)"
+      candidate:
+        description: "Portal to test, as JSON. Only read in --probe mode"
+        required: false
+        default: ""
+        type: string
   schedule:
     # 04:17 UTC = 07:17 Asia/Amman. Jordan is UTC+3 year-round (DST abolished
     # in 2022), so this needs no seasonal adjustment. GitHub cron is always UTC.
@@ -113,6 +119,36 @@ jobs:
           done
           exit 0
 
+      # Try a portal that is NOT in portals.json yet.
+      #
+      # The alternative was to commit the entry, diagnose it, and remove it
+      # again if it was no good -- which leaves a half-added portal in the
+      # repository, two commits of noise per attempt, and a window where a
+      # scheduled run picks up something nobody has looked at. Passing the
+      # candidate as data avoids all three.
+      #
+      # The JSON arrives on stdin rather than as an argument: it comes off a
+      # phone keyboard and would otherwise have to survive shell quoting.
+      - name: Test a candidate portal
+        if: github.event.inputs.mode == 'test a candidate portal (--probe)'
+        env:
+          CANDIDATE: ${{ github.event.inputs.candidate }}
+        run: |
+          if [ -z "$CANDIDATE" ]; then
+            echo "No candidate was supplied. Nothing to test." >&2
+            exit 1
+          fi
+          printf '%s' "$CANDIDATE" | python jordan_tender_monitor/run.py --probe -
+
+      - name: Upload the probe result
+        if: always() && github.event.inputs.mode == 'test a candidate portal (--probe)'
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-probe-${{ github.run_number }}
+          path: jordan_tender_monitor/output/probe_*.json
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Upload the captured pages
         if: github.event.inputs.mode == 'diagnose portals (--capture)'
         uses: actions/upload-artifact@v4
@@ -124,7 +160,7 @@ jobs:
 
       - name: Run the monitor
         id: run
-        if: github.event.inputs.mode != 'diagnose portals (--capture)' 
+        if: github.event.inputs.mode == 'produce the report' || github.event.inputs.mode == ''
         env:
           # A run you triggered by hand almost always wants the whole current
           # pipeline -- you are looking at it now. The schedule wants what
@@ -148,7 +184,7 @@ jobs:
 
       # always(): the summary matters most when the run failed.
       - name: Show the results on the run page
-        if: always() && github.event.inputs.mode != 'diagnose portals (--capture)' 
+        if: always() && (github.event.inputs.mode == 'produce the report' || github.event.inputs.mode == '')
         run: |
           if compgen -G "jordan_tender_monitor/output/*.md" > /dev/null; then
             cat jordan_tender_monitor/output/*.md >> "$GITHUB_STEP_SUMMARY"
@@ -160,7 +196,7 @@ jobs:
           fi
 
       - name: Upload the Word and Excel reports, and the app's JSON
-        if: always() && github.event.inputs.mode != 'diagnose portals (--capture)' 
+        if: always() && (github.event.inputs.mode == 'produce the report' || github.event.inputs.mode == '')
         uses: actions/upload-artifact@v4
         with:
           name: jordan-tenders-${{ github.run_number }}

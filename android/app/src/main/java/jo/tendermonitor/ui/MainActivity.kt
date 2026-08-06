@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -34,8 +35,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jo.tendermonitor.TenderMonitorApp
+import jo.tendermonitor.ui.screens.AddPortalScreen
 import jo.tendermonitor.ui.screens.FilesScreen
 import jo.tendermonitor.ui.screens.PortalHealthScreen
+import jo.tendermonitor.ui.screens.PortalsScreen
 import jo.tendermonitor.ui.screens.ReportScreen
 import jo.tendermonitor.ui.screens.RunScreen
 import jo.tendermonitor.ui.screens.SettingsScreen
@@ -55,6 +58,8 @@ class MainActivity : ComponentActivity() {
                     AppViewModel(graph.reports, graph.settings, graph.settings) as T
                 modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
                     SettingsViewModel(graph.settings, graph.settings, graph.client) as T
+                modelClass.isAssignableFrom(PortalsViewModel::class.java) ->
+                    PortalsViewModel(graph.portals) as T
                 else -> throw IllegalArgumentException(modelClass.name)
             }
         }
@@ -130,7 +135,8 @@ class MainActivity : ComponentActivity() {
 private enum class Tab(val label: String, val icon: ImageVector) {
     LATEST("Latest", Icons.Filled.Article),
     RUN("Run", Icons.Filled.PlayArrow),
-    PORTALS("Portals", Icons.Filled.Dns),
+    HEALTH("Health", Icons.Filled.Dns),
+    PORTALS("Portals", Icons.Filled.Tune),
     FILES("Files", Icons.Filled.Folder),
     SETTINGS("Settings", Icons.Filled.Settings),
 }
@@ -145,13 +151,20 @@ private fun AppScaffold(
 ) {
     val app: AppViewModel = viewModel(factory = factory)
     val settingsVm: SettingsViewModel = viewModel(factory = factory)
+    val portalsVm: PortalsViewModel = viewModel(factory = factory)
 
     var tab by remember { mutableStateOf(Tab.LATEST) }
+    // The Add form is a sub-screen of Portals rather than a tab: it is a
+    // task with a beginning and an end, and a tab you can wander away from
+    // mid-edit would lose a tested candidate without saying so.
+    var addingPortal by remember { mutableStateOf(false) }
 
     val reportState by app.report.collectAsState()
     val runState by app.runs.collectAsState()
     val filesState by app.files.collectAsState()
     val settings by settingsVm.settings.collectAsState()
+    val portalsState by portalsVm.state.collectAsState()
+    val addState by portalsVm.add.collectAsState()
     val fingerprint by settingsVm.fingerprint.collectAsState()
     val verifyResult by settingsVm.verifyResult.collectAsState()
 
@@ -190,11 +203,34 @@ private fun AppScaffold(
                 modifier = modifier,
             )
 
-            Tab.PORTALS -> PortalHealthScreen(
+            Tab.HEALTH -> PortalHealthScreen(
                 state = reportState,
                 onOpenUrl = onOpenUrl,
                 modifier = modifier,
             )
+
+            Tab.PORTALS -> if (addingPortal) {
+                AddPortalScreen(
+                    state = addState,
+                    onChange = portalsVm::updateAdd,
+                    onTest = portalsVm::test,
+                    onSave = portalsVm::save,
+                    onCancel = { portalsVm.resetAdd(); addingPortal = false },
+                    onOpenUrl = onOpenUrl,
+                    modifier = modifier,
+                )
+            } else {
+                PortalsScreen(
+                    state = portalsState,
+                    onReload = portalsVm::load,
+                    onToggle = portalsVm::setEnabled,
+                    onRemove = portalsVm::remove,
+                    onAdd = { addingPortal = true },
+                    onOpenUrl = onOpenUrl,
+                    onDismissCommit = portalsVm::dismissCommit,
+                    modifier = modifier,
+                )
+            }
 
             Tab.FILES -> FilesScreen(
                 state = filesState,
@@ -228,7 +264,8 @@ private fun AppScaffold(
 private fun topBarTitle(tab: Tab, repo: String): String = when (tab) {
     Tab.LATEST -> "Latest report"
     Tab.RUN -> "Run the monitor"
-    Tab.PORTALS -> "Portal health"
+    Tab.HEALTH -> "Portal health"
+    Tab.PORTALS -> "Manage portals"
     Tab.FILES -> "Files"
     Tab.SETTINGS -> repo
 }

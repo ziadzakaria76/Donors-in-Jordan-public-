@@ -15,7 +15,7 @@ environment blocked all 13 domains.
 | | Status |
 |---|---|
 | **Verified against the live web** | EBRD — 4,012 notices scanned, 119 Jordan. UK Find a Tender (500 read), IsDB (144), GIZ (20) and KfW/GTAI (3) all read cleanly and had no open Jordan notices on the day. |
-| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience, the portal list and its validation — **1,435 checks** |
+| **Verified offline against fixtures** | Extraction cascade, quality gate, parsers, filtering, scoring, deduplication, reporting, all output formats, alerting, `--capture`, scraper resilience, the portal list and its validation — **1,502 checks** |
 | **Fixed and confirmed live** | GIZ — one unclosed `<td>` was nesting the rest of each row inside the deadline cell, so every deadline was garbage while the layer scored 1.00. Deadlines now read cleanly on the live page. |
 | **Confirmed live** | UNGM — reads its Jordan-filtered listing from the site's own JSON search endpoint, paged to the end: 69 notices in ~12s, no browser. Was 3 notices from 388 rows of a worldwide list in ~5 minutes. |
 | **Known broken, live** | EU TED (HTTP 400) · JICA (404, URL moved) · ADFD (no listing found) |
@@ -100,6 +100,7 @@ running service, and no email is sent until `--send` is scheduled.
 | `--dry-run` | Full pipeline, printed. Writes the files but records nothing as seen |
 | `--run` (alias `--send`) | The real run: writes the Word and Excel files into `output/` and records what was reported |
 | `--capture PORTAL` | Fetches a portal's live pages, saves them under `tests/fixtures/live/`, and reports per-layer row counts and quality, which layer won, and the selectors the page actually uses |
+| `--probe JSON` | Tries a portal that is **not** in `portals.json` yet. Takes one entry as JSON (`-` reads stdin), fetches its pages, and writes `probe_<key>.json` saying what every layer found. Commits nothing and touches no state — this is what the phone app's "test it before saving" runs |
 | `--self-test` | Runs the whole pipeline on offline fixtures in a temp directory |
 | `--reset-db` | Forgets every reported tender, so the next run reports in full once |
 | `--schedule` | Runs continuously on the configured schedule |
@@ -314,7 +315,7 @@ getting the IP blocked costs far more time than it saves.
 ## Tests
 
 ```bash
-python tests/run_all.py    # 1,435 checks, no network, no credentials
+python tests/run_all.py    # 1,502 checks, no network, no credentials
 ```
 
 State is redirected to a temp directory before `config` is imported, so no test

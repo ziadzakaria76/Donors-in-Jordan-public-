@@ -36,7 +36,8 @@ from jordan_tender_monitor import config  # noqa: E402
 from jordan_tender_monitor.tests import (harness, test_browser,  # noqa: E402
                                          test_capture, test_extraction,
                                          test_pipeline, test_portal_config,
-                                         test_portals_api, test_report_json)
+                                         test_portals_api, test_probe,
+                                         test_report_json)
 
 
 def main() -> int:
@@ -54,6 +55,8 @@ def main() -> int:
                       test_portal_config.TESTS)
     harness.run_suite("The JSON report the Android app reads",
                       test_report_json.TESTS)
+    harness.run_suite("Testing a portal before it is added (--probe)",
+                      test_probe.TESTS)
     harness.run_suite("The headless-browser path (UNGM)", test_browser.TESTS)
 
     return harness.report()
