@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import jo.tendermonitor.TenderMonitorApp
 import jo.tendermonitor.data.Outcome
+import jo.tendermonitor.data.Problem
 
 /**
  * The background check.
@@ -45,13 +46,7 @@ class PollWorker(
                 if (settings.notifyOnFailures) {
                     RunNotice.forTrouble(runs.problem, failures)?.let(notifier::post)
                 }
-                return when (PollPolicy.verdictFor(runs.problem)) {
-                    PollPolicy.Verdict.RETRY -> Result.retry()
-                    // Not a failure to WorkManager: returning failure would
-                    // cancel the periodic work entirely, and an expired token
-                    // would then silently end background checking forever.
-                    else -> Result.success()
-                }
+                return retryOrGiveUp(runs.problem)
             }
 
             is Outcome.Ok -> {
@@ -106,14 +101,43 @@ class PollWorker(
                         if (settings.notifyOnFailures) {
                             RunNotice.forTrouble(loaded.problem, failures)?.let(notifier::post)
                         }
-                        when (PollPolicy.verdictFor(loaded.problem)) {
-                            PollPolicy.Verdict.RETRY -> Result.retry()
-                            else -> Result.success()
-                        }
+                        retryOrGiveUp(loaded.problem)
                     }
                 }
             }
         }
+    }
+
+    /**
+     * What to do about a failed check.
+     *
+     * `Result.retry()` hands the timing to WorkManager, which doubles from
+     * fifteen minutes knowing nothing about the cause. That is right when
+     * nobody knows how long the trouble lasts. A rate limit is the one case
+     * where somebody does — GitHub says when it lifts — so that answer is used
+     * instead of guessing around it.
+     *
+     * Nothing here returns `Result.failure()`. To WorkManager that cancels the
+     * periodic work outright, so an expired token would end background
+     * checking permanently and silently, which is the failure this whole class
+     * is written to avoid.
+     */
+    private fun retryOrGiveUp(problem: Problem): Result {
+        if (PollPolicy.verdictFor(problem) != PollPolicy.Verdict.RETRY) {
+            return Result.success()
+        }
+
+        val now = System.currentTimeMillis() / 1000
+        if (problem.retryAtEpochSeconds != null) {
+            PollScheduler.scheduleRetry(
+                applicationContext,
+                PollPolicy.backoffMinutes(problem, runAttemptCount, now),
+            )
+            // Success, because the next attempt is booked. Returning retry as
+            // well would give the same failure two appointments.
+            return Result.success()
+        }
+        return Result.retry()
     }
 
     companion object {

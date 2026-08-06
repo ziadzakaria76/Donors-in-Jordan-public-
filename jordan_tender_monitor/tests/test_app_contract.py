@@ -479,6 +479,38 @@ def test_the_app_can_find_the_files_the_run_actually_produces():
                   f"monitor.yml publishes {published}")
 
 
+def test_every_policy_decision_is_one_the_app_actually_makes():
+    """A policy nothing calls is a documented behaviour that does not happen.
+
+    The background worker's decisions live in PollPolicy so they can be tested
+    without leaving a phone alone for a day. That only means anything while the
+    worker calls them. `backoffMinutes` was written, documented as honouring
+    GitHub's rate-limit reset, and tested -- and called by nothing but its own
+    tests, while the app doubled blindly past the reset time. Every check
+    passed. The claim in the docstring was simply not true of the app.
+
+    Unit tests cannot catch that: a test calls the function directly, which is
+    exactly what the caller was failing to do.
+    """
+    policy = (APP / "work" / "PollPolicy.kt").read_text(encoding="utf-8")
+    declared = re.findall(r"^    fun (\w+)\(", policy, re.M)
+    check(len(declared) >= 4,
+          "policy: PollPolicy's functions were found",
+          f"got {declared}")
+
+    callers = []
+    for path in APP.rglob("*.kt"):
+        if path.name != "PollPolicy.kt":
+            callers.append(path.read_text(encoding="utf-8"))
+    everything = "\n".join(callers)
+
+    unused = [name for name in declared
+              if f"PollPolicy.{name}" not in everything]
+    check(not unused,
+          "policy: every decision PollPolicy defines is one the app asks it for",
+          f"never called outside its own tests: {unused}")
+
+
 def test_the_apps_workflow_inputs_match_the_workflow():
     """A choice input is matched literally. A typo is a 422 at the moment you tap Run."""
     import io
@@ -521,5 +553,6 @@ TESTS = [
     test_the_app_reads_the_portal_fields_the_loader_accepts,
     test_the_forms_rules_are_the_rules_the_loader_enforces,
     test_the_app_can_find_the_files_the_run_actually_produces,
+    test_every_policy_decision_is_one_the_app_actually_makes,
     test_the_apps_workflow_inputs_match_the_workflow,
 ]

@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import jo.tendermonitor.data.settings.AppSettings
@@ -61,7 +63,42 @@ object PollScheduler {
         )
     }
 
-    fun cancel(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(PollWorker.NAME)
+    /**
+     * One extra check, at a time GitHub named.
+     *
+     * WorkManager's own backoff doubles blindly, which is the right shape when
+     * nobody knows how long the trouble lasts. A rate limit is the case where
+     * somebody does: the response carries the reset time. Doubling past it
+     * wastes hours; doubling short of it earns another rejection. So the reset
+     * time is honoured with a one-off request instead.
+     *
+     * REPLACE, not append: a second rate limit before the first retry fires
+     * should move the appointment, not queue a second one.
+     */
+    fun scheduleRetry(context: Context, delayMinutes: Int) {
+        val request = OneTimeWorkRequestBuilder<PollWorker>()
+            .setInitialDelay(delayMinutes.toLong(), TimeUnit.MINUTES)
+            // Deliberately no network constraint. The periodic check owns the
+            // unmetered-only policy; this one is already scheduled for a
+            // moment that was chosen, and adding a constraint could delay it
+            // past the next ordinary check, making it pointless.
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            RETRY_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request,
+        )
     }
+
+    fun cancel(context: Context) {
+        val manager = WorkManager.getInstance(context)
+        manager.cancelUniqueWork(PollWorker.NAME)
+        // Otherwise switching background checks off leaves a pending retry
+        // that fires once more afterwards -- a notification from a feature the
+        // user had just turned off.
+        manager.cancelUniqueWork(RETRY_NAME)
+    }
+
+    const val RETRY_NAME = "jordan-tender-poll-retry"
 }
