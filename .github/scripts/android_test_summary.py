@@ -33,7 +33,13 @@ def main(argv: list[str]) -> int:
     print(f"### Instrumented tests — API {api_level}")
     print()
 
-    files = sorted(glob.glob(os.path.join(results_dir, "*.xml")))
+    # Recursive. AGP nests connected-test results under a build-type
+    # directory (.../connected/debug/TEST-*.xml), and looking only in the top
+    # level reported "no results" for a run where 26 tests had executed and 2
+    # had failed. Wrong on its own terms, and the wrong direction of wrong:
+    # the summary is the part someone reads instead of the log.
+    files = sorted(glob.glob(os.path.join(results_dir, "**", "*.xml"),
+                             recursive=True))
     if not files:
         # An absent report is not a pass. Say which it is, loudly, because a
         # silent "0 failures" from a run where nothing executed reads exactly

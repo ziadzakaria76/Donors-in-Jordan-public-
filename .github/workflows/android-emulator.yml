@@ -97,18 +97,18 @@ jobs:
           script: |
             adb logcat -c || true
             adb logcat > logcat-api${{ matrix.api-level }}.txt &
+            # The screenshot has to be taken HERE, inside the action's script,
+            # and not in a later step. The emulator is killed the moment this
+            # action returns, so a step afterwards gets "device offline" and
+            # writes a zero-byte file -- which then uploads successfully and
+            # looks like evidence. It did exactly that the first time.
+            set +e
             ./gradlew --no-daemon connectedDebugAndroidTest
-
-      # Both of these run on failure too, and that is the point: a screenshot
-      # of the screen that crashed, and the log that says why, are the only
-      # evidence available for a device nobody can attach a debugger to.
-      - name: Screenshot whatever is on screen
-        if: always()
-        continue-on-error: true
-        working-directory: android
-        run: |
-          adb exec-out screencap -p > screen-api${{ matrix.api-level }}.png || true
-          ls -l screen-api${{ matrix.api-level }}.png || true
+            STATUS=$?
+            set -e
+            adb exec-out screencap -p > screen-api${{ matrix.api-level }}.png || true
+            ls -l screen-api${{ matrix.api-level }}.png || true
+            exit $STATUS
 
       # The summariser is a file, not an inline heredoc. A Python heredoc
       # inside a block scalar has to terminate at column 1, which ends the

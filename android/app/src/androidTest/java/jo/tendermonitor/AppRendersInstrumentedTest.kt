@@ -2,7 +2,8 @@ package jo.tendermonitor
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -39,16 +40,41 @@ class AppRendersInstrumentedTest {
         compose.onNodeWithText("Latest report").assertIsDisplayed()
     }
 
+    /**
+     * Tap a navigation tab, however the framework chose to expose it.
+     *
+     * The first version of this matched only the icon's content description
+     * and found nothing: `NavigationBarItem` merges its descendants, and what
+     * the merged node ends up carrying is Compose's business, not ours. Both
+     * routes are tried rather than betting on one, and the unmerged tree is
+     * searched so a merge cannot hide the icon.
+     *
+     * `onAllNodes...[0]` rather than `onNode...` on purpose: once a tab is
+     * open its title can repeat its label -- "Files" is both -- and demanding
+     * exactly one node fails on the screen that is working correctly.
+     */
+    private fun clickTab(name: String) {
+        val byDescription = compose.onAllNodesWithContentDescription(
+            name, useUnmergedTree = true,
+        )
+        if (byDescription.fetchSemanticsNodes().isNotEmpty()) {
+            byDescription[0].performClick()
+        } else {
+            compose.onAllNodesWithText(name, useUnmergedTree = true)[0].performClick()
+        }
+        compose.waitForIdle()
+    }
+
     @Test
     fun every_tab_is_reachable_and_draws_without_crashing() {
-        // The icons carry the tab name as their content description, which is
-        // how this reaches the bar item rather than the label text -- "Files"
-        // is both a tab and a title, and matching on text alone is ambiguous.
         TABS.forEach { (tab, title) ->
-            compose.onNodeWithContentDescription(tab).performClick()
-            compose.waitForIdle()
+            clickTab(tab)
 
-            compose.onNodeWithText(title).assertIsDisplayed()
+            compose.onAllNodesWithText(title).fetchSemanticsNodes().let { nodes ->
+                check(nodes.isNotEmpty()) {
+                    "opening the $tab tab drew nothing containing \"$title\""
+                }
+            }
         }
     }
 
@@ -58,14 +84,10 @@ class AppRendersInstrumentedTest {
         // `remember` that should have been a `rememberSaveable`, or a list
         // index kept across a data change, shows itself.
         repeat(2) {
-            TABS.forEach { (tab, _) ->
-                compose.onNodeWithContentDescription(tab).performClick()
-                compose.waitForIdle()
-            }
+            TABS.forEach { (tab, _) -> clickTab(tab) }
         }
 
-        compose.onNodeWithContentDescription("Latest").performClick()
-        compose.waitForIdle()
+        clickTab("Latest")
         compose.onNodeWithText("Latest report").assertIsDisplayed()
     }
 
