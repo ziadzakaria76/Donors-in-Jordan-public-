@@ -11,7 +11,7 @@ const COMPANY = {
   name: { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },   // «REPLACE»
   short: { ar: "جنرال شيرمان", en: "General Sherman" },                              // «REPLACE»
   tagline: { ar: "سكنٌ يليق بمقامك", en: "Homes with standing" },
-  founded: 2009,
+  founded: 2009,                      // «REPLACE»
   intro: {
     ar: "شركة أردنية للتطوير العقاري متخصصة في الشقق السكنية الفاخرة في غرب عمّان، تجمع بين العمارة الهادئة والتشطيبات عالية الجودة والتسليم في موعده.",
     en: "A Jordanian residential developer specialising in luxury apartments across West Amman — restrained architecture, high-specification finishes, and delivery on schedule.",
@@ -35,7 +35,7 @@ const COMPANY = {
      with an email fallback — no backend required. Paste a Formspree/Web3Forms
      endpoint here and the forms POST to it instead. */
   formEndpoint: "",                   // «REPLACE» e.g. "https://formspree.io/f/xxxxxxx"
-  registration: {
+  registration: {                     // «REPLACE»
     ar: "سجل تجاري رقم ٢٠٠٩/‏٤٤١٧٢ — نقابة المقاولين الأردنيين",
     en: "Commercial registration 44172/2009 — Jordanian Construction Contractors Association",
   },
@@ -45,6 +45,11 @@ const COMPANY = {
     { id: "linkedin", label: "LinkedIn", href: "#" },    // «REPLACE»
     { id: "youtube", label: "YouTube", href: "#" },      // «REPLACE»
   ],
+  /* «REPLACE» — these are invented figures. The site now carries a real
+     company's name and logo, so publishing an unverified track record is a
+     claim the business would be making. Put the true numbers here or delete
+     the block: the stats band is rendered from this array, so emptying it
+     removes the band from the home and about pages. */
   stats: [
     { value: "16", label: { ar: "مشروعاً مُسلَّماً", en: "Projects delivered" } },
     { value: "480+", label: { ar: "وحدة سكنية", en: "Homes handed over" } },
@@ -58,8 +63,6 @@ const COMPANY = {
 const DISTRICTS = {
   abdoun: { ar: "عبدون", en: "Abdoun" },
   "deir-ghbar": { ar: "دير غبار", en: "Deir Ghbar" },
-  khalda: { ar: "خلدا", en: "Khalda" },
-  "um-uthaina": { ar: "أم أذينة", en: "Um Uthaina" },
   rabieh: { ar: "الرابية", en: "Rabieh" },
 };
 
@@ -151,84 +154,6 @@ const PROJECTS = [
     reserved: ["1-A", "2-A", "3-D", "6-B"],
     plans: ["early", "handover", "bank"],
     gallery: ["project-crescent", "gallery-facade-2", "gallery-interior-2", "gallery-skyline-1"],
-  },
-  {
-    id: "bayt-al-sarw",
-    name: { ar: "بيت السرو", en: "Bayt Al Sarw" },
-    district: "khalda",
-    status: "construction",
-    image: "sarw",
-    year: 2027,
-    delivery: { ar: "التسليم: الربع الرابع ٢٠٢٧", en: "Delivery: Q4 2027" },
-    address: { ar: "شارع وصفي التل الفرعي، خلدا", en: "Off Wasfi Al-Tal Street, Khalda" },
-    mapQuery: "Khalda, Amman, Jordan",
-    tagline: {
-      ar: "ثمانية عشر بيتاً عائلياً بين أشجار السرو",
-      en: "Eighteen family homes among the cypress trees",
-    },
-    description: {
-      ar: "مشروع هادئ من ستة طوابق في قلب خلدا، صُمِّم لعائلات تبحث عن مساحة حقيقية قرب المدارس والخدمات. حافظنا على صفّ أشجار السرو القائم على حدود الأرض وبنينا حوله، فصار فاصلاً طبيعياً عن الشارع. التوزيع الداخلي يفصل جناح النوم عن مساحات الاستقبال، بمدخل خدمة مستقل لكل شقة.",
-      en: "A quiet six-storey building in the middle of Khalda, planned for families who want genuine space near schools and services. We kept the existing row of cypress trees on the boundary and built around it, so it screens the building from the street. Internally, the sleeping wing is separated from the reception rooms, and every apartment keeps its own service entrance.",
-    },
-    highlights: [
-      { ar: "مدخل خدمة مستقل لكل شقة", en: "Separate service entrance for every apartment" },
-      { ar: "غرفة خادمة بحمّام مستقل", en: "Maid's room with its own bathroom" },
-      { ar: "قرب المدارس الدولية ومراكز التسوق", en: "Minutes from international schools and retail" },
-      { ar: "خزانات مياه مستقلة لكل وحدة", en: "Independent water tanks per unit" },
-    ],
-    amenities: ["reception", "generator", "parking", "security", "elevator", "storage", "playground", "garden"],
-    floors: 6,
-    groundFloorIsGarden: true,
-    pricePerM2: 890,
-    floorPremium: 0.016,
-    lines: [
-      { code: "A", beds: 3, baths: 3, area: 188, type: "apartment", plan: "plan-3br", orientation: "south", balcony: 20 },
-      { code: "B", beds: 3, baths: 2, area: 175, type: "apartment", plan: "plan-3br", orientation: "north", balcony: 16 },
-      { code: "C", beds: 2, baths: 2, area: 142, type: "apartment", plan: "plan-2br", orientation: "west", balcony: 12 },
-    ],
-    sold: ["0-A", "0-C", "1-B", "2-A", "3-C"],
-    reserved: ["1-A", "4-B"],
-    plans: ["early", "handover", "bank"],
-    gallery: ["project-sarw", "gallery-interior-3", "gallery-facade-3", "gallery-courtyard-2"],
-  },
-  {
-    id: "alto",
-    name: { ar: "ألتو", en: "Alto" },
-    district: "um-uthaina",
-    status: "ready",
-    image: "alto",
-    year: 2024,
-    delivery: { ar: "جاهز للسكن", en: "Ready to move in" },
-    address: { ar: "شارع عبد الرحيم الحاج محمد، أم أذينة", en: "Abdul Rahim Al-Haj Mohammad Street, Um Uthaina" },
-    mapQuery: "Um Uthaina, Amman, Jordan",
-    tagline: {
-      ar: "مبنى بوتيك من عشر شقق — تبقّت وحدتان",
-      en: "A ten-apartment boutique building — two homes remain",
-    },
-    description: {
-      ar: "أصغر مشاريعنا وأكثرها خصوصية: خمسة طوابق بشقتين فقط في كل طابق، لكل منهما مصعد خاص يفتح داخل الشقة. التشطيبات من البلوط الطبيعي والرخام الأردني، والمطابخ مصنوعة حسب الطلب. سُلِّم المشروع في ٢٠٢٤ وبيعت ثماني وحدات منه.",
-      en: "Our smallest and most private building: five floors with only two apartments each, both served by a lift that opens directly into the home. Finishes are natural oak and Jordanian marble, with kitchens made to order. Delivered in 2024, with eight of the ten homes now sold.",
-    },
-    highlights: [
-      { ar: "مصعد خاص يفتح داخل الشقة", en: "Private lift opening into the apartment" },
-      { ar: "شقتان فقط في كل طابق", en: "Only two apartments per floor" },
-      { ar: "مطابخ مصنوعة حسب الطلب", en: "Made-to-order kitchens" },
-      { ar: "على بعد دقائق من دوار الواحة", en: "Minutes from Al-Waha Circle" },
-    ],
-    amenities: ["reception", "generator", "parking", "security", "elevator", "storage"],
-    floors: 5,
-    groundFloorIsGarden: false,
-    pricePerM2: 1180,
-    floorPremium: 0.025,
-    lines: [
-      { code: "A", beds: 2, baths: 2, area: 152, type: "apartment", plan: "plan-2br", orientation: "east", balcony: 14 },
-      { code: "B", beds: 3, baths: 3, area: 198, type: "apartment", plan: "plan-3br", orientation: "west", balcony: 24 },
-    ],
-    sold: ["0-A", "0-B", "1-A", "1-B", "2-B", "3-A", "3-B", "4-A"],
-    reserved: [],
-    topFloorIsPenthouse: true,
-    plans: ["handover", "bank"],
-    gallery: ["project-alto", "gallery-interior-2", "gallery-skyline-2", "gallery-facade-1"],
   },
   {
     id: "rabieh-gardens",
@@ -364,7 +289,7 @@ const TESTIMONIALS = [
   },
   {
     name: { ar: "سامر حدّاد", en: "Samer Haddad" },
-    role: { ar: "مالك شقة في ألتو", en: "Owner, Alto" },
+    role: { ar: "مالك شقة في حدائق الرابية", en: "Owner, Rabieh Gardens" },
     quote: {
       ar: "ما أقنعني هو أنهم أجابوا عن أسئلتي التقنية بالتفصيل: نوع العزل، وسماكة الزجاج، ومصدر المصاعد. لم أشعر أنني أمام بائع بل أمام مهندس يعرف مبناه.",
       en: "What convinced me was that they answered the technical questions properly — the insulation, the glazing thickness, where the lifts came from. It felt like talking to an engineer who knew the building, not a salesman.",
@@ -372,7 +297,7 @@ const TESTIMONIALS = [
   },
   {
     name: { ar: "د. ليلى الشوابكة", en: "Dr. Laila Al-Shawabkeh" },
-    role: { ar: "مالكة شقة في بيت السرو", en: "Owner, Bayt Al Sarw" },
+    role: { ar: "مالكة شقة في ذا كريسنت", en: "Owner, The Crescent" },
     quote: {
       ar: "كنت أبحث عن شقة عائلية تفصل غرف النوم عن مساحة الضيوف، وهذا نادر في عمّان. التوزيع هنا كان الوحيد الذي لم أحتج لتعديله.",
       en: "I was looking for a family apartment that separates the bedrooms from the guest space, which is rare in Amman. This was the only layout I did not want to change.",

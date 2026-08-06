@@ -49,7 +49,15 @@ re-run `npm run pages`).
 Everything below is invented placeholder content. Search for `«REPLACE»` in
 `assets/js/data.js` to find each one.
 
-- **Company identity** — name, tagline, founding year, commercial registration.
+- **Company identity** — tagline, founding year, commercial registration. The
+  name and logo are real; everything around them is not.
+- **The track record** — `COMPANY.stats` (16 projects, 480 homes, 17 years, 98%
+  on time), the founding year, and the company history in `about.*` in
+  `i18n.js` are all invented. With a real name and logo on the page these read
+  as claims the business is making, so replace them with true figures or empty
+  the `stats` array to drop the band entirely.
+- **Testimonials** — `TESTIMONIALS` are invented people and quotes. Replace with
+  real, permissioned quotes or delete the array to remove the section.
 - **Contact details** — phone, WhatsApp number (digits only, no `+` or spaces),
   both email addresses, the office address and `mapQuery`.
 - **Social links** — the four `href: "#"` entries.

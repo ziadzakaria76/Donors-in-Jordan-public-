@@ -124,8 +124,6 @@
     const CAPTIONS = {
       "project-residence76": { ar: "ريزيدنس ٧٦ — الواجهة الغربية عند الغروب", en: "Residence 76 — west elevation at dusk" },
       "project-crescent": { ar: "ذا كريسنت — الكتلة الرئيسية من جهة الوادي", en: "The Crescent — main massing from the valley side" },
-      "project-sarw": { ar: "بيت السرو — الواجهة الجنوبية في ضوء الصباح", en: "Bayt Al Sarw — south elevation in morning light" },
-      "project-alto": { ar: "ألتو — المبنى البوتيك ليلاً", en: "Alto — the boutique building at night" },
       "project-rabieh": { ar: "حدائق الرابية — المسبح والتراس المشترك", en: "Rabieh Gardens — pool and shared terrace" },
       "gallery-facade-1": { ar: "دراسة الواجهة — إيقاع الشرفات والحجر", en: "Facade study — balcony rhythm and stone" },
       "gallery-facade-2": { ar: "دراسة الواجهة — الزجاج والظل في ضوء العصر", en: "Facade study — glass and shadow in afternoon light" },

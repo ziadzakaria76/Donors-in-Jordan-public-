@@ -102,9 +102,9 @@ const PAGES = [];
 
 PAGES.push({
   file: "projects.html",
-  title: "مشاريعنا — شقق سكنية في عبدون ودير غبار وخلدا والرابية | جنرال شيرمان",
-  desc: "خمسة مشاريع سكنية من جنرال شيرمان في غرب عمّان: ريزيدنس ٧٦ في عبدون، ذا كريسنت في دير غبار، بيت السرو في خلدا، ألتو في أم أذينة، وحدائق الرابية.",
-  keywords: "مشاريع سكنية عمان, شقق عبدون, شقق دير غبار, شقق خلدا, شقق الرابية",
+  title: "مشاريعنا — شقق سكنية في عبدون ودير غبار والرابية | جنرال شيرمان",
+  desc: "ثلاثة مشاريع سكنية من جنرال شيرمان في غرب عمّان: ريزيدنس ٧٦ في عبدون، ذا كريسنت في دير غبار، وحدائق الرابية.",
+  keywords: "مشاريع سكنية عمان, شقق عبدون, شقق دير غبار, شقق الرابية",
   scripts: ["pages.js"],
   modals: [ENQUIRY],
   main: `
@@ -112,7 +112,7 @@ ${pageHero({
     image: "hero-about",
     crumb: '<span data-i18n="nav.projects">مشاريعنا</span>',
     eyebrow: '<span data-i18n="projects.eyebrow">المشاريع</span>',
-    title: '<span data-i18n="projects.title">خمسة مشاريع، خمس مناطق، منهج واحد</span>',
+    title: '<span data-i18n="projects.title">ثلاثة مشاريع، ثلاث مناطق، منهج واحد</span>',
     lead: '<span data-i18n="projects.lead">نبني عدداً محدوداً من المشاريع في الوقت نفسه حتى يبقى كل مشروع تحت إشراف مباشر من فريقنا الهندسي حتى التسليم.</span>',
   })}
 
@@ -133,20 +133,20 @@ ${pageHero({
       <div class="section-head">
         <p class="eyebrow" data-i18n="projects.mapEyebrow">أين نبني</p>
         <h2 data-i18n="projects.mapTitle">مناطق نعرفها جيداً</h2>
-        <p class="lead" data-i18n="projects.mapLead">نعمل في نطاق جغرافي ضيق عمداً: خمس مناطق في غرب عمّان نعرف أسعار أراضيها وأنظمة البناء فيها وحركة الطلب عليها.</p>
+        <p class="lead" data-i18n="projects.mapLead">نعمل في نطاق جغرافي ضيق عمداً: ثلاث مناطق في غرب عمّان نعرف أسعار أراضيها وأنظمة البناء فيها وحركة الطلب عليها.</p>
       </div>
       <div class="grid grid--3">
         <article class="card reveal" style="padding:1.5rem">
-          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d1Title">عبدون وأم أذينة</h3>
+          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d1Title">عبدون</h3>
           <p class="card__text" data-i18n="projects.d1Body">أعلى شريحة سعرية في عمّان، ومشترون يبحثون عن الخصوصية والمساحة الكبيرة أكثر من عدد الغرف.</p>
         </article>
         <article class="card reveal" style="padding:1.5rem">
-          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d2Title">دير غبار والرابية</h3>
-          <p class="card__text" data-i18n="projects.d2Body">مناطق منحدرة تمنح إطلالات مفتوحة، وهي الأنسب لمن يوازن بين السعر والموقع.</p>
+          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d2Title">دير غبار</h3>
+          <p class="card__text" data-i18n="projects.d2Body">أرض منحدرة تمنح إطلالات مفتوحة على الوادي، وهي الأنسب لمن يوازن بين السعر والموقع.</p>
         </article>
         <article class="card reveal" style="padding:1.5rem">
-          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d3Title">خلدا</h3>
-          <p class="card__text" data-i18n="projects.d3Body">منطقة عائلية بامتياز: مدارس وخدمات ضمن دقائق، وطلب مستقر على الشقق الكبيرة.</p>
+          <h3 class="card__title" style="font-size:1.15rem" data-i18n="projects.d3Title">الرابية</h3>
+          <p class="card__text" data-i18n="projects.d3Body">كثافة بناء منخفضة ومساحات خارجية حقيقية، وهي الأنسب لمن يريد حديقة أو تراساً دون مغادرة عمّان.</p>
         </article>
       </div>
     </div>

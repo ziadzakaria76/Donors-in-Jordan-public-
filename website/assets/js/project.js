@@ -10,8 +10,14 @@
 
   const { PROJECTS, UNITS, DISTRICTS, AMENITIES, PAYMENT_PLANS, PROJECT_STATUS, UNIT_TYPES, PLAN_LEGEND } = window.DATA;
 
-  const id = new URLSearchParams(location.search).get("id") || PROJECTS[0].id;
-  const project = PROJECTS.find((p) => p.id === id) || PROJECTS[0];
+  const id = new URLSearchParams(location.search).get("id");
+  const project = id ? PROJECTS.find((p) => p.id === id) : PROJECTS[0];
+  // An id that no longer exists (a retired project, a stale link) must not
+  // quietly render a different building under the requested name.
+  if (!project) {
+    location.replace(`${BASE}projects.html${window.I18N.lang === "en" ? "?lang=en" : ""}`);
+    return;
+  }
   const units = UNITS.filter((u) => u.projectId === project.id);
   const available = units.filter((u) => u.status === "available");
 

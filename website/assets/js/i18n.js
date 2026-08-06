@@ -15,16 +15,16 @@ const T = {
   "home.eyebrow": { ar: "تطوير عقاري في عمّان منذ ٢٠٠٩", en: "Developing in Amman since 2009" },
   "home.heroTitle": { ar: "شققٌ مبنيّة لتُسكن، لا لتُباع فقط.", en: "Apartments built to be lived in, not only sold." },
   "home.heroSub": {
-    ar: "خمسة مشاريع سكنية في عبدون ودير غبار وخلدا وأم أذينة والرابية — تصميم هادئ، تشطيبات نعرف مصدرها، وعقود تحدد موعد التسليم بوضوح.",
-    en: "Five residential schemes across Abdoun, Deir Ghbar, Khalda, Um Uthaina and Rabieh — restrained design, finishes we can trace, and contracts that state the handover date plainly.",
+    ar: "ثلاثة مشاريع سكنية في عبدون ودير غبار — تصميم هادئ، تشطيبات نعرف مصدرها، وعقود تحدد موعد التسليم بوضوح.",
+    en: "Three residential schemes across Abdoun, Deir Ghbar — restrained design, finishes we can trace, and contracts that state the handover date plainly.",
   },
   "home.searchBtn": { ar: "اعرض الوحدات", en: "Show units" },
   "home.scroll": { ar: "تابع", en: "Scroll" },
   "home.projectsEyebrow": { ar: "المشاريع", en: "Projects" },
-  "home.projectsTitle": { ar: "خمسة عناوين في غرب عمّان", en: "Five addresses in West Amman" },
+  "home.projectsTitle": { ar: "ثلاثة عناوين في غرب عمّان", en: "Three addresses in West Amman" },
   "home.projectsLead": {
-    ar: "مشروعان جاهزان للسكن وثلاثة قيد الإنشاء. كل مشروع صُمِّم لأرضه ولمن سيسكنه، لا نسخةً مكررة عن سابقه.",
-    en: "Two buildings ready to move into and three under construction. Each one is designed for its own plot and its own buyers, not copied from the last.",
+    ar: "مشروع جاهز للسكن ومشروعان قيد الإنشاء. كل مشروع صُمِّم لأرضه ولمن سيسكنه، لا نسخةً مكررة عن سابقه.",
+    en: "One building ready to move into and two under construction. Each one is designed for its own plot and its own buyers, not copied from the last.",
   },
   "home.whyEyebrow": { ar: "لماذا جنرال شيرمان", en: "Why General Sherman" },
   "home.whyTitle": { ar: "ما نعد به مكتوبٌ في العقد", en: "What we promise is written into the contract" },
@@ -226,7 +226,7 @@ const T = {
 
   /* projects index */
   "projects.eyebrow": { ar: "المشاريع", en: "Projects" },
-  "projects.title": { ar: "خمسة مشاريع، خمس مناطق، منهج واحد", en: "Five schemes, five districts, one method" },
+  "projects.title": { ar: "ثلاثة مشاريع، ثلاث مناطق، منهج واحد", en: "Three schemes, three districts, one method" },
   "projects.lead": {
     ar: "نبني عدداً محدوداً من المشاريع في الوقت نفسه حتى يبقى كل مشروع تحت إشراف مباشر من فريقنا الهندسي حتى التسليم.",
     en: "We keep only a few schemes running at once, so each one stays under our own engineers' direct supervision through to handover.",
@@ -237,23 +237,23 @@ const T = {
   "projects.mapEyebrow": { ar: "أين نبني", en: "Where we build" },
   "projects.mapTitle": { ar: "مناطق نعرفها جيداً", en: "Districts we know well" },
   "projects.mapLead": {
-    ar: "نعمل في نطاق جغرافي ضيق عمداً: خمس مناطق في غرب عمّان نعرف أسعار أراضيها وأنظمة البناء فيها وحركة الطلب عليها.",
-    en: "We work in a deliberately narrow area: five districts of West Amman whose land prices, building regulations and demand we know first-hand.",
+    ar: "نعمل في نطاق جغرافي ضيق عمداً: ثلاث مناطق في غرب عمّان نعرف أسعار أراضيها وأنظمة البناء فيها وحركة الطلب عليها.",
+    en: "We work in a deliberately narrow area: three districts of West Amman whose land prices, building regulations and demand we know first-hand.",
   },
-  "projects.d1Title": { ar: "عبدون وأم أذينة", en: "Abdoun and Um Uthaina" },
+  "projects.d1Title": { ar: "عبدون", en: "Abdoun" },
   "projects.d1Body": {
     ar: "أعلى شريحة سعرية في عمّان، ومشترون يبحثون عن الخصوصية والمساحة الكبيرة أكثر من عدد الغرف.",
     en: "Amman's highest price bracket, where buyers want privacy and generous space more than an extra bedroom.",
   },
-  "projects.d2Title": { ar: "دير غبار والرابية", en: "Deir Ghbar and Rabieh" },
+  "projects.d2Title": { ar: "دير غبار", en: "Deir Ghbar" },
   "projects.d2Body": {
-    ar: "مناطق منحدرة تمنح إطلالات مفتوحة، وهي الأنسب لمن يوازن بين السعر والموقع.",
-    en: "Sloping ground that keeps views open — the best balance of price and address.",
+    ar: "أرض منحدرة تمنح إطلالات مفتوحة على الوادي، وهي الأنسب لمن يوازن بين السعر والموقع.",
+    en: "Ground that falls away and keeps the valley views open — the best balance of price and address.",
   },
-  "projects.d3Title": { ar: "خلدا", en: "Khalda" },
+  "projects.d3Title": { ar: "الرابية", en: "Rabieh" },
   "projects.d3Body": {
-    ar: "منطقة عائلية بامتياز: مدارس وخدمات ضمن دقائق، وطلب مستقر على الشقق الكبيرة.",
-    en: "Family territory: schools and services minutes away, and steady demand for larger apartments.",
+    ar: "كثافة بناء منخفضة ومساحات خارجية حقيقية، وهي الأنسب لمن يريد حديقة أو تراساً دون مغادرة عمّان.",
+    en: "Low building density and real outdoor space — the choice for buyers who want a garden or a terrace without leaving Amman.",
   },
 
   /* project detail */
@@ -350,8 +350,8 @@ const T = {
   "about.eyebrow": { ar: "من نحن", en: "Who we are" },
   "about.title": { ar: "سبعة عشر عاماً، ومبنى واحد في كل مرة", en: "Seventeen years, one building at a time" },
   "about.lead": {
-    ar: "بدأنا عام ٢٠٠٩ بمبنى واحد في خلدا. اليوم سلّمنا ١٦ مشروعاً و٤٨٠ وحدة، وما زلنا نبني عدداً محدوداً في الوقت نفسه.",
-    en: "We started in 2009 with a single building in Khalda. We have since delivered 16 projects and 480 homes — and still keep only a few on site at once.",
+    ar: "بدأنا عام ٢٠٠٩ بمبنى واحد في الرابية. اليوم سلّمنا ١٦ مشروعاً و٤٨٠ وحدة، وما زلنا نبني عدداً محدوداً في الوقت نفسه.",
+    en: "We started in 2009 with a single building in Rabieh. We have since delivered 16 projects and 480 homes — and still keep only a few on site at once.",
   },
   "about.storyEyebrow": { ar: "القصة", en: "The story" },
   "about.storyTitle": { ar: "لماذا نبني قليلاً", en: "Why we build slowly" },
