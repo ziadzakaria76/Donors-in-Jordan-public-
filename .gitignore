@@ -29,3 +29,19 @@ venv/
 
 # Captured live pages -- may embed contact details from real notices
 jordan_tender_monitor/tests/fixtures/live/
+
+# Android
+#
+# The keystore and its password NEVER go in the repository -- a signing key in
+# git is a signing key anyone who ever cloned it can use, and rotating it means
+# every existing install can no longer be updated. If release signing is set
+# up, both live in repository secrets. See android/ANDROID.md.
+*.jks
+*.keystore
+android/local.properties
+android/**/build/
+android/.gradle/
+android/.idea/
+android/out/
+android/app/release/
+local.properties
