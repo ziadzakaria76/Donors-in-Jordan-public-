@@ -31,7 +31,7 @@ from jordan_tender_monitor import config, fixtures, probe as prober
 from jordan_tender_monitor.agents import filter as filters, reporter
 from jordan_tender_monitor.portals import base, harvester
 
-from .harness import check, check_eq
+from .harness import check, check_eq, yaml
 
 APP = (Path(__file__).resolve().parent.parent.parent / "android" / "app" / "src"
        / "main" / "java" / "jo" / "tendermonitor")
@@ -402,9 +402,7 @@ def test_the_app_can_find_the_files_the_run_actually_produces():
     # and the first one belongs to the diagnose step, which writes markdown
     # only. A regex for the first match would have tested the wrong step and
     # passed while the real one wrote no json at all.
-    import yaml
-
-    steps = yaml.safe_load(workflow)["jobs"]["monitor"]["steps"]
+    steps = yaml().safe_load(workflow)["jobs"]["monitor"]["steps"]
     running = [s for s in steps if "--run" in str(s.get("run", ""))]
     check(len(running) == 1,
           "contract: exactly one step runs the monitor",

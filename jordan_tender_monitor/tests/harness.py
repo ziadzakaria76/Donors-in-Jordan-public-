@@ -69,3 +69,27 @@ def report() -> int:
 
 def counts() -> tuple[int, int]:
     return len(_PASSED), len(_FAILED)
+
+
+def yaml():
+    """PyYAML, or a failure that says how to get it.
+
+    A TEST-ONLY dependency, in requirements-dev.txt rather than
+    requirements.txt: a deployment that only wants the weekday report should
+    not install a YAML parser it never loads.
+
+    Raised rather than skipped. Several checks compare what a workflow really
+    declares against what the app assumes, and a check that quietly does not
+    run is the failure this suite exists to catch -- a green tick over an
+    unanswered question.
+    """
+    try:
+        import yaml as module
+    except ModuleNotFoundError:
+        raise AssertionError(
+            "PyYAML is not installed, and the workflow checks need it to read "
+            "what the workflows actually declare. It is a test-only "
+            "dependency:\n"
+            "    pip install -r jordan_tender_monitor/requirements-dev.txt"
+        ) from None
+    return module

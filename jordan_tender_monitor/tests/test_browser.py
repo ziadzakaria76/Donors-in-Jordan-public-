@@ -27,7 +27,7 @@ from jordan_tender_monitor import portals
 from jordan_tender_monitor.portals import base, browser, harvester, ungm
 from jordan_tender_monitor.portals.base import PortalError
 
-from .harness import check, check_eq
+from .harness import check, check_eq, yaml
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 ROOT = Path(__file__).resolve().parent.parent
@@ -691,11 +691,16 @@ def test_every_workflow_file_is_structurally_valid_yaml():
     whose continuation lines started at column 1, which ends the YAML block
     scalar and makes the rest of the file nonsense.
 
-    PyYAML is not a dependency of this project and is not worth becoming one
-    for this, so the check is structural rather than a full parse: inside a
-    block scalar (`run: |`), every non-blank line must be indented further
-    than the key that opened it. That is exactly the mistake that was made,
-    and it costs nothing to keep out.
+    The check is structural rather than a full parse: inside a block scalar
+    (`run: |`), every non-blank line must be indented further than the key that
+    opened it. That is exactly the mistake that was made.
+
+    PyYAML has since become a TEST-ONLY dependency (requirements-dev.txt) and
+    other checks now parse the workflows properly. This one stays structural
+    anyway, for two reasons. It names the offending file, line and block, which
+    a parser error does not. And it still runs when PyYAML is absent -- which
+    is precisely the situation in which someone is least likely to notice that
+    the parsing checks did not.
     """
     import re
 
@@ -799,9 +804,7 @@ def test_the_release_workflow_cannot_silently_skip_a_release():
     # Cutting a release from the Releases page is the only route that needs no
     # terminal, and it is the route actually available here -- pushing a tag
     # from this environment is refused. It arrives as a `release` event.
-    import yaml
-
-    document = yaml.safe_load(release)
+    document = yaml().safe_load(release)
     # 'on' is YAML 1.1's boolean true, which is why this is not document["on"].
     triggers = document.get("on") or document.get(True)
     check("release" in triggers,
@@ -849,6 +852,40 @@ def test_the_release_workflow_cannot_silently_skip_a_release():
               f"release: {name} checks out enough history for it to be right")
 
 
+def test_ci_installs_the_test_only_dependencies_the_suite_needs():
+    """The workflow checks need PyYAML, and CI has to install it.
+
+    It is deliberately not in requirements.txt -- a deployment that wants the
+    weekday report should not install a YAML parser it never loads. That split
+    only works while tests.yml installs the other file. If that line is ever
+    dropped, several checks stop being able to read the workflows at all.
+
+    They fail rather than skip, so the suite would go red rather than quietly
+    green. This test is the earlier, clearer signal.
+    """
+    import io
+
+    root = Path(__file__).resolve().parent.parent
+    dev = root / "requirements-dev.txt"
+    check(dev.exists(), "deps: the test-only requirements file exists",
+          f"missing {dev}")
+
+    listed = [line.strip() for line in io.open(dev, encoding="utf-8")
+              if line.strip() and not line.strip().startswith("#")]
+    check(any(item.lower().startswith("pyyaml") for item in listed),
+          "deps: it pins the YAML parser the workflow checks need",
+          f"got {listed}")
+
+    runtime = io.open(root / "requirements.txt", encoding="utf-8").read().lower()
+    check("pyyaml" not in runtime,
+          "deps: and requirements.txt does NOT, so a deployment skips it")
+
+    tests_yml = io.open(
+        root.parent / ".github" / "workflows" / "tests.yml", encoding="utf-8").read()
+    check("requirements-dev.txt" in tests_yml,
+          "deps: CI installs it, or the workflow checks cannot read anything")
+
+
 def test_the_emulator_workflow_covers_what_no_jvm_test_can():
     """The instrumented suite is the only place three things are exercised.
 
@@ -861,11 +898,10 @@ def test_the_emulator_workflow_covers_what_no_jvm_test_can():
     convincing green tick in the repository.
     """
     import io
-    import yaml
 
     workflows = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
     emulator = io.open(workflows / "android-emulator.yml", encoding="utf-8").read()
-    document = yaml.safe_load(emulator)
+    document = yaml().safe_load(emulator)
     job = document["jobs"]["instrumented"]
 
     check("connectedDebugAndroidTest" in emulator,
@@ -1028,6 +1064,7 @@ TESTS = [
     test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at,
     test_every_workflow_file_is_structurally_valid_yaml,
     test_the_release_workflow_cannot_silently_skip_a_release,
+    test_ci_installs_the_test_only_dependencies_the_suite_needs,
     test_the_emulator_workflow_covers_what_no_jvm_test_can,
     test_the_instrumented_tests_exist_and_cover_the_untestable_three,
     test_the_workflow_installs_the_browser_only_for_diagnosis,
