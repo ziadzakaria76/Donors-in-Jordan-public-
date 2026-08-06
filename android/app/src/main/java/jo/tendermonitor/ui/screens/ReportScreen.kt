@@ -198,10 +198,15 @@ fun ReportScreen(
                 .filter { sectorFilter == null || it.sector == sectorFilter }
                 .sortedWith(
                     when (sortBy) {
-                        SortBy.SCORE -> compareByDescending { it.score }
-                        // Undated notices go last rather than first: they have
-                        // no deadline, which is not the same as an urgent one.
-                        SortBy.DEADLINE -> compareBy(nullsLast()) { it.closingDate }
+                        SortBy.SCORE -> compareByDescending<Opportunity> { it.score }
+                        // Undated notices go LAST rather than first. They have
+                        // no deadline, which is not the same as an imminent
+                        // one, and sorting them to the top of a
+                        // deadline-ordered list would read as urgency.
+                        SortBy.DEADLINE -> compareBy<Opportunity>(
+                            { it.closingDate.isNullOrBlank() },
+                            { it.closingDate.orEmpty() },
+                        )
                     }
                 )
         }

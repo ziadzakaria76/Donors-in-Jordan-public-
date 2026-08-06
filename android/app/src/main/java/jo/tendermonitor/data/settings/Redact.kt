@@ -40,8 +40,12 @@ object Redact {
      * @param known the token this app currently holds, if any.
      */
     fun scrub(text: String?, known: String? = null): String {
-        if (text.isNullOrEmpty()) return text ?: ""
-        var out = text
+        // Declared non-null rather than relying on a smart cast: `var out =
+        // text` infers the parameter's nullable type, and every later call
+        // then has to be null-safe for a value that provably is not.
+        var out: String = text ?: return ""
+        if (out.isEmpty()) return out
+
         // The known token first: an exact match is the strongest signal, and
         // doing it before the shape rules means a token that does not match
         // any known shape is still removed.
@@ -49,12 +53,9 @@ object Redact {
             out = out.replace(known, MASK)
         }
         for (shape in TOKEN_SHAPES) {
-            out = shape.replace(out) { match ->
-                if (match.groupValues.size > 1 && match.groupValues[1].isNotEmpty()) {
-                    match.groupValues[1] + MASK
-                } else {
-                    MASK
-                }
+            out = shape.replace(out) { match: MatchResult ->
+                val prefix = match.groupValues.getOrNull(1).orEmpty()
+                if (prefix.isEmpty()) MASK else prefix + MASK
             }
         }
         return out
