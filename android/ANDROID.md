@@ -140,8 +140,8 @@ new one and paste it in.
 ## Cutting a release
 
 ```bash
-git tag v0.4.0
-git push origin v0.4.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 That is all. The **Android release** workflow runs the unit tests, builds the
@@ -150,7 +150,10 @@ its SHA-256 attached. If the tests fail, no release is published.
 
 It can also be run from the Actions tab (**Android release → Run workflow**)
 against a tag that already exists — useful for re-cutting one whose build
-failed for a reason since fixed.
+failed for a reason since fixed. If the release is already there, its APK and
+its notes are **replaced**, and the log says which of the two happened. That
+matters for a tag that has been moved: leaving the old release in place would
+publish the wrong build under the right name.
 
 The release notes are generated, and they say the APK is debug-signed and what
 that means. They also repeat that nothing has been run on a device, because a
