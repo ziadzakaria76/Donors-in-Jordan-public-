@@ -498,8 +498,8 @@ ${pageHero({
 
 PAGES.push({
   file: "about.html",
-  title: "عن الشركة — شركة جنرال شيرمان للإسكان في عمّان منذ ٢٠٠٩",
-  desc: "جنرال شيرمان: ١٦ مشروعاً مُسلَّماً و٤٨٠ وحدة سكنية في غرب عمّان منذ ٢٠٠٩. كيف نختار الأرض، وكيف نبني، وما الذي نضمنه بعد التسليم.",
+  title: "عن الشركة — كيف تبني شركة جنرال شيرمان للإسكان في عمّان",
+  desc: "كيف تختار جنرال شيرمان الأرض، وكيف تبني، وما الذي تضمنه بعد التسليم: أربعة التزامات ومسار واضح من الزيارة الأولى إلى تسليم المفتاح.",
   scripts: ["pages.js"],
   modals: [],
   main: `
@@ -507,26 +507,10 @@ ${pageHero({
     image: "hero-about",
     crumb: '<span data-i18n="nav.about">عن الشركة</span>',
     eyebrow: '<span data-i18n="about.eyebrow">من نحن</span>',
-    title: '<span data-i18n="about.title">سبعة عشر عاماً، ومبنى واحد في كل مرة</span>',
-    lead: '<span data-i18n="about.lead">بدأنا عام ٢٠٠٩ بمبنى واحد في خلدا. اليوم سلّمنا ١٦ مشروعاً و٤٨٠ وحدة، وما زلنا نبني عدداً محدوداً في الوقت نفسه.</span>',
+    title: '<span data-i18n="about.title">مبنى واحد في كل مرة</span>',
+    lead: '<span data-i18n="about.lead">نبني عدداً محدوداً من المشاريع في الوقت نفسه، ونلتزم بالمواصفات وموعد التسليم كتابةً. هذه صفحة عن كيف نعمل، لا عن كم بنينا.</span>',
   })}
 
-
-  <section class="section">
-    <div class="wrap split split--wide">
-      <div>
-        <p class="eyebrow" data-i18n="about.storyEyebrow">القصة</p>
-        <h2 data-i18n="about.storyTitle">لماذا نبني قليلاً</h2>
-        <p class="lead" style="margin-block:1.5rem" data-i18n="about.story1">تأسست جنرال شيرمان عام ٢٠٠٩ على قاعدة بسيطة: ألا نبدأ مشروعاً جديداً قبل أن يصل السابق إلى مرحلة التشطيبات. هذا يعني نمواً أبطأ من غيرنا، لكنه يعني أيضاً أن المهندس المشرف على مبناك ليس مسؤولاً عن ستة مبانٍ أخرى في الوقت نفسه.</p>
-        <p class="lead" data-i18n="about.story2">نشتري الأرض نقداً قبل التصميم، فلا نضطر لضغط المواصفات لاحقاً لتغطية كلفة التمويل. ونشتري مواد التشطيب الأساسية — البلاط والأدوات الصحية والمصاعد — دفعةً واحدة عند التعاقد، حتى لا يتغير ما وعدناك به إذا تغيرت الأسعار.</p>
-      </div>
-      <div class="split__media reveal">
-        <img src="assets/img/gallery-facade-3-800.webp"
-             srcset="assets/img/gallery-facade-3-480.webp 480w, assets/img/gallery-facade-3-800.webp 800w, assets/img/gallery-facade-3-1280.webp 1280w"
-             sizes="(max-width: 860px) 92vw, 46vw" alt="دراسة معمارية لواجهة حجرية بوحدات متكررة" loading="lazy" width="800" height="450">
-      </div>
-    </div>
-  </section>
 
   <section class="section section--stone">
     <div class="wrap">

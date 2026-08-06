@@ -51,9 +51,9 @@ Everything below is invented placeholder content. Search for `«REPLACE»` in
 
 - **Company identity** — tagline, founding year, commercial registration. The
   name and logo are real; everything around them is not.
-- **Company history** — the founding year, the registration number, and the
-  story in `about.*` in `i18n.js` are still invented. With a real name and logo
-  on the page these read as claims the business is making.
+- **Founding year and registration** — `COMPANY.founded` is `null` and no page
+  states a founding year, because the one here was invented. `registration` is
+  likewise a placeholder and is not rendered anywhere yet.
 - **Contact details** — phone, WhatsApp number (digits only, no `+` or spaces),
   both email addresses, the office address and `mapQuery`.
 - **Social links** — the four `href: "#"` entries.
@@ -127,10 +127,18 @@ change its twin in `i18n.js`.**
 
 ---
 
-## Restoring the stats and testimonials
+## Removed sections
 
-Both sections were removed rather than filled, because the figures and quotes
-in them were invented for the build. `COMPANY.stats` and `TESTIMONIALS` in
+Three things were cut rather than filled, because their content was invented
+and the site now carries the real name and logo: the **stats band**, the
+**testimonials**, and the About page's **company story**. No page now claims a
+track record or a founding year.
+
+The About page runs hero → four commitments → process → CTA. To add a story
+section back, write it into `i18n.js` and add a `split split--wide` section to
+`about.html`; the four commitments section is the nearest pattern to copy.
+
+### Restoring the stats and testimonials `COMPANY.stats` and `TESTIMONIALS` in
 `data.js` are now empty arrays, and the markup is gone from `index.html` and
 `about.html`.
 

@@ -12,11 +12,11 @@ const T = {
   "brand.tag": { ar: "General Sherman Housing", en: "شركة جنرال شيرمان للإسكان" },
 
   /* home page */
-  "home.eyebrow": { ar: "تطوير عقاري في عمّان منذ ٢٠٠٩", en: "Developing in Amman since 2009" },
+  "home.eyebrow": { ar: "تطوير عقاري في غرب عمّان", en: "Residential development in West Amman" },
   "home.heroTitle": { ar: "شققٌ مبنيّة لتُسكن، لا لتُباع فقط.", en: "Apartments built to be lived in, not only sold." },
   "home.heroSub": {
-    ar: "ثلاثة مشاريع سكنية في عبدون ودير غبار — تصميم هادئ، تشطيبات نعرف مصدرها، وعقود تحدد موعد التسليم بوضوح.",
-    en: "Three residential schemes across Abdoun, Deir Ghbar — restrained design, finishes we can trace, and contracts that state the handover date plainly.",
+    ar: "ثلاثة مشاريع سكنية في عبدون ودير غبار والرابية — تصميم هادئ، تشطيبات نعرف مصدرها، وعقود تحدد موعد التسليم بوضوح.",
+    en: "Three residential schemes across Abdoun, Deir Ghbar and Rabieh — restrained design, finishes we can trace, and contracts that state the handover date plainly.",
   },
   "home.searchBtn": { ar: "اعرض الوحدات", en: "Show units" },
   "home.scroll": { ar: "تابع", en: "Scroll" },
@@ -57,8 +57,8 @@ const T = {
 
   /* footer */
   "footer.about": {
-    ar: "شركة أردنية للتطوير العقاري متخصصة في الشقق السكنية الفاخرة في غرب عمّان منذ عام ٢٠٠٩.",
-    en: "A Jordanian residential developer specialising in luxury apartments across West Amman since 2009.",
+    ar: "شركة أردنية متخصصة في الشقق السكنية الفاخرة في غرب عمّان.",
+    en: "A Jordanian developer specialising in luxury apartments across West Amman.",
   },
   "footer.explore": { ar: "تصفّح", en: "Explore" },
   "footer.projects": { ar: "المشاريع", en: "Projects" },
@@ -348,20 +348,10 @@ const T = {
 
   /* about */
   "about.eyebrow": { ar: "من نحن", en: "Who we are" },
-  "about.title": { ar: "سبعة عشر عاماً، ومبنى واحد في كل مرة", en: "Seventeen years, one building at a time" },
+  "about.title": { ar: "مبنى واحد في كل مرة", en: "One building at a time" },
   "about.lead": {
-    ar: "بدأنا عام ٢٠٠٩ بمبنى واحد في الرابية. اليوم سلّمنا ١٦ مشروعاً و٤٨٠ وحدة، وما زلنا نبني عدداً محدوداً في الوقت نفسه.",
-    en: "We started in 2009 with a single building in Rabieh. We have since delivered 16 projects and 480 homes — and still keep only a few on site at once.",
-  },
-  "about.storyEyebrow": { ar: "القصة", en: "The story" },
-  "about.storyTitle": { ar: "لماذا نبني قليلاً", en: "Why we build slowly" },
-  "about.story1": {
-    ar: "تأسست جنرال شيرمان عام ٢٠٠٩ على قاعدة بسيطة: ألا نبدأ مشروعاً جديداً قبل أن يصل السابق إلى مرحلة التشطيبات. هذا يعني نمواً أبطأ من غيرنا، لكنه يعني أيضاً أن المهندس المشرف على مبناك ليس مسؤولاً عن ستة مبانٍ أخرى في الوقت نفسه.",
-    en: "General Sherman was founded in 2009 on a simple rule: no new project starts until the previous one reaches finishing stage. That makes us grow more slowly than others — and it also means the engineer supervising your building is not running six others at the same time.",
-  },
-  "about.story2": {
-    ar: "نشتري الأرض نقداً قبل التصميم، فلا نضطر لضغط المواصفات لاحقاً لتغطية كلفة التمويل. ونشتري مواد التشطيب الأساسية — البلاط والأدوات الصحية والمصاعد — دفعةً واحدة عند التعاقد، حتى لا يتغير ما وعدناك به إذا تغيرت الأسعار.",
-    en: "We buy the land outright before design begins, so we are never squeezing the specification later to cover financing costs. And we buy the main finishing materials — tiling, sanitary ware, lifts — in one order at contract stage, so what we promised does not quietly change when prices do.",
+    ar: "نبني عدداً محدوداً من المشاريع في الوقت نفسه، ونلتزم بالمواصفات وموعد التسليم كتابةً. هذه صفحة عن كيف نعمل، لا عن كم بنينا.",
+    en: "We keep only a few schemes running at once, and we put the specification and the handover date in writing. This page is about how we work, not how much we have built.",
   },
   "about.valuesEyebrow": { ar: "كيف نعمل", en: "How we work" },
   "about.valuesTitle": { ar: "أربعة التزامات لا نساوم عليها", en: "Four commitments we do not trade away" },
