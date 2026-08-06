@@ -41,12 +41,9 @@ const COMPANY = {
     ar: "سجل تجاري رقم ٢٠٠٩/‏٤٤١٧٢ — نقابة المقاولين الأردنيين",
     en: "Commercial registration 44172/2009 — Jordanian Construction Contractors Association",
   },
-  social: [
-    { id: "instagram", label: "Instagram", href: "#" },  // «REPLACE»
-    { id: "facebook", label: "Facebook", href: "#" },    // «REPLACE»
-    { id: "linkedin", label: "LinkedIn", href: "#" },    // «REPLACE»
-    { id: "youtube", label: "YouTube", href: "#" },      // «REPLACE»
-  ],
+  /* No social accounts yet. When there are, add them here and restore the
+     .socials list in the footer (README → "Removed sections"). */
+  social: [],
   /* Track record. Empty because the figures that were here were invented for
      the build, and the site now carries the real name and logo. To bring the
      band back: add entries here and restore the stats <section> in index.html
@@ -61,12 +58,10 @@ const DISTRICTS = {
 };
 
 /* ---------------------------------------------------------------- projects
-   Units are not listed one by one. Each project declares its floors and its
-   unit lines (A, B, C …) — the layout that repeats on every floor, exactly how
-   these buildings are actually planned and priced. `sold` and `reserved` hold
-   the exceptions, written as "<floor>-<line>", floor 0 being the ground floor.
-
-   Price = area × pricePerM2 × (1 + floorPremium × floor), rounded to JOD 500.
+   Each project carries its own schedule of units, stated one at a time as the
+   sales brochure publishes them. Prices are stated, never calculated — real
+   schedules do not follow a formula — and a sold unit carries no price,
+   because the brochure publishes none.
    -------------------------------------------------------------------------- */
 
 const PROJECTS = [

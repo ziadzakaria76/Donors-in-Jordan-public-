@@ -59,7 +59,6 @@ Everything below is invented placeholder content. Search for `«REPLACE»` in
   are empty, so the footer's address line, the contact page's office row and
   the office map are all absent. Filling either field in is not enough on its
   own — the markup was removed too (see *Removed sections*).
-- **Social links** — the four `href: "#"` entries.
 - **Domain** — `COMPANY.domain` plus the SEO tags noted above.
 - **Projects and units** — see below.
 - **Logo** — `assets/img/logo-mark.png` (house mark) and `assets/img/logo.png`
@@ -134,33 +133,33 @@ change its twin in `i18n.js`.**
 
 ## Removed sections
 
-Five things were cut rather than filled, because their content was invented and
-the site now carries the real name and logo: the **stats band**, the
-**testimonials**, the About page's **company story**, the **office address**,
-and the **three projects** with their entire inventory. No page now claims a
-track record, a founding year, a location beyond Amman, or a scheme that does
-not exist.
+Five things were cut rather than filled, because they were invented or do not
+exist: the **stats band**, the **testimonials**, the About page's **company
+story**, the **office address**, and the **social links**. No page claims a
+track record, a founding year, a location beyond Amman, or an account the
+company does not have.
 
-### The projects
-
-`PROJECTS` and `DISTRICTS` in `data.js` are empty, and the site adapts rather
-than breaking. With no projects:
-
-- the home page drops its featured-projects and featured-units sections, and
-  the hero's quick search;
-- the project index and the units page show a stated empty state with a link to
-  contact, and the filter panel and status tabs are removed;
-- `project.html` redirects to the index for any id;
-- the calculator loses its unit picker but still works on a typed-in price;
-- the contact form loses its project dropdown;
-- the footer's projects column is gone.
-
-Adding real projects back to the array restores all of it — the markup and the
-renderers are untouched, and there is nothing else to switch on.
+The site is built to tolerate absent data generally — a project with no unit
+schedule, a unit with no price, a scheme with no map — so sections remove
+themselves rather than rendering empty.
 
 The About page runs hero → four commitments → process → CTA. To add a story
 section back, write it into `i18n.js` and add a `split split--wide` section to
 `about.html`; the four commitments section is the nearest pattern to copy.
+
+### Restoring the social links
+
+`COMPANY.social` is empty and the footer's icon row is gone, because the company
+has no accounts yet. To bring it back, add entries and restore the markup in the
+footer of `index.html`, then run `npm run pages`:
+
+```html
+<ul class="socials">
+  <li><a href="https://…" aria-label="Instagram" rel="noopener"><span data-icon="instagram"></span></a></li>
+</ul>
+```
+
+Icons available: `instagram`, `facebook`, `linkedin`, `youtube`.
 
 ### Restoring the office address
 
