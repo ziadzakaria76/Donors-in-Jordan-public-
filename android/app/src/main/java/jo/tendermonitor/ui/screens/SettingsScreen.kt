@@ -14,6 +14,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,8 +31,10 @@ import androidx.compose.ui.unit.dp
 import jo.tendermonitor.data.settings.AppSettings
 import jo.tendermonitor.data.settings.Redact
 import jo.tendermonitor.data.settings.TokenAdvice
+import jo.tendermonitor.ui.PollStatus
 import jo.tendermonitor.ui.SectionHeader
 import jo.tendermonitor.ui.theme.StatusColors
+import jo.tendermonitor.work.PollPolicy
 
 /**
  * Token and repository.
@@ -49,6 +53,10 @@ fun SettingsScreen(
     onSaveSettings: (AppSettings) -> Unit,
     onVerifyToken: () -> Unit,
     verifyResult: String?,
+    pollStatus: PollStatus,
+    nowMillis: Long,
+    notificationsAllowed: Boolean,
+    onRequestNotificationPermission: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     var token by remember { mutableStateOf("") }
@@ -178,19 +186,162 @@ fun SettingsScreen(
             }
         }
 
-        SectionHeader("Notifications")
+        SectionHeader("Background checks")
         Card(Modifier.fillMaxWidth().padding(12.dp)) {
             Column(Modifier.padding(14.dp)) {
                 Text(
-                    "Background checks and notifications are Phase 3 and are not " +
-                        "wired up yet. Nothing on this screen turns them on, and the " +
-                        "app does not poll in the background today.",
+                    "The monitor runs on GitHub's servers on a weekday schedule " +
+                        "whether or not this phone is awake. These checks only ask " +
+                        "whether a run has finished, and tell you what it found.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+
+                Spacer(Modifier.height(12.dp))
+                Text("How often", style = MaterialTheme.typography.labelLarge)
+                Column {
+                    PollPolicy.INTERVALS.forEach { (minutes, label) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            RadioButton(
+                                selected = settings.pollMinutes == minutes,
+                                onClick = { onSaveSettings(settings.copy(pollMinutes = minutes)) },
+                            )
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+                Text(
+                    PollPolicy.describeCost(settings.pollMinutes),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Android decides when a background job actually runs. It will " +
+                        "be at least this long and can be considerably more if the " +
+                        "phone is asleep — this is an interval, not an appointment.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider()
+                Spacer(Modifier.height(10.dp))
+
+                SwitchRow(
+                    checked = settings.notifyOnResults,
+                    onChange = { onSaveSettings(settings.copy(notifyOnResults = it)) },
+                    title = "Tell me about results",
+                    detail = "\"12 new opportunities\", and \"no new opportunities " +
+                        "— all 13 portals read\", which is a different thing and " +
+                        "arrives as a different sentence.",
+                )
+                SwitchRow(
+                    checked = settings.notifyOnFailures,
+                    onChange = { onSaveSettings(settings.copy(notifyOnFailures = it)) },
+                    title = "Tell me when something is wrong",
+                    detail = "Portals unreachable, or this app unable to check at " +
+                        "all. Sent on a separate, higher-priority channel so you " +
+                        "can make it noisier than results in Android's settings — " +
+                        "or quieten results without quietening this.",
+                )
+                SwitchRow(
+                    checked = settings.pollOnMetered,
+                    onChange = { onSaveSettings(settings.copy(pollOnMetered = it)) },
+                    title = "Check on mobile data too",
+                    detail = "Off by default. Checking hourly over mobile data to " +
+                        "find out that nothing changed spends your allowance " +
+                        "without asking. On Wi-Fi only, the checks are free.",
+                )
+
+                if (!notificationsAllowed) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Android is not allowing this app to post notifications, so " +
+                            "nothing above will reach you. The checks still run and " +
+                            "the app still updates when you open it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StatusColors.warning,
+                    )
+                    onRequestNotificationPermission?.let { request ->
+                        TextButton(onClick = request) { Text("Allow notifications") }
+                    }
+                }
+            }
+        }
+
+        SectionHeader("Last check")
+        Card(Modifier.fillMaxWidth().padding(12.dp)) {
+            Column(Modifier.padding(14.dp)) {
+                // The line that makes silence legible. With nothing here, "no
+                // notifications this week" means either no news or no checks,
+                // and those are the two states this whole system exists to
+                // keep apart.
+                Text(
+                    PollPolicy.describeLastCheck(pollStatus.lastAttemptMillis, nowMillis),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+                if (pollStatus.lastNote.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(pollStatus.lastNote, style = MaterialTheme.typography.bodySmall)
+                }
+                if (pollStatus.consecutiveFailures > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "${pollStatus.consecutiveFailures} check(s) in a row have " +
+                            "failed. Until one succeeds, no news here is not the " +
+                            "same as no news.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = StatusColors.warning,
+                    )
+                }
+                if (pollStatus.lastNotifiedRunId > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Last run announced: #${pollStatus.lastNotifiedRunId}.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (settings.pollMinutes <= 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "Background checks are off, so this will not change.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    checked: Boolean,
+    onChange: (Boolean) -> Unit,
+    title: String,
+    detail: String,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Switch(checked = checked, onCheckedChange = onChange)
+        Spacer(Modifier.height(0.dp))
+        Column(Modifier.padding(start = 12.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                detail,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

@@ -8,15 +8,29 @@ import jo.tendermonitor.data.settings.AppSettings
 import jo.tendermonitor.data.settings.Redact
 import jo.tendermonitor.data.settings.SettingsStore
 import jo.tendermonitor.data.settings.TokenStore
+import jo.tendermonitor.work.PollState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+/** What the background checks have been doing, for the Settings screen. */
+data class PollStatus(
+    val lastAttemptMillis: Long = 0L,
+    val lastSuccessMillis: Long = 0L,
+    val lastNote: String = "",
+    val consecutiveFailures: Int = 0,
+    val lastNotifiedRunId: Long = 0L,
+)
+
 class SettingsViewModel(
     private val tokens: TokenStore,
     private val settingsStore: SettingsStore,
     private val client: GitHubClient,
+    private val pollState: PollState,
+    /** Applied whenever the schedule changes. Injected so the view model
+     *  stays free of Android context. */
+    private val onScheduleChanged: (AppSettings) -> Unit = {},
 ) : ViewModel() {
 
     private val _settings = MutableStateFlow(settingsStore.settings())
@@ -27,6 +41,22 @@ class SettingsViewModel(
 
     private val _verifyResult = MutableStateFlow<String?>(null)
     val verifyResult: StateFlow<String?> = _verifyResult.asStateFlow()
+
+    private val _pollStatus = MutableStateFlow(readPollStatus())
+    val pollStatus: StateFlow<PollStatus> = _pollStatus.asStateFlow()
+
+    private fun readPollStatus() = PollStatus(
+        lastAttemptMillis = pollState.lastAttemptMillis(),
+        lastSuccessMillis = pollState.lastSuccessMillis(),
+        lastNote = pollState.lastNote(),
+        consecutiveFailures = pollState.consecutiveFailures(),
+        lastNotifiedRunId = pollState.lastNotifiedRunId(),
+    )
+
+    /** Re-read when the Settings screen comes back into view. */
+    fun refreshPollStatus() {
+        _pollStatus.value = readPollStatus()
+    }
 
     fun saveToken(token: String) {
         tokens.saveToken(token)
@@ -42,7 +72,12 @@ class SettingsViewModel(
 
     fun saveSettings(settings: AppSettings) {
         settingsStore.save(settings)
-        _settings.value = settingsStore.settings()
+        val saved = settingsStore.settings()
+        _settings.value = saved
+        // Re-registered immediately rather than on next launch: a schedule
+        // that only takes effect after a restart is a setting that looks
+        // applied and is not.
+        onScheduleChanged(saved)
         _verifyResult.value = null
     }
 

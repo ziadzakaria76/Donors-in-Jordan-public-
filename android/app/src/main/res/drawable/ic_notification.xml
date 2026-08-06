@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="?attr/colorControlNormal">
+    <!-- A document with a checked line. Monochrome and solid: Android masks
+         a notification icon to its alpha channel, so anything with colour or
+         detail arrives as a white blob. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M7,2h7l5,5v13a2,2 0,0 1,-2 2H7a2,2 0,0 1,-2 -2V4a2,2 0,0 1,2 -2zM13,3.5V8h4.5L13,3.5zM8,11h8v1.6H8V11zM8,14h5v1.6H8V14z" />
+</vector>

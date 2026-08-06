@@ -2,11 +2,15 @@ package jo.tendermonitor.ui
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Article
@@ -43,13 +47,21 @@ import jo.tendermonitor.ui.screens.ReportScreen
 import jo.tendermonitor.ui.screens.RunScreen
 import jo.tendermonitor.ui.screens.SettingsScreen
 import jo.tendermonitor.ui.theme.JordanTenderTheme
+import jo.tendermonitor.work.Notifier
+import jo.tendermonitor.work.PollScheduler
+import jo.tendermonitor.work.RunNotice
 import java.io.File
 
 class MainActivity : ComponentActivity() {
 
+    private val notificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Either way the app works; only the notifications differ. */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val graph = (application as TenderMonitorApp).graph
+        val notifier = Notifier(this)
 
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -57,7 +69,9 @@ class MainActivity : ComponentActivity() {
                 modelClass.isAssignableFrom(AppViewModel::class.java) ->
                     AppViewModel(graph.reports, graph.settings, graph.settings) as T
                 modelClass.isAssignableFrom(SettingsViewModel::class.java) ->
-                    SettingsViewModel(graph.settings, graph.settings, graph.client) as T
+                    SettingsViewModel(
+                        graph.settings, graph.settings, graph.client, graph.pollState,
+                    ) { updated -> PollScheduler.apply(applicationContext, updated) } as T
                 modelClass.isAssignableFrom(PortalsViewModel::class.java) ->
                     PortalsViewModel(graph.portals) as T
                 else -> throw IllegalArgumentException(modelClass.name)
@@ -68,11 +82,34 @@ class MainActivity : ComponentActivity() {
             JordanTenderTheme {
                 AppScaffold(
                     factory = factory,
+                    startTab = destinationFrom(intent),
                     onOpenUrl = ::openUrl,
                     onOpenFile = ::openFile,
                     onShareFile = ::shareFile,
+                    notificationsAllowed = notifier.canPost(),
+                    onRequestNotificationPermission = ::askForNotifications,
                 )
             }
+        }
+    }
+
+    /**
+     * Where a tapped notification should land.
+     *
+     * A notification about three unreachable portals that opened the
+     * opportunity list would be worse than one that opened nothing: it would
+     * show a short report and no reason for it.
+     */
+    private fun destinationFrom(intent: Intent?): String? =
+        intent?.getStringExtra(Notifier.EXTRA_DESTINATION)
+
+    private fun askForNotifications() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(
+            this, android.Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!granted) {
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -145,15 +182,26 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 @Composable
 private fun AppScaffold(
     factory: ViewModelProvider.Factory,
+    startTab: String?,
     onOpenUrl: (String) -> Unit,
     onOpenFile: (File) -> Unit,
     onShareFile: (File) -> Unit,
+    notificationsAllowed: Boolean,
+    onRequestNotificationPermission: () -> Unit,
 ) {
     val app: AppViewModel = viewModel(factory = factory)
     val settingsVm: SettingsViewModel = viewModel(factory = factory)
     val portalsVm: PortalsViewModel = viewModel(factory = factory)
 
-    var tab by remember { mutableStateOf(Tab.LATEST) }
+    var tab by remember {
+        mutableStateOf(
+            when (startTab) {
+                RunNotice.Destination.HEALTH.name -> Tab.HEALTH
+                RunNotice.Destination.SETTINGS.name -> Tab.SETTINGS
+                else -> Tab.LATEST
+            }
+        )
+    }
     // The Add form is a sub-screen of Portals rather than a tab: it is a
     // task with a beginning and an end, and a tab you can wander away from
     // mid-edit would lose a tested candidate without saying so.
@@ -167,6 +215,7 @@ private fun AppScaffold(
     val addState by portalsVm.add.collectAsState()
     val fingerprint by settingsVm.fingerprint.collectAsState()
     val verifyResult by settingsVm.verifyResult.collectAsState()
+    val pollStatus by settingsVm.pollStatus.collectAsState()
 
     Scaffold(
         topBar = {
@@ -255,6 +304,10 @@ private fun AppScaffold(
                 },
                 onVerifyToken = settingsVm::verify,
                 verifyResult = verifyResult,
+                pollStatus = pollStatus,
+                nowMillis = System.currentTimeMillis(),
+                notificationsAllowed = notificationsAllowed,
+                onRequestNotificationPermission = onRequestNotificationPermission,
                 modifier = modifier,
             )
         }

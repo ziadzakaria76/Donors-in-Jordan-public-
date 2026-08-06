@@ -17,7 +17,8 @@ Be clear about this before relying on any of it.
 | | |
 |---|---|
 | **Compiles** | Yes — CI builds it on every push. That is the only place it is compiled; it is developed in an environment with no Android SDK |
-| **Unit tested** | Token redaction, the API client's failure paths (401 / 403-permission / 403-rate-limit / 404 / 410 / 5xx / offline), report parsing and schema refusal, the artifact zip reader, and editing `portals.json` without destroying the prose in it |
+| **Unit tested** | Token redaction, the API client's failure paths (401 / 403-permission / 403-rate-limit / 404 / 410 / 5xx / offline), report parsing and schema refusal, the artifact zip reader, editing `portals.json` without destroying the prose in it, and the notification and retry policies |
+| **NOT tested end to end** | The background worker itself, and the probe round-trip. Their decision logic is tested; the sequences — WorkManager firing, dispatch, poll, download — have never run |
 | **NOT tested** | The Keystore-backed token store — `EncryptedSharedPreferences` needs a real Android Keystore and cannot run on a JVM. It is two AndroidX calls, deliberately with no logic around them |
 | **NOT run on a device by anyone** | Every screen. No emulator, no handset. The first person to install this is the first person to see it render |
 
@@ -192,11 +193,48 @@ list changed rather than clobbering it.
 
 ---
 
-## Background notifications
+## Background checks and notifications
 
-**Not implemented yet — Phase 3.** The Settings screen says so rather than
-showing a switch that does nothing. Today the app polls only while you are
-looking at it.
+The app checks whether a run has finished and tells you what it found. It does
+**not** start runs — the monitor has its own weekday schedule on GitHub's
+servers that fires whether or not this phone is awake.
+
+**Intervals:** off (the default), hourly, every 3 hours, every 6 hours, or once
+a day. The monitor produces one run per weekday at 07:17 Amman, so hourly is
+enough to hear about it the same morning and nothing shorter is offered.
+
+Hourly costs about 24 checks a day, at most 3 requests each, against a budget
+of 5,000 an hour. **The constraint is battery and data, not the rate limit** —
+so do not pick a longer interval to protect a limit that was never at risk.
+
+**Wi-Fi only, unless you say otherwise.** Checking hourly over mobile data to
+find out that nothing changed spends your allowance without asking.
+
+**Two channels, so you can tune them apart:**
+
+| Channel | Carries | Why separate |
+|---|---|---|
+| Run results | "12 new opportunities"; "No new opportunities — all 13 portals read" | Routine. Mute it in a busy fortnight if you like |
+| Needs attention | "ACTION NEEDED — nothing could be read"; "3 of 13 portals unavailable"; "the monitor cannot check — token refused" | High priority. Muting results must never mute this |
+
+A notification about unreachable portals opens **Health**, not the opportunity
+list — a short report with no reason for it is worse than no report.
+
+**"Last check" in Settings is the important line.** No notifications means
+either no news or no checks, and only that line says which. It shows when the
+app last reached GitHub, what it found, and how many checks in a row have
+failed.
+
+**Android decides when a background job actually runs.** The interval is a
+floor, not an appointment; a sleeping phone can delay it considerably. If that
+matters on a given morning, open the app and pull to refresh.
+
+If the app cannot check for a reason a person has to fix — a refused token, a
+missing permission, a repository it cannot see — it says so on the attention
+channel straight away rather than going quiet. Temporary failures (no
+connection, GitHub having an afternoon, a rate limit) retry with backoff and
+only produce a notification after eight in a row, by which point the silence
+would otherwise be indistinguishable from "no new tenders".
 
 ---
 

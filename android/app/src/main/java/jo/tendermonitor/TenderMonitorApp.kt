@@ -8,6 +8,9 @@ import jo.tendermonitor.data.db.TenderDatabase
 import jo.tendermonitor.data.github.GitHubClient
 import jo.tendermonitor.data.portals.PortalsRepository
 import jo.tendermonitor.data.settings.KeystoreSettings
+import jo.tendermonitor.work.Notifier
+import jo.tendermonitor.work.PollScheduler
+import jo.tendermonitor.work.PollState
 import java.io.File
 
 /**
@@ -20,6 +23,18 @@ import java.io.File
 class TenderMonitorApp : Application() {
 
     val graph: Graph by lazy { Graph(this) }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Channels are created up front rather than at first post: a person
+        // who wants to make failures noisier should be able to find the
+        // channel in Android's settings before one has ever fired.
+        Notifier(this).ensureChannels()
+        // Re-applied on every launch so the schedule survives a reboot, an
+        // app update, or WorkManager's database being cleared. Enqueuing the
+        // same unique work again is a no-op when nothing changed.
+        PollScheduler.apply(this, graph.settings.settings())
+    }
 
     class Graph(context: Context) {
         val settings = KeystoreSettings(context)
@@ -47,5 +62,7 @@ class TenderMonitorApp : Application() {
         )
 
         val portals = PortalsRepository(client = client, settings = settings)
+
+        val pollState = PollState(context)
     }
 }
