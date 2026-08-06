@@ -5,17 +5,24 @@
 # Local databases
 *.db
 
-# Generated reports -- keep the directory, ignore its contents.
-# The ** prefix matters: a pattern containing a slash is anchored to this
-# file's directory, so a bare "output/*" would only cover a top-level output/
-# and would happily commit every report written to
-# jordan_tender_monitor/output/.
-**/output/*
-!**/output/.gitkeep
-
-# Local state -- keep the directory, ignore the database
-**/data/*
-!**/data/.gitkeep
+# Generated reports and local state -- keep the directory, ignore its contents.
+#
+# SCOPED TO THE MONITOR, and that is the whole point. These were written as
+# **/output/* and **/data/*, on the reasoning that a pattern containing a slash
+# is anchored to this file's directory so a bare "output/*" would miss
+# jordan_tender_monitor/output/. True, and the fix over-reached: **/data/*
+# matches ANY directory called data at ANY depth, which silently swallowed the
+# Android app's entire data package -- twelve source files, including every
+# model and the API client. `git add -A` said nothing, the commit looked
+# complete, and the build failed with 240 unresolved references pointing at
+# files that were on disk the whole time.
+#
+# An ignore rule that hides source is the same failure as a scraper that
+# returns zero: the output looks like a result. Name the directory.
+jordan_tender_monitor/output/*
+!jordan_tender_monitor/output/.gitkeep
+jordan_tender_monitor/data/*
+!jordan_tender_monitor/data/.gitkeep
 
 # Logs
 *.log

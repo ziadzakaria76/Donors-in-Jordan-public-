@@ -631,6 +631,57 @@ def test_ungm_declares_its_source_and_filters_to_jordan():
 # The environment this actually runs in
 # ---------------------------------------------------------------------------
 
+def test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at():
+    """A `.gitignore` pattern that hides source is a silent failure.
+
+    `**/data/*` was written to cover jordan_tender_monitor/data/, and it also
+    matches ANY directory called data at ANY depth. It swallowed the Android
+    app's entire data package -- twelve files, every model and the API client.
+    `git add -A` said nothing, the commit looked complete, and the build failed
+    with 240 unresolved references pointing at files that were on disk the
+    whole time.
+
+    That is the same shape as a scraper returning zero: the output looked like
+    a result. So the rules that hide GENERATED state are required to name the
+    directory they mean, and any new `**/`-prefixed rule has to be added to the
+    allowlist below deliberately, with a reason.
+    """
+    ignore = (ROOT.parent / ".gitignore").read_text(encoding="utf-8")
+    lines = [line.strip() for line in ignore.splitlines()
+             if line.strip() and not line.strip().startswith("#")]
+
+    # Patterns that may legitimately match at any depth: they name a file
+    # extension or a build artefact, never a source directory.
+    allowed_globs = {"**/output/.gitkeep", "**/data/.gitkeep"}
+
+    unscoped = [line for line in lines
+                if line.lstrip("!").startswith("**/")
+                and line.lstrip("!") not in
+                {g.lstrip("!") for g in allowed_globs}]
+    check(not unscoped,
+          "gitignore: no rule hides a whole directory name at any depth",
+          f"unscoped: {unscoped}")
+
+    for directory in ("output", "data"):
+        check(f"jordan_tender_monitor/{directory}/*" in lines,
+              f"gitignore: the monitor's {directory}/ is ignored by name")
+
+    # And the concrete regression: nothing under android/ may be ignored.
+    for path in ("android/app/src/main/java/jo/tendermonitor/data/Outcome.kt",
+                 "android/app/src/main/java/jo/tendermonitor/data/db/Database.kt",
+                 "android/app/src/test/java/jo/tendermonitor/RedactTest.kt"):
+        source = ROOT.parent / path
+        check(source.exists(), f"gitignore: {path} is present on disk")
+        segments = path.split("/")
+        hidden = [line for line in lines
+                  if not line.startswith("!")
+                  and line.startswith("**/")
+                  and line[3:].split("/")[0] in segments]
+        check(not hidden,
+              f"gitignore: no rule matches a directory in {path}",
+              f"would be hidden by {hidden}")
+
+
 def test_every_workflow_file_is_structurally_valid_yaml():
     """A workflow GitHub cannot parse does not run, and nothing says so.
 
@@ -774,6 +825,7 @@ TESTS = [
     test_ungm_routes_its_rendered_html_through_the_cascade,
     test_ungm_selectors_come_from_the_rendered_dom,
     test_ungm_declares_its_source_and_filters_to_jordan,
+    test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at,
     test_every_workflow_file_is_structurally_valid_yaml,
     test_the_workflow_installs_the_browser_only_for_diagnosis,
     test_the_schedule_is_weekday_mornings_and_not_on_the_hour,
