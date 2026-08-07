@@ -65,6 +65,33 @@ def active_weights() -> dict[str, float]:
 # ---------------------------------------------------------------------------
 
 
+def _repair_implausible_value(record: dict) -> str | None:
+    """Blank a value that cannot be true, before the floor is applied to it.
+
+    Ordering is the whole point. _passes_value() drops anything under
+    MIN_VALUE_USD, so a misread value removes the tender: "Published: 01 August
+    2026" parsed to 1.0 falls under the floor and leaves under "below minimum
+    value" -- the same reason a genuine small tender gets. Nothing separates the
+    two, so a scraper reading the wrong part of a page quietly shrinks the
+    pipeline instead of failing.
+
+    An implausible value is therefore treated as *unknown*, which
+    KEEP_UNKNOWN_VALUE already handles correctly, and the record carries a flag
+    saying so. The tender survives to be judged on everything else, and the
+    parsing problem shows up in the report rather than only in the logs.
+
+    Returns a flag to attach, or None when the value is credible.
+    """
+    value = record.get("estimated_value_usd")
+    if value is None or isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if config.MIN_PLAUSIBLE_VALUE_USD <= value <= config.MAX_PLAUSIBLE_VALUE_USD:
+        return None
+
+    record["estimated_value_usd"] = None
+    return config.IMPLAUSIBLE_VALUE_NOTE.format(value=f"USD {value:,.0f}")
+
+
 def _passes_value(record: dict) -> tuple[bool, str | None]:
     value = record.get("estimated_value_usd")
     if value is None:
@@ -172,6 +199,12 @@ def apply_filters(records: list[dict], today: date | None = None
     for record in records:
         flags = list(record.get("flags") or [])
 
+        # Before any filter reads the value, so an unusable number cannot be
+        # mistaken for a small tender and dropped.
+        implausible_value = _repair_implausible_value(record)
+        if implausible_value:
+            flags.append(implausible_value)
+
         ok, flag = _passes_deadline(record, today)
         if not ok:
             drop("closed")
@@ -183,7 +216,9 @@ def apply_filters(records: list[dict], today: date | None = None
         if not ok:
             drop("below minimum value")
             continue
-        if flag:
+        # The generic "Value not published" is redundant once the record already
+        # explains that its published value was not usable.
+        if flag and not implausible_value:
             flags.append(flag)
 
         if not _passes_undated_lookback(record, today):
