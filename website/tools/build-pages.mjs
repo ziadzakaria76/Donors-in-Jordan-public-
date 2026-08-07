@@ -226,22 +226,6 @@ PAGES.push({
     </div>
   </section>
 
-  <!-- The plan cards that sat here (#p-payment) are gone with PAYMENT_PLANS;
-       what is left is the calculator link, which stands on its own. README →
-       "Restoring the payment plans" has the markup to put back. -->
-  <section class="section section--stone">
-    <div class="wrap wrap--narrow">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="project.calcEyebrow">الدفع</p>
-        <h2 data-i18n="project.calcTitle">احسب قسطك الشهري على وحدة من هذا المشروع</h2>
-        <p class="lead" data-i18n="project.calcBody">أداة تقديرية تعطيك القسط التقريبي خلال ثوانٍ. لمعرفة خطط الدفع المتاحة على وحدة بعينها، تواصل مع فريق المبيعات.</p>
-      </div>
-      <p>
-        <a class="link-arrow" href="payment-plans.html"><span data-i18n="project.calcLink">احسب قسطك الشهري</span> <span data-icon="arrow" class="icon icon--dir"></span></a>
-      </p>
-    </div>
-  </section>
-
   <section class="section section--paper" id="p-nearby-section">
     <div class="wrap">
       <div class="section-head">
@@ -334,94 +318,6 @@ ${pageHero({
       <p class="form-note" style="margin-block-start:2.5rem" data-i18n="units.note">الأسعار بالدينار الأردني وتشمل موقف السيارة والمستودع، ولا تشمل رسوم التسجيل ما لم يُذكر خلاف ذلك في خطة الدفع.</p>
     </div>
   </section>`,
-});
-
-/* --------------------------------------------------------- payment plans */
-
-PAGES.push({
-  file: "payment-plans.html",
-  title: "حاسبة الأقساط — شركة جنرال شيرمان للإسكان",
-  desc: "احسب القسط الشهري التقريبي لأي وحدة من وحدات شركة جنرال شيرمان للإسكان، أو لأي سعر تدخله.",
-  keywords: "حاسبة أقساط, تقسيط شقق عمان, حاسبة قرض سكني الأردن",
-  scripts: ["pages.js", "plans.js"],
-  modals: [],
-  main: `
-${pageHero({
-    image: "sherman2-exterior-day",
-    crumb: '<span data-i18n="nav.plans">خطط الدفع</span>',
-    eyebrow: '<span data-i18n="plans.eyebrow">الدفع والتمويل</span>',
-    title: '<span data-i18n="plans.title">احسب قسطك الشهري</span>',
-    lead: '<span data-i18n="plans.lead">أداة تقديرية تساعدك على تقدير القسط قبل الحديث مع فريق المبيعات. لمعرفة خطط الدفع المتاحة لكل وحدة، تواصل معنا مباشرةً.</span>',
-  })}
-
-  <section class="section">
-    <div class="wrap">
-      <h2 class="sr-only" data-i18n="nav.plans">خطط الدفع</h2>
-      <div class="grid grid--3" id="plan-cards"></div>
-    </div>
-  </section>
-
-  <section class="section section--stone" id="calculator">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="calc.title">حاسبة الأقساط</p>
-        <h2 data-i18n="plans.calcTitle">كم سيكون قسطك الشهري؟</h2>
-        <p class="lead" data-i18n="plans.calcLead">اختر وحدة من مخزوننا أو أدخل أي سعر، ثم عدّل الدفعة الأولى والمدة.</p>
-      </div>
-
-      <div class="calc">
-        <div class="calc__panel">
-          <div class="field" style="margin-block-end:1.5rem">
-            <label for="c-unit" data-i18n="calc.pickUnit">اختر وحدة لتعبئة السعر</label>
-            <select id="c-unit"></select>
-          </div>
-          <div class="field" style="margin-block-end:1.5rem">
-            <label for="c-price" data-i18n="calc.price">سعر الوحدة (دينار)</label>
-            <input id="c-price" type="number" min="20000" step="1000" inputmode="numeric">
-          </div>
-
-          <fieldset style="border:0;padding:0;margin:0 0 1.5rem">
-            <legend class="field" style="padding:0"><span data-i18n="calc.plan">خطة الدفع</span></legend>
-            <div class="plan-radios">
-              <label class="plan-radio">
-                <input type="radio" name="c-mode" value="company" checked>
-                <span><strong data-i18n="plans.modeCompany">أقساط الشركة — بدون فوائد</strong>
-                <span data-i18n="plans.modeCompanyNote">حتى ٥ سنوات، بدون فوائد أو رسوم إدارية.</span></span>
-              </label>
-              <label class="plan-radio">
-                <input type="radio" name="c-mode" value="bank">
-                <span><strong data-i18n="plans.modeBank">تمويل بنكي</strong>
-                <span data-i18n="plans.modeBankNote">حتى ٢٥ سنة عبر البنوك الشريكة، بفائدة يحددها البنك.</span></span>
-              </label>
-            </div>
-          </fieldset>
-
-          <div class="field" style="margin-block-end:1.5rem">
-            <div class="range-row"><label for="c-down" data-i18n="calc.down">الدفعة الأولى</label><output id="c-down-out">25%</output></div>
-            <input id="c-down" type="range" min="10" max="60" step="5">
-          </div>
-          <div class="field" style="margin-block-end:1.5rem">
-            <div class="range-row"><label for="c-years" data-i18n="calc.years">مدة التقسيط (سنوات)</label><output id="c-years-out">15</output></div>
-            <input id="c-years" type="range" min="1" max="25" step="1">
-          </div>
-          <div class="field" id="c-rate-field">
-            <div class="range-row"><label for="c-rate" data-i18n="calc.rate">الفائدة السنوية للبنك</label><output id="c-rate-out">6.5%</output></div>
-            <input id="c-rate" type="range" min="3" max="10" step="0.25">
-          </div>
-        </div>
-
-        <div class="calc__out">
-          <p class="eyebrow" style="color:var(--brass-2)" data-i18n="calc.monthly">القسط الشهري التقريبي</p>
-          <p class="calc__result num" id="c-monthly"></p>
-          <dl class="calc__rows" id="c-rows"></dl>
-          <p style="font-size:var(--fs-xs);color:#8E9BA1;margin-block-start:1.5rem" data-i18n="calc.disclaimer">الأرقام تقديرية لغرض التخطيط فقط ولا تمثّل عرضاً ملزماً.</p>
-          <a class="btn btn--brass btn--block" style="margin-block-start:1.5rem" href="contact.html" data-i18n="plans.talkBtn">تحدّث مع فريق المبيعات</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-`,
 });
 
 /* ---------------------------------------------------------------- gallery */

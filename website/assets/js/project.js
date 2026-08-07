@@ -8,7 +8,7 @@
   const root = $("#project-page");
   if (!root) return;
 
-  const { PROJECTS, UNITS, DISTRICTS, AMENITIES, PAYMENT_PLANS, PROJECT_STATUS, UNIT_TYPES } = window.DATA;
+  const { PROJECTS, UNITS, DISTRICTS, AMENITIES, PROJECT_STATUS, UNIT_TYPES } = window.DATA;
 
   const id = new URLSearchParams(location.search).get("id");
   const project = id ? PROJECTS.find((p) => p.id === id) : PROJECTS[0];
@@ -154,22 +154,6 @@
 
   /* --------------------------------------------------------- plans + map */
 
-  function renderPayment() {
-    if (!$("#p-payment")) return;
-    if (!project.plans?.length) { dropSection("#p-payment"); return; }
-    $("#p-payment").innerHTML = project.plans.map((pid) => {
-      const plan = PAYMENT_PLANS.find((p) => p.id === pid);
-      return `<article class="card" style="padding:clamp(1.25rem,2.4vw,1.75rem);gap:.85rem">
-        <span class="badge badge--plain">${tx(plan.badge)}</span>
-        <h3 class="card__title" style="font-size:1.15rem">${tx(plan.name)}</h3>
-        <p class="card__text">${tx(plan.summary)}</p>
-        <ul class="tick-list" style="margin-block-start:.5rem">
-          ${plan.steps.map((s) => `<li>${iconSvg("check")}<span><strong class="num">${s.pct}%</strong> — ${tx(s.label)}</span></li>`).join("")}
-        </ul>
-      </article>`;
-    }).join("");
-  }
-
   function renderNearby() {
     if (!$("#p-nearby")) return;
     if (!project.nearby?.length) { $("#p-nearby-section")?.remove(); return; }
@@ -219,7 +203,7 @@
 
   function renderAll() {
     renderHero(); renderAbout(); renderMatrix(); renderUnits(); renderPlans();
-    renderPayment(); renderNearby(); renderMap(); renderGallery(); renderRelated();
+    renderNearby(); renderMap(); renderGallery(); renderRelated();
     // Deep links from the units page: ?id=…#unit-<id>
     const hash = location.hash.slice(1);
     if (hash.startsWith("unit-")) {
