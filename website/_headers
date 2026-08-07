@@ -4,14 +4,38 @@
 # _redirects file — and a www -> apex redirect cannot live here either; it is a
 # Redirect Rule in the Cloudflare dashboard (README -> "Deploy it").
 
-# Fonts and images are content-hashed by name and never edited in place, so
-# they can be cached for a year.
+# Fonts are immutable: a woff2 subset is never re-cut under the same name, so a
+# year is safe and they are the largest thing a repeat visitor would refetch.
 /assets/fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Images are NOT immutable, despite looking like they should be. The filenames
+# carry no content hash — sherman2-lobby-1-480.webp is a stable name for
+# whatever that photograph currently is — and they do get re-rendered in place:
+# twenty-six of them were re-cut in one commit to crop a camera watermark out.
+# Under `immutable` a returning visitor would have kept the watermarked version
+# for a year, with no way to tell them otherwise. A week, revalidated, keeps
+# them cheap without making a correction impossible to deliver.
 /assets/img/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
+# CSS and JS are deliberately left on the default (revalidate every time).
+# main.css and app.js are unversioned names, so caching them hard would strand
+# visitors on old markup after a deploy.
+
+# HTML must never be cached hard. These pages carry the prices, the
+# availability and the contact details; a stale one is a wrong one, and a
+# corrected page that visitors cannot see is the failure mode that matters.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# frame-ancestors: the site embeds a map, but is never itself meant to be
+# embedded. Framing it elsewhere would let someone wrap the real prices and
+# phone number in their own page. X-Frame-Options repeats it for older browsers.
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'self'
+  X-Frame-Options: SAMEORIGIN
