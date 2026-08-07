@@ -183,77 +183,6 @@ const PROJECTS = [
   },
 ];
 
-/* ----------------------------------------------------------- payment plans */
-
-/* «REPLACE» — THESE THREE PLANS ARE INVENTED. They were written as demo
-   content before the company was named, and nothing in the brochure states
-   payment terms. They are commercial claims on a site that now carries the
-   real name, logo and phone number: a 3% early-reservation discount, 36
-   interest-free instalments, and bank financing to 25 years. Replace them
-   with the real terms, or empty this array — the payment-plans page and the
-   per-project plans section both disappear when it is empty. */
-const PAYMENT_PLANS = [
-  {
-    id: "early",
-    name: { ar: "خطة الحجز المبكر", en: "Early reservation plan" },
-    summary: {
-      ar: "للمشترين في مرحلة الإنشاء — أفضل سعر مقابل دفعات موزّعة على فترة البناء.",
-      en: "For buyers during construction — the best price in exchange for payments spread across the build.",
-    },
-    badge: { ar: "خصم ٣٪ على سعر الوحدة", en: "3% off the unit price" },
-    downPayment: 15,
-    steps: [
-      { pct: 15, label: { ar: "عند توقيع عقد الحجز", en: "On signing the reservation contract" } },
-      { pct: 45, label: { ar: "أقساط ربعية خلال فترة الإنشاء", en: "Quarterly instalments through construction" } },
-      { pct: 40, label: { ar: "عند التسليم ونقل الملكية", en: "On handover and transfer of title" } },
-    ],
-    notes: [
-      { ar: "السعر مثبّت من تاريخ التوقيع ولا يتأثر بارتفاع أسعار المواد.", en: "The price is fixed from signing and is not affected by material cost increases." },
-      { ar: "يشمل رسوم تسجيل الوحدة في دائرة الأراضي والمساحة.", en: "Includes Department of Lands and Survey registration fees." },
-    ],
-    availableFor: { ar: "المشاريع قيد الإنشاء", en: "Projects under construction" },
-  },
-  {
-    id: "handover",
-    name: { ar: "خطة التسليم المريح", en: "Comfortable handover plan" },
-    summary: {
-      ar: "استلم مفتاحك أولاً وادفع الباقي على ٣٦ قسطاً شهرياً بدون أي فوائد.",
-      en: "Take the keys first, then pay the balance over 36 monthly instalments with no interest.",
-    },
-    badge: { ar: "بدون فوائد", en: "Interest-free" },
-    downPayment: 10,
-    steps: [
-      { pct: 10, label: { ar: "دفعة الحجز", en: "Reservation payment" } },
-      { pct: 30, label: { ar: "عند توقيع عقد البيع", en: "On signing the sale contract" } },
-      { pct: 60, label: { ar: "٣٦ قسطاً شهرياً بعد التسليم", en: "36 monthly instalments after handover" } },
-    ],
-    notes: [
-      { ar: "الأقساط بدون فوائد أو رسوم إدارية.", en: "Instalments carry no interest and no administrative fees." },
-      { ar: "تُنقل الملكية بعد سداد القسط الأخير.", en: "Title transfers once the final instalment is settled." },
-    ],
-    availableFor: { ar: "جميع المشاريع", en: "All projects" },
-  },
-  {
-    id: "bank",
-    name: { ar: "التمويل البنكي", en: "Bank financing" },
-    summary: {
-      ar: "دفعة أولى ٢٥٪ والباقي قرض سكني حتى ٢٥ سنة عبر بنوكنا الشريكة.",
-      en: "A 25% down payment, with the balance financed for up to 25 years through our partner banks.",
-    },
-    badge: { ar: "حتى ٢٥ سنة", en: "Up to 25 years" },
-    downPayment: 25,
-    steps: [
-      { pct: 25, label: { ar: "دفعة أولى من المشتري", en: "Buyer's down payment" } },
-      { pct: 75, label: { ar: "تمويل بنكي يُصرف للشركة", en: "Bank financing released to the company" } },
-    ],
-    notes: [
-      { ar: "نتولى إجراءات التقييم والتسجيل مع البنك نيابةً عنك.", en: "We handle valuation and registration with the bank on your behalf." },
-      { ar: "أسعار الفائدة تحددها البنوك وتخضع للتغيير.", en: "Interest rates are set by the banks and are subject to change." },
-    ],
-    availableFor: { ar: "المشاريع الجاهزة والقريبة من التسليم", en: "Completed projects and those near handover" },
-  },
-];
-
 /* ---------------------------------------------------------------- amenities */
 
 const AMENITIES = {
@@ -395,7 +324,7 @@ const PROJECT_STATUS = {
 
 
 const DATA = {
-  COMPANY, DISTRICTS, PROJECTS, UNITS, PAYMENT_PLANS, AMENITIES, TESTIMONIALS,
+  COMPANY, DISTRICTS, PROJECTS, UNITS, AMENITIES, TESTIMONIALS,
   PROCESS, FAQS, UNIT_TYPES, ORIENTATIONS, PROJECT_STATUS,
 };
 
