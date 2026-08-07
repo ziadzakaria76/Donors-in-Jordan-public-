@@ -49,12 +49,6 @@ const T = {
   "home.processTitle": { ar: "من الزيارة الأولى إلى تسليم المفتاح", en: "From the first visit to the handover of keys" },
   "home.quotesEyebrow": { ar: "آراء الملّاك", en: "Owners" },
   "home.quotesTitle": { ar: "ما يقوله من سكن معنا", en: "What the people who live there say" },
-  "home.ctaTitle": { ar: "احسب قسطك الشهري قبل أن تتصل", en: "Work out your instalment before you call" },
-  "home.ctaBody": {
-    ar: "اختر وحدة من المتاح، أو أدخل أي سعر، وستعرف القسط التقريبي خلال ثوانٍ. ثم تواصل معنا لمعرفة خطط الدفع على تلك الوحدة.",
-    en: "Pick an available unit, or type any price, and see the approximate instalment in seconds. Then talk to us about the payment plans on that unit.",
-  },
-  "home.ctaBtn": { ar: "حاسبة الأقساط", en: "Instalment calculator" },
 
   /* footer */
   "footer.about": {
@@ -75,7 +69,6 @@ const T = {
   "nav.about": { ar: "عن الشركة", en: "About" },
   "nav.projects": { ar: "مشاريعنا", en: "Projects" },
   "nav.units": { ar: "الوحدات المتاحة", en: "Available units" },
-  "nav.plans": { ar: "خطط الدفع", en: "Payment plans" },
   "nav.gallery": { ar: "معرض الصور", en: "Gallery" },
   "nav.contact": { ar: "اتصل بنا", en: "Contact" },
   "nav.menu": { ar: "القائمة", en: "Menu" },
@@ -176,24 +169,6 @@ const T = {
   "grid.line": { ar: "الخط", en: "Line" },
 
   /* calculator */
-  "calc.title": { ar: "حاسبة الأقساط", en: "Instalment calculator" },
-  "calc.price": { ar: "سعر الوحدة (دينار)", en: "Unit price (JOD)" },
-  "calc.down": { ar: "الدفعة الأولى", en: "Down payment" },
-  "calc.years": { ar: "مدة التقسيط (سنوات)", en: "Instalment period (years)" },
-  "calc.rate": { ar: "الفائدة السنوية للبنك", en: "Annual bank interest" },
-  "calc.plan": { ar: "خطة الدفع", en: "Payment plan" },
-  "calc.monthly": { ar: "القسط الشهري التقريبي", en: "Estimated monthly instalment" },
-  "calc.downAmount": { ar: "الدفعة الأولى", en: "Down payment" },
-  "calc.financed": { ar: "المبلغ المقسّط", en: "Amount financed" },
-  "calc.total": { ar: "إجمالي المدفوع", en: "Total paid" },
-  "calc.interest": { ar: "إجمالي الفوائد", en: "Total interest" },
-  "calc.months": { ar: "عدد الأقساط", en: "Number of instalments" },
-  "calc.pickUnit": { ar: "اختر وحدة لتعبئة السعر", en: "Pick a unit to fill in the price" },
-  "calc.custom": { ar: "سعر مخصص", en: "Custom price" },
-  "calc.disclaimer": {
-    ar: "الأرقام تقديرية لغرض التخطيط فقط ولا تمثّل عرضاً ملزماً. تُحتسب أقساط الشركة بدون فوائد، بينما يعتمد التمويل البنكي على سعر الفائدة الذي يحدده البنك.",
-    en: "These figures are estimates for planning only and are not a binding offer. Company instalments carry no interest; bank financing depends on the rate your bank sets.",
-  },
 
   /* forms */
   "form.name": { ar: "الاسم الكامل", en: "Full name" },
@@ -260,14 +235,6 @@ const T = {
     en: "Indicative drawings, approximately to scale. Final areas are stated in the contract.",
   },
   "project.legend": { ar: "دليل الغرف", en: "Room key" },
-  "project.paymentTitle": { ar: "خطط الدفع المتاحة لهذا المشروع", en: "Payment plans available here" },
-  "project.calcEyebrow": { ar: "الدفع", en: "Paying for it" },
-  "project.calcTitle": { ar: "احسب قسطك الشهري على وحدة من هذا المشروع", en: "Work out the monthly instalment on a unit here" },
-  "project.calcBody": {
-    ar: "أداة تقديرية تعطيك القسط التقريبي خلال ثوانٍ. لمعرفة خطط الدفع المتاحة على وحدة بعينها، تواصل مع فريق المبيعات.",
-    en: "An estimate that gives you the approximate instalment in seconds. For the payment plans available on a specific unit, talk to the sales team.",
-  },
-  "project.calcLink": { ar: "احسب قسطك الشهري", en: "Work out your monthly instalment" },
   "project.mapTitle": { ar: "أين يقع المشروع", en: "Where the project is" },
   "project.openMap": { ar: "افتح في خرائط جوجل", en: "Open in Google Maps" },
   "project.galleryTitle": { ar: "صور المشروع", en: "Project images" },
@@ -286,23 +253,6 @@ const T = {
     en: "Prices are in Jordanian dinars and include the parking bay and store. Registration fees are excluded unless your payment plan says otherwise.",
   },
 
-  /* payment plans page */
-  "plans.eyebrow": { ar: "الدفع والتمويل", en: "Payment and financing" },
-  "plans.title": { ar: "احسب قسطك الشهري", en: "Work out your monthly instalment" },
-  "plans.lead": {
-    ar: "أداة تقديرية تساعدك على تقدير القسط قبل الحديث مع فريق المبيعات. لمعرفة خطط الدفع المتاحة لكل وحدة، تواصل معنا مباشرةً.",
-    en: "An estimate to work from before you speak to the sales team. For the payment plans available on a specific unit, contact us directly.",
-  },
-  "plans.calcTitle": { ar: "كم سيكون قسطك الشهري؟", en: "What would your monthly instalment be?" },
-  "plans.calcLead": {
-    ar: "اختر وحدة من مخزوننا أو أدخل أي سعر، ثم عدّل الدفعة الأولى والمدة.",
-    en: "Pick a unit from our inventory or type any price, then adjust the down payment and the term.",
-  },
-  "plans.modeCompany": { ar: "أقساط الشركة — بدون فوائد", en: "Company instalments — interest-free" },
-  "plans.modeCompanyNote": { ar: "حتى ٥ سنوات، بدون فوائد أو رسوم إدارية.", en: "Up to 5 years, with no interest and no admin fees." },
-  "plans.modeBank": { ar: "تمويل بنكي", en: "Bank financing" },
-  "plans.modeBankNote": { ar: "حتى ٢٥ سنة عبر البنوك الشريكة، بفائدة يحددها البنك.", en: "Up to 25 years through partner banks, at the bank's rate." },
-  "plans.talkBtn": { ar: "تحدّث مع فريق المبيعات", en: "Talk to the sales team" },
   "gallery.eyebrow": { ar: "المعرض", en: "Gallery" },
   "gallery.title": { ar: "الواجهات والمساحات والتفاصيل", en: "Elevations, spaces and details" },
   "gallery.lead": {

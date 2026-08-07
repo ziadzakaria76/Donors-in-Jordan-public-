@@ -2,7 +2,7 @@
 
 A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential
 developer: project showcases, a live unit inventory with filters, a per-building
-availability grid, floor plans, an instalment calculator, a gallery, and lead
+availability grid, floor plans, a gallery, and lead
 capture through WhatsApp, phone and forms.
 
 Plain HTML, CSS and JavaScript. **No build step, no framework, no runtime
@@ -252,40 +252,24 @@ rendering a heading over nothing.
 The `home.quotes*` keys are still in `i18n.js`, and `.stat-row` / `.quote-grid`
 are still in the stylesheet, so nothing else needs changing.
 
-### Restoring the payment plans
+### The payment plans and the calculator are gone
 
-`PAYMENT_PLANS` in `data.js` is an empty array: nothing in the brochure states
-payment terms, and the plans that were here — deposit percentages, instalment
-schedules, a grace period, a no-early-settlement-fee promise — were written as
-demo content. With the array empty, the plans section removes itself from
-`payment-plans.html` and from every project page, and the page runs hero →
-calculator only. The calculator does not depend on the plans; it works off the
-unit prices.
+Both were removed, not blanked. Nothing in the brochure states payment terms,
+and the three plans that were here — deposit percentages, instalment
+schedules, a grace period, a no-early-settlement-fee promise — were demo
+content written before the company was named.
 
-Add real terms in the same shape to bring the section back:
+Emptying `PAYMENT_PLANS` took only the cards. It left the calculator, which
+priced financing from a default interest rate and term that nobody had agreed,
+and a home page band advertising it. On a site carrying the real name, logo and
+phone number, that is a financing claim a visitor can act on, so the page went
+with the data: `payment-plans.html`, `assets/js/plans.js`, the `PAYMENT_PLANS`
+array, the per-project section, the navigation entry, the sitemap entry, the
+home page band, and the page definition in `tools/build-pages.mjs`.
 
-```js
-{ id: "…", name: { ar, en }, summary: { ar, en }, badge: { ar, en },
-  downPayment: 20,                                    // percent
-  steps: [{ pct: 40, label: { ar, en } }, …],
-  notes: [{ ar, en }], availableFor: { ar, en } }
-```
-
-The plan cards on the project page were markup, not just data, so they need
-restoring too — in `tools/build-pages.mjs`, inside `PROJECT_BODY`, where the
-calculator section now sits. Then run `npm run pages`:
-
-```html
-<div class="section-head">
-  <p class="eyebrow" data-i18n="nav.plans">خطط الدفع</p>
-  <h2 data-i18n="project.paymentTitle">خطط الدفع المتاحة لهذا المشروع</h2>
-</div>
-<div class="grid grid--3" id="p-payment"></div>
-```
-
-`project.paymentTitle` is still in `i18n.js`, and `renderPayment` in
-`project.js` already looks for `#p-payment` — it just returns early while the
-element is absent.
+Restoring it means writing the real terms first and rebuilding the page around
+them. It was deliberately not left as a shell to fill in: a half-restored
+financing page is the failure mode that matters here.
 
 ### Project status badges
 
@@ -368,7 +352,6 @@ website/
 ├── projects.html            Project index
 ├── project.html             Project detail (?id=sherman-2) — grid, plans, map, gallery
 ├── units.html               Full inventory with filters, sorting and shareable URLs
-├── payment-plans.html       Instalment calculator
 ├── gallery.html             Filterable gallery with lightbox
 ├── about.html               Commitments and process
 ├── contact.html             Contact form, direct channels, map, FAQ
@@ -387,7 +370,6 @@ website/
 │       ├── pages.js         Home, project index, gallery, contact page modules
 │       ├── units.js         Inventory filtering, sorting, URL state
 │       ├── project.js       Project detail page
-│       └── plans.js         Payment plans and the calculator
 ├── tools/                   Optional generators (images, page scaffolding)
 ├── netlify.toml, vercel.json, robots.txt, sitemap.xml
 ```
