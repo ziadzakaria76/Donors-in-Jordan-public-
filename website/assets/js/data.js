@@ -137,6 +137,7 @@ const PROJECTS = [
       "sherman2-exterior-day", "sherman2-exterior-dusk", "sherman2-lobby-1", "sherman2-lobby-2",
       "sherman2-entrance", "sherman2-living-1", "sherman2-living-2", "sherman2-interior-1",
       "sherman2-interior-3", "sherman2-interior-5", "sherman2-interior-7", "sherman2-lobby-3",
+      "sherman2-interior-2", "sherman2-interior-4", "sherman2-interior-6", "sherman2-lobby-4",
     ],
     /* Every apartment as listed in the brochure's schedule. Prices are per unit
        and do not follow a formula, so they are stated, not derived. */

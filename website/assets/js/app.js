@@ -63,10 +63,22 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-/** Responsive <img> for a generated scene. */
+/**
+ * Responsive <img>.
+ *
+ * The srcset lists only the widths that exist on disk, from IMG_VARIANTS in
+ * img-manifest.js. Most of the brochure photographs top out at 480px — they
+ * are phone pictures embedded in a PDF — and offering the browser a 1280 that
+ * is not there means a 404 on exactly the wide viewports where it picks the
+ * largest candidate. A name absent from the manifest falls back to all four
+ * widths, so a newly dropped-in image still renders before `npm run manifest`
+ * has been run.
+ */
 function picture(name, alt, { sizes = "100vw", cls = "", eager = false, ratio = "" } = {}) {
-  const srcset = IMG_WIDTHS.map((w) => `${BASE}assets/img/${name}-${w}.webp ${w}w`).join(", ");
-  return `<img src="${BASE}assets/img/${name}-1280.webp" srcset="${srcset}" sizes="${sizes}"
+  const widths = (typeof IMG_VARIANTS !== "undefined" && IMG_VARIANTS[name]) || IMG_WIDTHS;
+  const srcset = widths.map((w) => `${BASE}assets/img/${name}-${w}.webp ${w}w`).join(", ");
+  const fallback = widths.includes(1280) ? 1280 : widths[widths.length - 1];
+  return `<img src="${BASE}assets/img/${name}-${fallback}.webp" srcset="${srcset}" sizes="${sizes}"
     alt="${esc(alt)}" class="${cls}" ${ratio ? `style="aspect-ratio:${ratio}"` : ""}
     loading="${eager ? "eager" : "lazy"}" decoding="async" ${eager ? 'fetchpriority="high"' : ""} width="1280" height="720">`;
 }

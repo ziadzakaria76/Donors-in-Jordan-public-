@@ -656,7 +656,7 @@ PAGES.push({
 /* ------------------------------------------------------------------ write */
 
 for (const page of PAGES) {
-  const scripts = ["data.js", "i18n.js", "app.js", ...page.scripts]
+  const scripts = ["img-manifest.js", "data.js", "i18n.js", "app.js", ...page.scripts]
     .map((s) => `<script src="assets/js/${s}"></script>`).join("\n");
   const html = `<!doctype html>
 <html lang="ar" dir="rtl">

@@ -306,13 +306,25 @@ are photographs and 3D studies of the three schemes; `plan-a` … `plan-i` are t
 architect's drawings for each unit model.
 
 To add more, drop files into `assets/img/` named `<name>-480.webp`,
-`<name>-800.webp`, `<name>-1280.webp`, `<name>-1920.webp` and reference `<name>`
-from `data.js` (`image:` and `gallery:`). The markup builds the `srcset` from
-those widths automatically. Floor plans need only `-800` and `-1280`.
+`<name>-800.webp`, `<name>-1280.webp`, `<name>-1920.webp`, reference `<name>`
+from `data.js` (`image:` and `gallery:`), then run:
 
-`sherman2-interior-2`, `-4` and `-6` are in the folder but not placed on any
-page — they are real brochure photographs held back from the gallery, kept so
-they can be dropped into `data.js` later without going back to the PDF.
+```bash
+npm run manifest
+```
+
+That rewrites `assets/js/img-manifest.js`, which records **which widths actually
+exist for each image**, so `picture()` offers the browser a `srcset` it can
+fetch. Not every photograph has all four: most of the brochure interiors are
+480 px at source, and before the manifest existed the pages asked for
+`sherman2-interior-1-1280.webp` and got a 404 — twenty-eight of them, on exactly
+the wide viewports where the browser reaches for the largest file. **Re-run
+`npm run manifest` whenever you add or re-render an image.** A name missing from
+the manifest still renders; it just falls back to offering all four widths.
+
+Fifteen of the photographs carried a burned-in `Galaxy S24 Ultra` camera stamp
+with the date and time. Each was cropped just above the stamp — between 7% and
+15% off the bottom, all of it floor — and re-rendered at every width.
 
 The generated artwork that stood in before the brochure arrived — `gallery-*`,
 `hero-*`, `project-*` and the old `plan-2br`-style drawings, 2.3 MB in all — is
@@ -366,8 +378,9 @@ website/
 │   │                        one stylesheet serves both RTL and LTR
 │   ├── css/fonts.css        Self-hosted IBM Plex Sans Arabic (no external requests)
 │   ├── fonts/               woff2 subsets
-│   ├── img/                 Generated scenes (.svg sources + .webp renders) and plans
+│   ├── img/                 Photographs (.webp at several widths) and floor plans
 │   └── js/
+│       ├── img-manifest.js   Generated — which widths exist per image
 │       ├── data.js          ← all content lives here
 │       ├── i18n.js          ← all interface strings live here
 │       ├── app.js           Header, language switch, modals, lightbox, forms, cards
