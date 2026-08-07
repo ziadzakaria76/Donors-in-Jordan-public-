@@ -1,0 +1,68 @@
+name: Deploy site to GitHub Pages
+
+# The repository root is the site root, so every push to main republishes it.
+# `workflow_dispatch` is here so the site can be redeployed by hand without an
+# empty commit -- useful when a deployment needs re-running rather than rebuilding.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write        # also lets configure-pages turn Pages on the first time
+  id-token: write     # deploy-pages authenticates to Pages with an OIDC token
+
+# Queue deployments rather than cancelling them: a cancelled run can leave the
+# live site on an older commit than the newest green one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage the site
+        # The root holds the site, but it also holds the tender monitor and the
+        # CI workflows. Only the site belongs on a public web server, so copy
+        # rather than publishing the repository wholesale.
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          # Only non-hidden entries are copied, which drops .git, .github and
+          # .gitignore without naming them. The site needs no dotfiles: the
+          # Actions deploy path serves the artifact as-is and never runs Jekyll,
+          # so there is nothing for a .nojekyll to suppress.
+          for entry in *; do
+            case "$entry" in
+              _site|jordan_tender_monitor) continue ;;
+            esac
+            cp -a "$entry" _site/
+          done
+          # Fail loudly here rather than deploying an empty or half-copied site.
+          test -f _site/index.html
+          test -d _site/assets/css
+          test -d _site/assets/js
+          test ! -e _site/jordan_tender_monitor
+          echo "staged $(find _site -type f | wc -l) files"
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
