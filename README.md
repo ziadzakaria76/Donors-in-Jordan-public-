@@ -65,14 +65,22 @@ and `COMPANY.domain` in `assets/js/data.js` to match.
 
 ## What to replace before going live
 
-Everything below is invented placeholder content. Search for `«REPLACE»` in
-`assets/js/data.js` to find each one.
+Two things are still unfinished. Neither is false — the invented content has
+been removed rather than left in place — so nothing here is published as a
+claim the company has not made. Search for `«REPLACE»` in `assets/js/data.js`.
 
-- **Company identity** — tagline, founding year, commercial registration. The
-  name and logo are real; everything around them is not.
-- **Founding year and registration** — `COMPANY.founded` is `null` and no page
-  states a founding year, because the one here was invented. `registration` is
-  likewise a placeholder and is not rendered anywhere yet.
+- **Founding year** — `COMPANY.founded` is `null` and no page states a year,
+  because the one that was here was invented. Set it and the About page can
+  state it.
+- **Form endpoint** — `COMPANY.formEndpoint` is empty, so enquiries go to
+  WhatsApp with an email fallback. See *Where the form submissions go* below.
+
+The **commercial registration is gone**, not blank: an invented registration
+number is a claim about a real company's legal standing, so it was deleted
+rather than left for someone to render by accident. Add the real one to
+`COMPANY` and write it into the footer deliberately.
+
+- **Company identity** — the name and logo are real, and are no longer marked.
 - **Contact details** — the phone, WhatsApp number and email are real. The
   **office address is deliberately blank**: `COMPANY.address` and `mapQuery`
   are empty, so the footer's address line, the contact page's office row and
