@@ -21,8 +21,10 @@ const COMPANY = {
   whatsapp: "962790730903",           // same mobile as `phone` — change if WhatsApp is on another line
   email: "Mohammed.Zakaria90@hotmail.com",
   salesEmail: "Mohammed.Zakaria90@hotmail.com",   // one address for both for now
-  domain: "https://www.generalsherman.jo",// «REPLACE» — no domain registered yet;
-                                      // this feeds canonical/og:url and the sitemap
+  domain: "https://generalshermanhousing.com",
+                                      // this feeds canonical/og:url and the sitemap.
+                                      // Kept in step with SITE in tools/build-pages.mjs
+                                      // and with the CNAME file GitHub Pages reads.
   /* Deliberately blank. The footer's address line, the contact page's office
      row and the office map are all removed while these are empty; fill either
      one in and restore the markup (README → "Removed sections") to bring the

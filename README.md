@@ -54,10 +54,12 @@ The site is a folder of static files. The repo root is the site root.
 | **cPanel / any shared host** | Upload the contents of the repo into `public_html/` over FTP. Nothing else to configure. |
 | **GitHub Pages** | Push, then set Pages to serve from the branch root (`/`). |
 
-After deploying, replace `https://www.generalsherman.jo` with the real domain in:
-`sitemap.xml`, `robots.txt`, and the `<link rel="canonical">` / `og:url` /
-`hreflang` tags in each page's `<head>` (or in `tools/build-pages.mjs`, then
-re-run `npm run pages`).
+The canonical domain is `https://generalshermanhousing.com`. It appears in
+`sitemap.xml`, `robots.txt`, the `CNAME` file that tells GitHub Pages which
+domain to serve, and the `<link rel="canonical">` / `og:url` / `hreflang` tags
+in each page's `<head>`. To change it, edit `SITE` in `tools/build-pages.mjs`
+and re-run `npm run pages`, then update `CNAME`, `sitemap.xml`, `robots.txt`
+and `COMPANY.domain` in `assets/js/data.js` to match.
 
 ---
 
