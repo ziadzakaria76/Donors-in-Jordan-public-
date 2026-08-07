@@ -20,8 +20,8 @@ only thing CI runs.
 
 A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential
 developer: project showcases, a live unit inventory with filters, a per-building
-availability grid, floor plans, payment plans with an instalment calculator, a
-gallery, and lead capture through WhatsApp, phone and forms.
+availability grid, floor plans, a gallery, and lead capture through WhatsApp,
+phone and forms.
 
 Plain HTML, CSS and JavaScript. **No build step, no framework, no runtime
 dependencies.** Every file in this folder is the file that gets deployed.
@@ -152,11 +152,20 @@ change its twin in `i18n.js`.**
 
 ## Removed sections
 
-Five things were cut rather than filled, because they were invented or do not
+Six things were cut rather than filled, because they were invented or do not
 exist: the **stats band**, the **testimonials**, the About page's **company
-story**, the **office address**, and the **social links**. No page claims a
-track record, a founding year, a location beyond Amman, or an account the
-company does not have.
+story**, the **office address**, the **social links**, and the **payment
+plans**. No page claims a track record, a founding year, a location beyond
+Amman, an account the company does not have, or terms on which it will sell.
+
+The payment plans went furthest and were removed most thoroughly. The whole
+`payment-plans.html` page, its instalment calculator and `assets/js/plans.js`
+are gone, along with the `PAYMENT_PLANS` data, the per-project plans section,
+the navigation entry on every page, the sitemap entry, and the home page's
+"from 10% down, with interest-free instalments" band. Nothing states a
+discount, an instalment count or an interest rate. Restoring it means writing
+the real terms first — the page was not left behind as a shell to fill in,
+because a half-restored financing page is the failure mode that matters here.
 
 The site is built to tolerate absent data generally — a project with no unit
 schedule, a unit with no price, a scheme with no map — so sections remove
@@ -283,7 +292,6 @@ SEO tags.
 ├── projects.html            Project index with status tabs
 ├── project.html             Project detail (?id=sherman-1) — grid, plans, map, gallery
 ├── units.html               Full inventory with filters, sorting and shareable URLs
-├── payment-plans.html       The three payment plans + instalment calculator
 ├── gallery.html             Filterable gallery with lightbox
 ├── about.html               Company story, commitments, process, testimonials
 ├── contact.html             Contact form, direct channels, map, FAQ
@@ -301,7 +309,6 @@ SEO tags.
 │       ├── pages.js         Home, project index, gallery, contact page modules
 │       ├── units.js         Inventory filtering, sorting, URL state
 │       ├── project.js       Project detail page
-│       └── plans.js         Payment plans and the calculator
 ├── tools/                   Optional generators (images, page scaffolding)
 ├── netlify.toml, vercel.json, robots.txt, sitemap.xml
 │

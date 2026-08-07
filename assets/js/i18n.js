@@ -49,12 +49,6 @@ const T = {
   "home.processTitle": { ar: "من الزيارة الأولى إلى تسليم المفتاح", en: "From the first visit to the handover of keys" },
   "home.quotesEyebrow": { ar: "آراء الملّاك", en: "Owners" },
   "home.quotesTitle": { ar: "ما يقوله من سكن معنا", en: "What the people who live there say" },
-  "home.ctaTitle": { ar: "خطط دفع تبدأ بـ ١٠٪ وأقساط بدون فوائد", en: "Payment plans from 10% down, with interest-free instalments" },
-  "home.ctaBody": {
-    ar: "احسب قسطك الشهري على أي وحدة متاحة خلال ثوانٍ، أو اطلب من فريق المبيعات دراسة مخصصة لوضعك.",
-    en: "Work out the monthly instalment on any available unit in seconds, or ask our sales team for a plan built around your situation.",
-  },
-  "home.ctaBtn": { ar: "حاسبة الأقساط", en: "Instalment calculator" },
 
   /* footer */
   "footer.about": {
@@ -75,7 +69,6 @@ const T = {
   "nav.about": { ar: "عن الشركة", en: "About" },
   "nav.projects": { ar: "مشاريعنا", en: "Projects" },
   "nav.units": { ar: "الوحدات المتاحة", en: "Available units" },
-  "nav.plans": { ar: "خطط الدفع", en: "Payment plans" },
   "nav.gallery": { ar: "معرض الصور", en: "Gallery" },
   "nav.contact": { ar: "اتصل بنا", en: "Contact" },
   "nav.menu": { ar: "القائمة", en: "Menu" },
@@ -176,24 +169,6 @@ const T = {
   "grid.line": { ar: "الخط", en: "Line" },
 
   /* calculator */
-  "calc.title": { ar: "حاسبة الأقساط", en: "Instalment calculator" },
-  "calc.price": { ar: "سعر الوحدة (دينار)", en: "Unit price (JOD)" },
-  "calc.down": { ar: "الدفعة الأولى", en: "Down payment" },
-  "calc.years": { ar: "مدة التقسيط (سنوات)", en: "Instalment period (years)" },
-  "calc.rate": { ar: "الفائدة السنوية للبنك", en: "Annual bank interest" },
-  "calc.plan": { ar: "خطة الدفع", en: "Payment plan" },
-  "calc.monthly": { ar: "القسط الشهري التقريبي", en: "Estimated monthly instalment" },
-  "calc.downAmount": { ar: "الدفعة الأولى", en: "Down payment" },
-  "calc.financed": { ar: "المبلغ المقسّط", en: "Amount financed" },
-  "calc.total": { ar: "إجمالي المدفوع", en: "Total paid" },
-  "calc.interest": { ar: "إجمالي الفوائد", en: "Total interest" },
-  "calc.months": { ar: "عدد الأقساط", en: "Number of instalments" },
-  "calc.pickUnit": { ar: "اختر وحدة لتعبئة السعر", en: "Pick a unit to fill in the price" },
-  "calc.custom": { ar: "سعر مخصص", en: "Custom price" },
-  "calc.disclaimer": {
-    ar: "الأرقام تقديرية لغرض التخطيط فقط ولا تمثّل عرضاً ملزماً. تُحتسب أقساط الشركة بدون فوائد، بينما يعتمد التمويل البنكي على سعر الفائدة الذي يحدده البنك.",
-    en: "These figures are estimates for planning only and are not a binding offer. Company instalments carry no interest; bank financing depends on the rate your bank sets.",
-  },
 
   /* forms */
   "form.name": { ar: "الاسم الكامل", en: "Full name" },
@@ -260,8 +235,6 @@ const T = {
     en: "Indicative drawings, approximately to scale. Final areas are stated in the contract.",
   },
   "project.legend": { ar: "دليل الغرف", en: "Room key" },
-  "project.paymentTitle": { ar: "خطط الدفع المتاحة لهذا المشروع", en: "Payment plans available here" },
-  "project.calcLink": { ar: "احسب قسطك الشهري", en: "Work out your monthly instalment" },
   "project.mapTitle": { ar: "أين يقع المشروع", en: "Where the project is" },
   "project.openMap": { ar: "افتح في خرائط جوجل", en: "Open in Google Maps" },
   "project.galleryTitle": { ar: "صور المشروع", en: "Project images" },
@@ -280,45 +253,6 @@ const T = {
     en: "Prices are in Jordanian dinars and include the parking bay and store. Registration fees are excluded unless your payment plan says otherwise.",
   },
 
-  /* payment plans page */
-  "plans.eyebrow": { ar: "الدفع والتمويل", en: "Payment and financing" },
-  "plans.title": { ar: "ثلاث طرق لتملّك وحدتك", en: "Three ways to own your home" },
-  "plans.lead": {
-    ar: "اختر الخطة التي تناسب سيولتك، لا التي تناسبنا. جميع الأقساط الداخلية بدون فوائد أو رسوم إدارية.",
-    en: "Choose the plan that fits your cash flow, not ours. Every in-house instalment is free of interest and administrative fees.",
-  },
-  "plans.calcTitle": { ar: "كم سيكون قسطك الشهري؟", en: "What would your monthly instalment be?" },
-  "plans.calcLead": {
-    ar: "اختر وحدة من مخزوننا أو أدخل أي سعر، ثم عدّل الدفعة الأولى والمدة.",
-    en: "Pick a unit from our inventory or type any price, then adjust the down payment and the term.",
-  },
-  "plans.modeCompany": { ar: "أقساط الشركة — بدون فوائد", en: "Company instalments — interest-free" },
-  "plans.modeCompanyNote": { ar: "حتى ٥ سنوات، بدون فوائد أو رسوم إدارية.", en: "Up to 5 years, with no interest and no admin fees." },
-  "plans.modeBank": { ar: "تمويل بنكي", en: "Bank financing" },
-  "plans.modeBankNote": { ar: "حتى ٢٥ سنة عبر البنوك الشريكة، بفائدة يحددها البنك.", en: "Up to 25 years through partner banks, at the bank's rate." },
-  "plans.talkBtn": { ar: "تحدّث مع فريق المبيعات", en: "Talk to the sales team" },
-  "plans.faqEyebrow": { ar: "أسئلة شائعة", en: "Common questions" },
-  "plans.faqTitle": { ar: "أسئلة عن الدفع والتملّك", en: "Questions about paying and owning" },
-  "plans.q1": { ar: "هل يمكن تغيير خطة الدفع بعد التوقيع؟", en: "Can the payment plan change after signing?" },
-  "plans.a1": {
-    ar: "نعم، يمكن الانتقال من خطة إلى أخرى قبل التسليم بموافقة الطرفين وبإعادة جدولة مكتوبة تُلحق بالعقد. الانتقال إلى التمويل البنكي شائع عند اقتراب موعد التسليم.",
-    en: "Yes. You can move between plans before handover, by mutual agreement and a written rescheduling annexed to the contract. Switching to bank financing as handover approaches is common.",
-  },
-  "plans.q2": { ar: "ماذا يحدث إذا تأخرت عن قسط؟", en: "What happens if I miss an instalment?" },
-  "plans.a2": {
-    ar: "هناك مهلة سماح ثلاثين يوماً بدون أي غرامة. بعدها نتواصل معك لإعادة الجدولة قبل اتخاذ أي إجراء تعاقدي — فسخ العقد هو الخيار الأخير لا الأول.",
-    en: "There is a 30-day grace period with no penalty. After that we contact you to reschedule before any contractual step is taken — cancelling the contract is the last resort, not the first.",
-  },
-  "plans.q3": { ar: "هل يمكن السداد المبكر؟", en: "Can I settle early?" },
-  "plans.a3": {
-    ar: "نعم، ودون أي رسوم على أقساط الشركة. أما في التمويل البنكي فتطبَّق شروط البنك المتعلقة بالسداد المبكر.",
-    en: "Yes, with no fee on company instalments. With bank financing, the bank's own early-settlement terms apply.",
-  },
-  "plans.q4": { ar: "ما هي الرسوم الحكومية المتوقعة؟", en: "What government fees should I expect?" },
-  "plans.a4": {
-    ar: "رسوم التسجيل في دائرة الأراضي والمساحة تُحتسب كنسبة من قيمة العقد وتخضع للتشريعات النافذة وقت التسجيل. نوضح لك الرقم التقديري كتابةً قبل التوقيع، وخطة الحجز المبكر تشملها.",
-    en: "Department of Lands and Survey registration fees are a percentage of the contract value, set by the legislation in force at the time. We put the estimate in writing before you sign, and the early reservation plan covers them.",
-  },
 
   /* gallery */
   "gallery.eyebrow": { ar: "المعرض", en: "Gallery" },

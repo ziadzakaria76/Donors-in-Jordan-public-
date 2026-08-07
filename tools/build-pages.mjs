@@ -232,19 +232,6 @@ PAGES.push({
     </div>
   </section>
 
-  <section class="section section--stone">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="nav.plans">خطط الدفع</p>
-        <h2 data-i18n="project.paymentTitle">خطط الدفع المتاحة لهذا المشروع</h2>
-      </div>
-      <div class="grid grid--3" id="p-payment"></div>
-      <p style="margin-block-start:2.5rem">
-        <a class="link-arrow" href="payment-plans.html"><span data-i18n="project.calcLink">احسب قسطك الشهري</span> <span data-icon="arrow" class="icon icon--dir"></span></a>
-      </p>
-    </div>
-  </section>
-
   <section class="section section--paper" id="p-nearby-section">
     <div class="wrap">
       <div class="section-head">
@@ -335,119 +322,6 @@ ${pageHero({
       <div class="grid grid--3" id="unit-grid" style="margin-block-start:2.5rem"></div>
 
       <p class="form-note" style="margin-block-start:2.5rem" data-i18n="units.note">الأسعار بالدينار الأردني وتشمل موقف السيارة والمستودع، ولا تشمل رسوم التسجيل ما لم يُذكر خلاف ذلك في خطة الدفع.</p>
-    </div>
-  </section>`,
-});
-
-/* --------------------------------------------------------- payment plans */
-
-PAGES.push({
-  file: "payment-plans.html",
-  title: "خطط الدفع وحاسبة الأقساط — شركة جنرال شيرمان للإسكان",
-  desc: "ثلاث خطط دفع: الحجز المبكر بخصم ٣٪، التسليم المريح بأقساط شهرية بدون فوائد، والتمويل البنكي حتى ٢٥ سنة. احسب قسطك الشهري على أي وحدة متاحة.",
-  keywords: "خطط دفع شقق الأردن, تقسيط شقق عمان, حاسبة قرض سكني الأردن",
-  scripts: ["pages.js", "plans.js"],
-  modals: [],
-  main: `
-${pageHero({
-    image: "sherman2-exterior-day",
-    crumb: '<span data-i18n="nav.plans">خطط الدفع</span>',
-    eyebrow: '<span data-i18n="plans.eyebrow">الدفع والتمويل</span>',
-    title: '<span data-i18n="plans.title">ثلاث طرق لتملّك وحدتك</span>',
-    lead: '<span data-i18n="plans.lead">اختر الخطة التي تناسب سيولتك، لا التي تناسبنا. جميع الأقساط الداخلية بدون فوائد أو رسوم إدارية.</span>',
-  })}
-
-  <section class="section">
-    <div class="wrap">
-      <h2 class="sr-only" data-i18n="nav.plans">خطط الدفع</h2>
-      <div class="grid grid--3" id="plan-cards"></div>
-    </div>
-  </section>
-
-  <section class="section section--stone" id="calculator">
-    <div class="wrap">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="calc.title">حاسبة الأقساط</p>
-        <h2 data-i18n="plans.calcTitle">كم سيكون قسطك الشهري؟</h2>
-        <p class="lead" data-i18n="plans.calcLead">اختر وحدة من مخزوننا أو أدخل أي سعر، ثم عدّل الدفعة الأولى والمدة.</p>
-      </div>
-
-      <div class="calc">
-        <div class="calc__panel">
-          <div class="field" style="margin-block-end:1.5rem">
-            <label for="c-unit" data-i18n="calc.pickUnit">اختر وحدة لتعبئة السعر</label>
-            <select id="c-unit"></select>
-          </div>
-          <div class="field" style="margin-block-end:1.5rem">
-            <label for="c-price" data-i18n="calc.price">سعر الوحدة (دينار)</label>
-            <input id="c-price" type="number" min="20000" step="1000" inputmode="numeric">
-          </div>
-
-          <fieldset style="border:0;padding:0;margin:0 0 1.5rem">
-            <legend class="field" style="padding:0"><span data-i18n="calc.plan">خطة الدفع</span></legend>
-            <div class="plan-radios">
-              <label class="plan-radio">
-                <input type="radio" name="c-mode" value="company" checked>
-                <span><strong data-i18n="plans.modeCompany">أقساط الشركة — بدون فوائد</strong>
-                <span data-i18n="plans.modeCompanyNote">حتى ٥ سنوات، بدون فوائد أو رسوم إدارية.</span></span>
-              </label>
-              <label class="plan-radio">
-                <input type="radio" name="c-mode" value="bank">
-                <span><strong data-i18n="plans.modeBank">تمويل بنكي</strong>
-                <span data-i18n="plans.modeBankNote">حتى ٢٥ سنة عبر البنوك الشريكة، بفائدة يحددها البنك.</span></span>
-              </label>
-            </div>
-          </fieldset>
-
-          <div class="field" style="margin-block-end:1.5rem">
-            <div class="range-row"><label for="c-down" data-i18n="calc.down">الدفعة الأولى</label><output id="c-down-out">25%</output></div>
-            <input id="c-down" type="range" min="10" max="60" step="5">
-          </div>
-          <div class="field" style="margin-block-end:1.5rem">
-            <div class="range-row"><label for="c-years" data-i18n="calc.years">مدة التقسيط (سنوات)</label><output id="c-years-out">15</output></div>
-            <input id="c-years" type="range" min="1" max="25" step="1">
-          </div>
-          <div class="field" id="c-rate-field">
-            <div class="range-row"><label for="c-rate" data-i18n="calc.rate">الفائدة السنوية للبنك</label><output id="c-rate-out">6.5%</output></div>
-            <input id="c-rate" type="range" min="3" max="10" step="0.25">
-          </div>
-        </div>
-
-        <div class="calc__out">
-          <p class="eyebrow" style="color:var(--brass-2)" data-i18n="calc.monthly">القسط الشهري التقريبي</p>
-          <p class="calc__result num" id="c-monthly"></p>
-          <dl class="calc__rows" id="c-rows"></dl>
-          <p style="font-size:var(--fs-xs);color:#8E9BA1;margin-block-start:1.5rem" data-i18n="calc.disclaimer">الأرقام تقديرية لغرض التخطيط فقط ولا تمثّل عرضاً ملزماً.</p>
-          <a class="btn btn--brass btn--block" style="margin-block-start:1.5rem" href="contact.html" data-i18n="plans.talkBtn">تحدّث مع فريق المبيعات</a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="wrap wrap--narrow">
-      <div class="section-head">
-        <p class="eyebrow" data-i18n="plans.faqEyebrow">أسئلة شائعة</p>
-        <h2 data-i18n="plans.faqTitle">أسئلة عن الدفع والتملّك</h2>
-      </div>
-      <div class="accordion">
-        <details>
-          <summary data-i18n="plans.q1">هل يمكن تغيير خطة الدفع بعد التوقيع؟</summary>
-          <div class="accordion__body" data-i18n="plans.a1">نعم، يمكن الانتقال من خطة إلى أخرى قبل التسليم بموافقة الطرفين وبإعادة جدولة مكتوبة تُلحق بالعقد. الانتقال إلى التمويل البنكي شائع عند اقتراب موعد التسليم.</div>
-        </details>
-        <details>
-          <summary data-i18n="plans.q2">ماذا يحدث إذا تأخرت عن قسط؟</summary>
-          <div class="accordion__body" data-i18n="plans.a2">هناك مهلة سماح ثلاثين يوماً بدون أي غرامة. بعدها نتواصل معك لإعادة الجدولة قبل اتخاذ أي إجراء تعاقدي — فسخ العقد هو الخيار الأخير لا الأول.</div>
-        </details>
-        <details>
-          <summary data-i18n="plans.q3">هل يمكن السداد المبكر؟</summary>
-          <div class="accordion__body" data-i18n="plans.a3">نعم، ودون أي رسوم على أقساط الشركة. أما في التمويل البنكي فتطبَّق شروط البنك المتعلقة بالسداد المبكر.</div>
-        </details>
-        <details>
-          <summary data-i18n="plans.q4">ما هي الرسوم الحكومية المتوقعة؟</summary>
-          <div class="accordion__body" data-i18n="plans.a4">رسوم التسجيل في دائرة الأراضي والمساحة تُحتسب كنسبة من قيمة العقد وتخضع للتشريعات النافذة وقت التسجيل. نوضح لك الرقم التقديري كتابةً قبل التوقيع، وخطة الحجز المبكر تشملها.</div>
-        </details>
-      </div>
     </div>
   </section>`,
 });
