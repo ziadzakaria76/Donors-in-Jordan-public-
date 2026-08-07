@@ -49,9 +49,17 @@ jobs:
           test ! -e _site/jordan_tender_monitor
           echo "staged $(find _site -type f | wc -l) files"
 
+      # One-time manual setup: Settings -> Pages -> Build and deployment ->
+      # Source: "GitHub Actions". Until that is set, this step fails with
+      # "Get Pages site failed. Error: Not Found" and nothing is published.
+      #
+      # This deliberately does NOT pass `enablement: true`. That option asks the
+      # workflow to create the Pages site itself, which it cannot do: GITHUB_TOKEN
+      # is an app installation token, and POST /repos/{owner}/{repo}/pages needs
+      # the repository *administration* permission, which no `permissions:` block
+      # here can grant. It fails with "Resource not accessible by integration",
+      # so the flag only ever appears to work where Pages is already enabled.
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
