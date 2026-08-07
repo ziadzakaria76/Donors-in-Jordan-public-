@@ -1,21 +1,39 @@
+# Netlify configuration. Same policy as _headers (Cloudflare Pages, which is
+# what actually serves the site) and vercel.json — keep the three in step.
+#
+# `publish = "."` is relative to the base directory. Connecting this repo to
+# Netlify means setting the base directory to `website`, since the site lives
+# there and the repository root holds a second, unrelated project.
+
 [build]
   publish = "."
 
+# Fonts are immutable: a woff2 subset is never re-cut under the same name.
 [[headers]]
   for = "/assets/fonts/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# Images are not immutable — the filenames carry no content hash and the images
+# do get re-rendered in place. See _headers for the full reasoning.
 [[headers]]
   for = "/assets/img/*"
   [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+# HTML carries prices, availability and contact details. A stale one is wrong.
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "frame-ancestors 'self'"
+    X-Frame-Options = "SAMEORIGIN"
 
 [[redirects]]
   from = "/*"

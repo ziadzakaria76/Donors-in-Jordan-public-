@@ -44,16 +44,53 @@ The site is a folder of static files. Publish `website/` as the site root.
 
 | Setting | Value |
 | --- | --- |
+| **Production branch** | `main` |
 | Framework preset | **None** |
 | Build command | *(empty)* |
 | Build output directory | `website` |
+| Root directory | `/` (default) |
 
-**Save and Deploy.** Every push to the branch redeploys; pull requests get their
-own preview URL.
+**Save and Deploy.** Every push to `main` redeploys.
+
+**The production branch must be `main`.** The site lived on a feature branch
+while it was being built, and for a while a second copy of it lived at the
+repository root as well. Both are gone: `main` holds the one copy, in
+`website/`. Pointing production at anything else re-creates the problem this
+layout exists to prevent — two copies of one site, diverging quietly.
+
+Consider setting **preview deployments to None** (Settings → Builds &
+deployments). Otherwise every branch is built and published at a public preview
+URL, including work in progress and branches with no `website/` directory at
+all.
+
+A Direct Upload project cannot be converted to a Git-connected one. If the
+project was created by dragging a folder in, make a new project connected to
+Git, check it on its `*.pages.dev` URL, then move the custom domain across and
+delete the old project.
 
 Then **Custom domains → Set up a custom domain**, add `generalshermanhousing.com`
 and `www.generalshermanhousing.com`. Cloudflare writes the DNS itself, since it
 is also the registrar, and issues the certificate.
+
+### Caching, and why images are not cached forever
+
+`_headers` sets three different policies deliberately, and `netlify.toml` and
+`vercel.json` mirror them:
+
+| What | Policy | Why |
+| --- | --- | --- |
+| `assets/fonts/*` | 1 year, `immutable` | a woff2 subset is never re-cut under the same name |
+| `assets/img/*` | 1 week, revalidated | filenames carry no content hash, and images **do** get re-rendered in place |
+| `*.html` | `max-age=0, must-revalidate` | these pages carry prices, availability and contact details |
+| CSS and JS | default (revalidate) | `main.css` and `app.js` are unversioned names |
+
+The image rule is the one that looks wrong and is not. `immutable` would be
+correct if filenames were content-hashed; they are not —
+`sherman2-lobby-1-480.webp` is a stable name for whatever that photograph
+currently is. Twenty-six images were once re-cut in a single commit to crop a
+camera watermark out of them. Under a year-long `immutable` cache, every
+returning visitor would have kept the watermarked version, and there would have
+been no way to reach them.
 
 `_headers` in this folder carries the cache and security headers — it is the
 Pages equivalent of `netlify.toml` and `vercel.json`, and Pages reads it with no

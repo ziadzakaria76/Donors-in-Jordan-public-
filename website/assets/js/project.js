@@ -21,6 +21,26 @@
   const units = UNITS.filter((u) => u.projectId === project.id);
   const available = units.filter((u) => u.status === "available");
 
+  /* ----------------------------------------------------------- <head> tags */
+
+  /* One HTML file serves all three projects, so the canonical, og:url and
+     hreflang tags stamped into project.html name the file without an id. Left
+     alone, all three projects would declare the same canonical — telling search
+     engines they are duplicates of a page that renders nothing. Rewrite them to
+     the URL actually being viewed, which is what sitemap.xml lists. */
+  function setCanonical() {
+    const domain = (window.DATA.COMPANY.domain || "").replace(/\/$/, "");
+    const base = `${domain}/project.html?id=${project.id}`;
+    const set = (sel, attr, value) => {
+      const el = document.head.querySelector(sel);
+      if (el) el.setAttribute(attr, value);
+    };
+    set('link[rel="canonical"]', "href", base);
+    set('meta[property="og:url"]', "content", base);
+    set('link[rel="alternate"][hreflang="ar"]', "href", base);
+    set('link[rel="alternate"][hreflang="en"]', "href", `${base}&lang=en`);
+  }
+
   /* --------------------------------------------------------------- header */
 
   function renderHero() {
@@ -202,7 +222,7 @@
   /* ---------------------------------------------------------------- boot */
 
   function renderAll() {
-    renderHero(); renderAbout(); renderMatrix(); renderUnits(); renderPlans();
+    setCanonical(); renderHero(); renderAbout(); renderMatrix(); renderUnits(); renderPlans();
     renderNearby(); renderMap(); renderGallery(); renderRelated();
     // Deep links from the units page: ?id=…#unit-<id>
     const hash = location.hash.slice(1);
