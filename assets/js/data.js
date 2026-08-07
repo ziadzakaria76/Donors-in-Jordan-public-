@@ -2,14 +2,17 @@
    SITE CONTENT — this is the only file you need to edit to change what the
    site says or sells. Every text field is an object: { ar: "…", en: "…" }.
 
-   PLACEHOLDER CONTENT: the company, its projects, the people quoted and all
-   contact details below are invented for this build. Replace anything marked
-   «REPLACE» before going live.
+   WHAT IS REAL HERE: the company name and logo, the phone, WhatsApp and email,
+   and the projects and their unit schedules, which come from the sales
+   brochure. The invented content that this file once carried — the payment
+   plans, the track-record figures, the testimonials, the founding year and the
+   commercial registration — has been removed rather than left to be published
+   by accident. Anything still marked «REPLACE» is unfinished, not false.
    ========================================================================== */
 
 const COMPANY = {
-  name: { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },   // «REPLACE»
-  short: { ar: "جنرال شيرمان", en: "General Sherman" },                              // «REPLACE»
+  name: { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },
+  short: { ar: "جنرال شيرمان", en: "General Sherman" },
   tagline: { ar: "نبني مستقبلك", en: "We build your future" },
   founded: null,                      // «REPLACE» — unverified, so no page states one
   intro: {
@@ -39,10 +42,11 @@ const COMPANY = {
      with an email fallback — no backend required. Paste a Formspree/Web3Forms
      endpoint here and the forms POST to it instead. */
   formEndpoint: "",                   // «REPLACE» e.g. "https://formspree.io/f/xxxxxxx"
-  registration: {                     // «REPLACE»
-    ar: "سجل تجاري رقم ٢٠٠٩/‏٤٤١٧٢ — نقابة المقاولين الأردنيين",
-    en: "Commercial registration 44172/2009 — Jordanian Construction Contractors Association",
-  },
+  /* No commercial registration. The number that sat here was invented, and an
+     invented registration number is a claim about a real company's legal
+     standing, so it is gone rather than left for someone to render by
+     accident. Add the real one here when it is to hand, and write it into the
+     footer deliberately — nothing reads this field today. */
   /* No social accounts yet. When there are, add them here and restore the
      .socials list in the footer (README → "Removed sections"). */
   social: [],
