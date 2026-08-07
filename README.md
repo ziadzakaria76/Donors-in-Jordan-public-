@@ -52,14 +52,25 @@ The site is a folder of static files. The repo root is the site root.
 | **Netlify** | Drag the repo folder onto the Netlify dashboard, or connect the repo and set **publish directory** `.`, and leave the build command empty. `netlify.toml` already sets caching and the 404 page. |
 | **Vercel** | Import the repo, framework preset **Other**, no build command, no root-directory override. `vercel.json` sets the caching headers. |
 | **cPanel / any shared host** | Upload the contents of the repo into `public_html/` over FTP. Nothing else to configure. |
-| **GitHub Pages** | Push, then set Pages to serve from the branch root (`/`). |
+| **GitHub Pages** | Serve from the branch root (`/`). Note the caveat below before turning this on. |
 
-The canonical domain is `https://generalshermanhousing.com`. It appears in
-`sitemap.xml`, `robots.txt`, the `CNAME` file that tells GitHub Pages which
-domain to serve, and the `<link rel="canonical">` / `og:url` / `hreflang` tags
-in each page's `<head>`. To change it, edit `SITE` in `tools/build-pages.mjs`
-and re-run `npm run pages`, then update `CNAME`, `sitemap.xml`, `robots.txt`
-and `COMPANY.domain` in `assets/js/data.js` to match.
+**This copy is not the deployed site.** `generalshermanhousing.com` is served
+from the `website/` folder on the `claude/real-estate-developer-site-efetxa`
+branch, through Cloudflare Pages. The copy here is a root-layout variant and
+the two have diverged.
+
+That is why this repository no longer publishes to GitHub Pages: it was putting
+a second, competing copy of the same site on the public internet, with a
+`CNAME` claiming the live domain. The deploy workflow and the `CNAME` file are
+both gone. Turning Pages back on would recreate that conflict — reconcile the
+two copies first.
+
+The canonical domain is still `https://generalshermanhousing.com`, and it
+appears here in `sitemap.xml`, `robots.txt`, and the `<link rel="canonical">` /
+`og:url` / `hreflang` tags in each page's `<head>`. To change it, edit `SITE`
+in `tools/build-pages.mjs` and re-run `npm run pages`, then update
+`sitemap.xml`, `robots.txt` and `COMPANY.domain` in `assets/js/data.js` to
+match.
 
 ---
 
