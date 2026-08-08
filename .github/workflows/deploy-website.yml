@@ -79,12 +79,42 @@ jobs:
         run: node tools/check-content.mjs
         working-directory: website
 
+      # --branch decides production vs preview, and getting it wrong is the
+      # quiet failure this whole workflow exists to end: a preview deployment
+      # succeeds, goes green, prints a URL, and leaves the custom domain on the
+      # old build. It must match the project's production branch exactly
+      # (Pages project -> Settings -> Production branch). Override it with the
+      # CLOUDFLARE_PAGES_PRODUCTION_BRANCH variable if that is not "main".
       - name: Deploy to Cloudflare Pages
+        id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
         run: |
           npx --yes wrangler@4 pages deploy website \
             --project-name="${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
-            --branch=main \
-            --commit-dirty=true
+            --branch="$BRANCH" \
+            --commit-dirty=true | tee deploy.log
+
+      # A green run is not proof the live site changed. Say so, and say how to
+      # tell, rather than letting a preview deployment look like a success.
+      - name: Report what to check
+        if: always()
+        env:
+          BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          {
+            printf '### Deployed `website/` to Pages project `%s`\n\n' "$PROJECT"
+            printf 'Deployment branch: `%s`\n\n' "$BRANCH"
+            printf 'This only reaches the custom domain if that matches the project'"'"'s\n'
+            printf '**production branch** (Pages project -> Settings). If it does not, this\n'
+            printf 'was a *preview* deployment: green, with a URL, and the live site\n'
+            printf 'unchanged.\n\n'
+            if [ -f deploy.log ]; then
+              printf '```\n'
+              grep -iE 'deployment complete|take a peek|uploaded|https://' deploy.log | tail -20 || true
+              printf '```\n'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
