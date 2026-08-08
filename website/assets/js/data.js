@@ -46,15 +46,18 @@ const COMPANY = {
      See README → "Where the form submissions go". */
   formEndpoint: "https://api.web3forms.com/submit",
   /* Extra fields the service needs in the body. The key is public by design —
-     it names an inbox, it does not open one — so it belongs in this file
-     rather than in a secret a static host has no way to read.
+     Web3Forms says so on the page that issues it: it names an inbox, it does
+     not open one. So it belongs here rather than in a secret a static host has
+     no way to read, and anything the browser must send is visible anyway.
 
-     While it is blank the capture counts as switched off rather than broken.
-     Submitting would otherwise POST to a real URL, be rejected for the missing
-     key, and log the rejection where nobody would ever look — which is
-     indistinguishable from working. Every form still hands the enquiry to
-     WhatsApp in the meantime, exactly as it does today. */
-  formFields: { access_key: "" },     // «REPLACE» — https://web3forms.com, enter the inbox address, the key is emailed back
+     Enquiries currently land in ziadzakaria76@gmail.com, the account that
+     created the form. Change the recipient in the Web3Forms dashboard, not
+     here — the key stays the same.
+
+     Emptying this switches capture off rather than breaking it: captureReady()
+     skips the POST entirely, and every form still hands the enquiry to
+     WhatsApp exactly as before. */
+  formFields: { access_key: "a61a7c6f-aa6d-4331-bf95-13be4bff8290" },
   /* No commercial registration. The number that sat here was invented, and an
      invented registration number is a claim about a real company's legal
      standing, so it is gone rather than left for someone to render by
