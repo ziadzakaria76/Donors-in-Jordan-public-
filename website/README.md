@@ -130,6 +130,30 @@ prices. They do not: every price, unit and phone number is in
 whatever a host happens to default to is leaving the price list to a platform
 default — so it is stated, not assumed.
 
+### Versioned asset URLs
+
+`must-revalidate` asks politely, and asking was not enough: the General Sherman
+3 schedule went live and the site kept showing "coming soon" with no units,
+because a browser was still using a `data.js` it had kept from before.
+
+So the deploy runs [`tools/stamp-assets.mjs`](tools/stamp-assets.mjs), which
+rewrites every CSS and JS reference with a hash of that file's contents:
+
+```html
+<script src="assets/js/data.js?v=f164527e"></script>
+```
+
+`data.js?v=f164527e` is simply a different URL from `data.js?v=1b7e0d33`, so no
+cache anywhere can answer one with the other. The HTML naming them is never
+cached hard, so a new hash reaches visitors on their next page load.
+
+**It runs in CI, not in the repository.** A committed stamp goes stale the
+moment someone edits `data.js` and forgets to re-run it — the same bug with an
+extra step. The deploy workflow stamps its own disposable checkout, so the files
+here keep plain URLs and stay openable. `npm run stamp` does it locally if you
+want to see the output; it is idempotent, and `git checkout -- '*.html'` undoes
+it.
+
 The image rule is the one that looks wrong and is not. `immutable` would be
 correct if filenames were content-hashed; they are not —
 `sherman2-lobby-1-480.webp` is a stable name for whatever that photograph

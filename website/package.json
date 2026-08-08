@@ -8,7 +8,8 @@
     "check": "node tools/check-content.mjs",
     "assets": "node tools/generate-assets.mjs",
     "manifest": "node tools/img-manifest.mjs",
-    "pages": "node tools/build-pages.mjs"
+    "pages": "node tools/build-pages.mjs",
+    "stamp": "node tools/stamp-assets.mjs"
   },
   "devDependencies": {
     "sharp": "^0.34.0"
