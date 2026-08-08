@@ -471,8 +471,13 @@ function unitCard(unit) {
   const { PROJECTS, UNIT_TYPES, ORIENTATIONS } = window.DATA;
   const project = PROJECTS.find((p) => p.id === unit.projectId);
   const sold = unit.status !== "available" || !unit.price;
+  /* The id is the other half of the `#unit-…` link below: a card on units.html
+     points at the same unit's card on its project page, and without the id
+     here that link arrives at the top of the page with nothing to say which
+     unit was clicked. A unit is only ever rendered once per page, so the id
+     stays unique. */
   return `
-  <article class="card reveal">
+  <article class="card reveal" id="unit-${unit.id}">
     <a class="card__media" href="${BASE}project.html?id=${project.id}#unit-${unit.id}" aria-label="${esc(tx(project.name))} ${unit.code}">
       ${picture(unitImage(unit), `${tx(project.name)} — ${tx(UNIT_TYPES[unit.type])}`, { sizes: "(max-width: 700px) 92vw, (max-width: 1100px) 45vw, 380px" })}
       <span class="badge badge--${unit.status} badge--on-media">${t(`status.${unit.status}`)}</span>

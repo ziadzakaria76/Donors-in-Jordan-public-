@@ -158,6 +158,7 @@
       "sherman1-3": { ar: "جنرال شيرمان ١ — الواجهة", en: "General Sherman 1 — elevation" },
       "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع", en: "General Sherman 3 — the scheme's design" },
       "sherman3-2": { ar: "جنرال شيرمان ٣ — تصميم الواجهة", en: "General Sherman 3 — elevation design" },
+      "sherman3-3": { ar: "جنرال شيرمان ٣ — المدخل والإنارة ليلاً", en: "General Sherman 3 — the entrance and its lighting at night" },
       "sherman3-4": { ar: "جنرال شيرمان ٣ — المشروع ليلاً", en: "General Sherman 3 — the scheme at night" },
     };
 
