@@ -180,7 +180,6 @@ const T = {
   "form.preferred": { ar: "طريقة التواصل المفضّلة", en: "Preferred contact method" },
   "form.optional": { ar: "اختياري", en: "optional" },
   "form.send": { ar: "إرسال الطلب", en: "Send enquiry" },
-  "form.sending": { ar: "جارٍ الإرسال…", en: "Sending…" },
   "form.consent": {
     ar: "أوافق على أن تتواصل معي جنرال شيرمان بخصوص هذا الطلب.",
     en: "I agree to be contacted by General Sherman about this enquiry.",
@@ -194,10 +193,6 @@ const T = {
   "form.okWhatsapp": {
     ar: "فتحنا محادثة واتساب بتفاصيل طلبك — أرسلها لنا وسيتواصل معك فريق المبيعات خلال يوم عمل واحد.",
     en: "We have opened a WhatsApp chat with your details — send it and our sales team will reply within one working day.",
-  },
-  "form.okPosted": {
-    ar: "شكراً لك. وصلنا طلبك وسيتواصل معك فريق المبيعات خلال يوم عمل واحد.",
-    en: "Thank you. We have your enquiry and our sales team will be in touch within one working day.",
   },
   "form.errSend": {
     ar: "تعذّر إرسال الطلب. يمكنك مراسلتنا على واتساب أو الاتصال بنا مباشرةً.",
