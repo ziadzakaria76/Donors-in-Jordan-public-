@@ -39,10 +39,22 @@ const COMPANY = {
     en: "Saturday – Thursday, 9:00 – 18:00",
   },
   mapQuery: "",
-  /* Where forms go. Leave empty and every form hands the enquiry to WhatsApp
-     with an email fallback — no backend required. Paste a Formspree/Web3Forms
-     endpoint here and the forms POST to it instead. */
-  formEndpoint: "",                   // «REPLACE» e.g. "https://formspree.io/f/xxxxxxx"
+  /* Where a copy of each enquiry is recorded. WhatsApp is the delivery and
+     always runs; this is the record, and runs as well once it is configured.
+     Web3Forms is the chosen service: one fixed URL for everybody, with the
+     destination inbox named by the access_key below.
+     See README → "Where the form submissions go". */
+  formEndpoint: "https://api.web3forms.com/submit",
+  /* Extra fields the service needs in the body. The key is public by design —
+     it names an inbox, it does not open one — so it belongs in this file
+     rather than in a secret a static host has no way to read.
+
+     While it is blank the capture counts as switched off rather than broken.
+     Submitting would otherwise POST to a real URL, be rejected for the missing
+     key, and log the rejection where nobody would ever look — which is
+     indistinguishable from working. Every form still hands the enquiry to
+     WhatsApp in the meantime, exactly as it does today. */
+  formFields: { access_key: "" },     // «REPLACE» — https://web3forms.com, enter the inbox address, the key is emailed back
   /* No commercial registration. The number that sat here was invented, and an
      invented registration number is a claim about a real company's legal
      standing, so it is gone rather than left for someone to render by

@@ -42,3 +42,24 @@ jobs:
 
       - name: Pipeline self-test on fixtures
         run: python jordan_tender_monitor/run.py --self-test
+
+  # The website is the other, unrelated project in this repository. Its content
+  # file is meant to be edited by whoever is selling the units, and a mistake
+  # there does not throw -- it renders a blank orientation, or a plan tab that
+  # fetches a drawing nobody made. This asserts what the code assumes.
+  #
+  # No install step: the checker uses only Node built-ins. `sharp` is a
+  # devDependency of the image tools, which CI does not run.
+  website-content:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check the site content against its images, pages and sitemap
+        run: node tools/check-content.mjs
+        working-directory: website

@@ -21,9 +21,20 @@
   [headers.values]
     Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
 
-# HTML carries prices, availability and contact details. A stale one is wrong.
+# Nothing carrying content may be cached hard -- and the prices, units and
+# phone number live in assets/js/data.js, not in the HTML. See _headers.
 [[headers]]
   for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/css/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 

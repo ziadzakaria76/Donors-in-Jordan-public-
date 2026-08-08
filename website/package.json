@@ -5,6 +5,7 @@
   "description": "Static bilingual (AR/EN) website for a Jordanian residential developer.",
   "scripts": {
     "start": "python3 -m http.server 8080",
+    "check": "node tools/check-content.mjs",
     "assets": "node tools/generate-assets.mjs",
     "manifest": "node tools/img-manifest.mjs",
     "pages": "node tools/build-pages.mjs"

@@ -332,6 +332,48 @@ function showStatus(form, kind, key, extra = "") {
   box.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
+/**
+ * Is the capture endpoint usable, or only half filled in?
+ *
+ * A blank access_key would still POST to a real URL, be rejected, and have the
+ * rejection logged and nowhere else — so a half-configured site would look like
+ * it was recording enquiries while recording none of them. That is worse than
+ * being switched off, so it counts as switched off.
+ */
+function captureReady({ formEndpoint, formFields }) {
+  if (!formEndpoint) return false;
+  return Object.values(formFields || {}).every((v) => String(v).trim());
+}
+
+/**
+ * The enquiry as the capture endpoint should receive it.
+ *
+ * The visible fields alone are not an actionable lead: both forms ask the same
+ * four questions, so a captured copy of the unit dialog would be
+ * indistinguishable from one sent off the contact page — no unit, no price, no
+ * indication of which of twenty-seven units was being asked about. The context
+ * the page already knows is added here rather than being left for whoever
+ * reads the inbox to guess.
+ *
+ * `subject` is sent twice under two names on purpose. Web3Forms reads
+ * `subject` as the email subject line and Formspree reads `_subject`; sending
+ * both means the endpoint can be swapped without touching this file, at the
+ * cost of one duplicated field in the body. `_gotcha` is deliberately left in
+ * the payload — both services use it to drop bots server-side.
+ */
+function enquiryPayload(form) {
+  const { COMPANY } = window.DATA;
+  const data = new FormData(form);
+  const subject = form.dataset.subject;
+  if (subject) { data.set("subject", subject); data.set("_subject", subject); }
+  data.set("page", location.href);
+  data.set("language", I18N.lang);
+  // Whatever the chosen service needs alongside the fields — Web3Forms wants
+  // an access_key in the body, Formspree wants nothing.
+  for (const [key, value] of Object.entries(COMPANY.formFields || {})) data.set(key, value);
+  return data;
+}
+
 /* Every enquiry goes to WhatsApp, and a copy is captured server-side when
    COMPANY.formEndpoint is set. WhatsApp is the delivery; the endpoint is the
    record. That ordering is deliberate — see below. */
@@ -343,7 +385,7 @@ async function submitForm(form) {
 
   // Read the fields before anything else: the form is reset further down, and
   // an awaited POST would otherwise send an empty body.
-  const data = COMPANY.formEndpoint ? new FormData(form) : null;
+  const data = captureReady(COMPANY) ? enquiryPayload(form) : null;
 
   // Open WhatsApp FIRST, synchronously. window.open only survives inside the
   // user gesture that triggered the submit; awaiting the fetch before this

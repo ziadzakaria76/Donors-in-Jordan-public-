@@ -32,13 +32,49 @@ The site is a folder of static files. Publish `website/` as the site root.
 
 | Host | What to do |
 | --- | --- |
-| **Cloudflare Pages** | The domain is already at Cloudflare, so this is the shortest path — see below. |
+| **Cloudflare Pages** | What the site actually uses. Deployed from CI, not the dashboard — see below. |
 | **Netlify** | Drag the `website/` folder onto the Netlify dashboard, or connect the repo and set **base directory** `website`, **publish directory** `website`, and leave the build command empty. `netlify.toml` already sets caching and the 404 page. |
 | **Vercel** | Import the repo, set **root directory** to `website`, framework preset **Other**, no build command. `vercel.json` sets the caching headers. |
 | **cPanel / any shared host** | Upload the contents of `website/` into `public_html/` over FTP. Nothing else to configure. |
 | **GitHub Pages** | Push, then set Pages to serve from the branch and the `/website` folder. |
 
 ### Cloudflare Pages
+
+Deployment is driven by
+[`.github/workflows/deploy-website.yml`](../.github/workflows/deploy-website.yml),
+not by the dashboard's Git integration. It publishes `website/` on every push to
+`main` that touches it, and has a **Run workflow** button for redeploying on
+demand.
+
+That is deliberate. A Git connection is a setting inside someone's account: you
+cannot see it from the repository, you cannot review a change to it, and when it
+is off, nothing says so — `main` simply stops reaching the site. That is not
+hypothetical here. The General Sherman 3 schedule sat merged on `main` while the
+live page still advertised it as a coming project with no units, and the only
+clue was a screenshot. A workflow is in the diff, leaves a log per commit, and
+fails loudly.
+
+It needs three values under **Settings → Secrets and variables → Actions**:
+
+| Name | Kind | Where it comes from |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | secret | My Profile → API Tokens → Create Token → **Cloudflare Pages: Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | secret | Cloudflare sidebar, or the hex string in the dashboard URL |
+| `CLOUDFLARE_PAGES_PROJECT` | **variable** | the Pages project name, spelled exactly as in Workers & Pages |
+
+The workflow checks all three are present and names any that are missing before
+it spends a deploy finding out. It also runs `npm run check` first, so a content
+file that fails its own tests never reaches the site.
+
+`CLOUDFLARE_PAGES_PROJECT` is a variable rather than a secret on purpose: a
+wrong project name does not fail, it silently creates a *second* Pages project
+that no domain points at, and you would rather be able to read it back.
+
+**If you also connect the project to Git in the dashboard, every push deploys
+twice.** Pick one.
+
+<details>
+<summary>Setting the project up in the dashboard by hand</summary>
 
 **Workers & Pages → Create → Pages → Connect to Git**, pick the repo, then:
 
@@ -63,14 +99,16 @@ deployments). Otherwise every branch is built and published at a public preview
 URL, including work in progress and branches with no `website/` directory at
 all.
 
-A Direct Upload project cannot be converted to a Git-connected one. If the
-project was created by dragging a folder in, make a new project connected to
-Git, check it on its `*.pages.dev` URL, then move the custom domain across and
-delete the old project.
+A Direct Upload project cannot be converted to a Git-connected one. That is a
+reason to prefer the workflow above: `wrangler pages deploy` publishes to a
+project of either kind, so a project created by dragging a folder in does not
+have to be rebuilt.
 
 Then **Custom domains → Set up a custom domain**, add `general-sherman-housing.com`
 and `www.general-sherman-housing.com`. Cloudflare writes the DNS itself, since it
 is also the registrar, and issues the certificate.
+
+</details>
 
 ### Caching, and why images are not cached forever
 
@@ -81,8 +119,16 @@ is also the registrar, and issues the certificate.
 | --- | --- | --- |
 | `assets/fonts/*` | 1 year, `immutable` | a woff2 subset is never re-cut under the same name |
 | `assets/img/*` | 1 week, revalidated | filenames carry no content hash, and images **do** get re-rendered in place |
-| `*.html` | `max-age=0, must-revalidate` | these pages carry prices, availability and contact details |
-| CSS and JS | default (revalidate) | `main.css` and `app.js` are unversioned names |
+| `*.html` | `max-age=0, must-revalidate` | the shells the content is rendered into |
+| `assets/js/*`, `assets/css/*` | `max-age=0, must-revalidate` | **the prices live here**, not in the HTML |
+
+The JS rule is the one that is easy to get wrong, and this file got it wrong
+until it was caught. It used to leave CSS and JS "on the default (revalidate
+every time)" and protect only the HTML, reasoning that the pages carry the
+prices. They do not: every price, unit and phone number is in
+`assets/js/data.js`, and the pages are shells it fills in. Leaving that file to
+whatever a host happens to default to is leaving the price list to a platform
+default — so it is stated, not assumed.
 
 The image rule is the one that looks wrong and is not. `immutable` would be
 correct if filenames were content-hashed; they are not —
@@ -130,8 +176,10 @@ claim the company has not made. Search for `«REPLACE»` in `assets/js/data.js`.
 - **Founding year** — `COMPANY.founded` is `null` and no page states a year,
   because the one that was here was invented. Set it and the About page can
   state it.
-- **Form endpoint** — `COMPANY.formEndpoint` is empty, so enquiries go to
-  WhatsApp with an email fallback. See *Where the form submissions go* below.
+- **Web3Forms access key** — `COMPANY.formFields.access_key` is empty, so no
+  copy of each enquiry is recorded yet. Every form still delivers to WhatsApp
+  with an email fallback in the meantime. See *Where the form submissions go*
+  below.
 
 The **commercial registration is gone**, not blank: an invented registration
 number is a claim about a real company's legal standing, so it was deleted
@@ -158,17 +206,49 @@ rather than left for someone to render by accident. Add the real one to
 details pre-written, and offers an email link as a backup. That needs no
 backend and puts the lead on the phone immediately.
 
-To *also* keep a server-side record, paste an endpoint into
-`COMPANY.formEndpoint` in `assets/js/data.js`:
+To *also* keep a server-side record, the site is pointed at **Web3Forms**. One
+thing is missing: the access key that says which inbox to deliver to. Get one at
+<https://web3forms.com> — enter the address, and the key is emailed back — then
+put it in `assets/js/data.js`:
 
 ```js
-formEndpoint: "https://formspree.io/f/xxxxxxx",   // or Web3Forms, Basin, …
+formEndpoint: "https://api.web3forms.com/submit",
+formFields: { access_key: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
 ```
 
-With that set, each submission still opens WhatsApp **and** is POSTed to the
-endpoint. WhatsApp is the delivery; the endpoint is the record. A hidden
-`_gotcha` honeypot field is already included and is respected by those
-services.
+That is the whole change. Each submission then opens WhatsApp **and** is POSTed
+to Web3Forms. WhatsApp is the delivery; the endpoint is the record.
+
+**While the key is blank, capture counts as switched off, not broken.** A blank
+key would still POST to a real URL, be rejected for the missing key, and log the
+rejection where nobody would look — indistinguishable from working. `submitForm`
+therefore skips the POST until every field in `formFields` has a value, and
+forms behave exactly as they do with no endpoint at all.
+
+The key is public by design: it names an inbox, it does not open one. That is
+why it lives in this file — a static host has no secret store to read from, and
+anything the browser must send is visible to anyone who looks.
+
+**Using Formspree instead?** Its id goes in the URL and it needs nothing in the
+body, so `formEndpoint: "https://formspree.io/f/xxxxxxx"` with
+`formFields: {}`. Both services are already handled; see `subject` below.
+
+### What the endpoint receives
+
+The visible fields are not enough on their own. Both forms ask the same four
+questions, so a captured unit enquiry would otherwise be indistinguishable from
+a general one — no unit, no price, no sign which of twenty-seven was meant.
+`enquiryPayload` adds what the page already knows:
+
+| Field | Value |
+| --- | --- |
+| `name`, `phone`, `email`, `message`, `consent` | what the visitor typed |
+| `unit` | the unit's title and summary, on the unit dialog only |
+| `project` | the chosen project, on the contact form only |
+| `subject`, `_subject` | the enquiry's heading — the same string under both names, because Web3Forms reads `subject` and Formspree reads `_subject` |
+| `page` | the full URL the enquiry came from |
+| `language` | `ar` or `en` — which language they were reading |
+| `_gotcha` | the honeypot, left in deliberately: both services use it to drop bots |
 
 Two details in `submitForm` matter if you edit it:
 
@@ -186,6 +266,29 @@ Two details in `submitForm` matter if you edit it:
 
 `assets/js/data.js` is the only file you need for content changes. Every piece
 of text is a `{ ar, en }` pair.
+
+### Checking an edit
+
+```bash
+npm run check
+```
+
+Reads `data.js` and asserts what the rest of the site assumes about it: that
+every image and floor plan it names exists at the widths the manifest promises,
+that unit ids are unique, that every orientation, type, district, amenity and
+status resolves to a label, that an available unit carries a price, that a plan
+shared by several units describes units of one size, that both languages are
+filled in together, and that `COMPANY.domain`, `build-pages.mjs`, `sitemap.xml`
+and `robots.txt` all name the same site.
+
+None of those throw on their own. A mistyped orientation renders a blank where
+the aspect goes; an available unit with no price shows as unsellable; a plan
+name with a typo fetches a drawing nobody made. The site degrades politely and
+says nothing, which is the worst way for a price list to be wrong.
+
+It also prints whatever is still marked `«REPLACE»`, so the go-live list is
+something you run rather than something you remember. CI runs it on every pull
+request.
 
 ### Projects and units
 
