@@ -158,29 +158,32 @@ rather than left for someone to render by accident. Add the real one to
 details pre-written, and offers an email link as a backup. That needs no
 backend and puts the lead on the phone immediately.
 
-To *also* keep a server-side record, fill in `COMPANY.formEndpoint` in
-`assets/js/data.js`. Two services are wired up; pick one.
-
-**Formspree** — put the form id in the URL, nothing else:
-
-```js
-formEndpoint: "https://formspree.io/f/xxxxxxx",
-formFields: {},
-```
-
-**Web3Forms** — one fixed URL, and the access key goes in the body:
+To *also* keep a server-side record, the site is pointed at **Web3Forms**. One
+thing is missing: the access key that says which inbox to deliver to. Get one at
+<https://web3forms.com> — enter the address, and the key is emailed back — then
+put it in `assets/js/data.js`:
 
 ```js
 formEndpoint: "https://api.web3forms.com/submit",
 formFields: { access_key: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
 ```
 
-Either key is public by design: it names an inbox, it does not open one. That
-is why it lives in this file — a static host has no secret store to read from,
-and anything the browser must send is visible to anyone who looks.
+That is the whole change. Each submission then opens WhatsApp **and** is POSTed
+to Web3Forms. WhatsApp is the delivery; the endpoint is the record.
 
-With that set, each submission still opens WhatsApp **and** is POSTed to the
-endpoint. WhatsApp is the delivery; the endpoint is the record.
+**While the key is blank, capture counts as switched off, not broken.** A blank
+key would still POST to a real URL, be rejected for the missing key, and log the
+rejection where nobody would look — indistinguishable from working. `submitForm`
+therefore skips the POST until every field in `formFields` has a value, and
+forms behave exactly as they do with no endpoint at all.
+
+The key is public by design: it names an inbox, it does not open one. That is
+why it lives in this file — a static host has no secret store to read from, and
+anything the browser must send is visible to anyone who looks.
+
+**Using Formspree instead?** Its id goes in the URL and it needs nothing in the
+body, so `formEndpoint: "https://formspree.io/f/xxxxxxx"` with
+`formFields: {}`. Both services are already handled; see `subject` below.
 
 ### What the endpoint receives
 

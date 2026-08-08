@@ -333,6 +333,19 @@ function showStatus(form, kind, key, extra = "") {
 }
 
 /**
+ * Is the capture endpoint usable, or only half filled in?
+ *
+ * A blank access_key would still POST to a real URL, be rejected, and have the
+ * rejection logged and nowhere else — so a half-configured site would look like
+ * it was recording enquiries while recording none of them. That is worse than
+ * being switched off, so it counts as switched off.
+ */
+function captureReady({ formEndpoint, formFields }) {
+  if (!formEndpoint) return false;
+  return Object.values(formFields || {}).every((v) => String(v).trim());
+}
+
+/**
  * The enquiry as the capture endpoint should receive it.
  *
  * The visible fields alone are not an actionable lead: both forms ask the same
@@ -372,7 +385,7 @@ async function submitForm(form) {
 
   // Read the fields before anything else: the form is reset further down, and
   // an awaited POST would otherwise send an empty body.
-  const data = COMPANY.formEndpoint ? enquiryPayload(form) : null;
+  const data = captureReady(COMPANY) ? enquiryPayload(form) : null;
 
   // Open WhatsApp FIRST, synchronously. window.open only survives inside the
   // user gesture that triggered the submit; awaiting the fetch before this
