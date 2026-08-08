@@ -193,17 +193,18 @@ by hand — the scaffolder does not touch those three.
 
 ## What to replace before going live
 
-Two things are still unfinished. Neither is false — the invented content has
-been removed rather than left in place — so nothing here is published as a
-claim the company has not made. Search for `«REPLACE»` in `assets/js/data.js`.
+One thing is still unfinished. It is not false — the invented content has been
+removed rather than left in place — so nothing here is published as a claim the
+company has not made. Search for `«REPLACE»` in `assets/js/data.js`, or run
+`npm run check`, which lists what is left.
 
 - **Founding year** — `COMPANY.founded` is `null` and no page states a year,
   because the one that was here was invented. Set it and the About page can
   state it.
-- **Web3Forms access key** — `COMPANY.formFields.access_key` is empty, so no
-  copy of each enquiry is recorded yet. Every form still delivers to WhatsApp
-  with an email fallback in the meantime. See *Where the form submissions go*
-  below.
+
+Enquiry capture is done: `COMPANY.formFields.access_key` holds a Web3Forms key,
+so every submission opens WhatsApp **and** is emailed. See *Where the form
+submissions go* below, including how to change which inbox receives them.
 
 The **commercial registration is gone**, not blank: an invented registration
 number is a claim about a real company's legal standing, so it was deleted
@@ -230,28 +231,30 @@ rather than left for someone to render by accident. Add the real one to
 details pre-written, and offers an email link as a backup. That needs no
 backend and puts the lead on the phone immediately.
 
-To *also* keep a server-side record, the site is pointed at **Web3Forms**. One
-thing is missing: the access key that says which inbox to deliver to. Get one at
-<https://web3forms.com> — enter the address, and the key is emailed back — then
-put it in `assets/js/data.js`:
+A copy is **also** kept, through **Web3Forms**. Each submission opens WhatsApp
+*and* is POSTed there: WhatsApp is the delivery, the endpoint is the record.
+It is configured in `assets/js/data.js`:
 
 ```js
 formEndpoint: "https://api.web3forms.com/submit",
-formFields: { access_key: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
+formFields: { access_key: "a61a7c6f-…" },
 ```
 
-That is the whole change. Each submission then opens WhatsApp **and** is POSTed
-to Web3Forms. WhatsApp is the delivery; the endpoint is the record.
+**To change which inbox receives them,** do it in the Web3Forms dashboard, not
+here — the key identifies the form, not the address, so the recipient can move
+without a deploy. They currently go to the account that created the form.
 
-**While the key is blank, capture counts as switched off, not broken.** A blank
-key would still POST to a real URL, be rejected for the missing key, and log the
-rejection where nobody would look — indistinguishable from working. `submitForm`
-therefore skips the POST until every field in `formFields` has a value, and
-forms behave exactly as they do with no endpoint at all.
+**Emptying the key switches capture off, it does not break it.** A blank key
+would otherwise still POST to a real URL, be rejected for the missing key, and
+log the rejection where nobody would look — indistinguishable from working. So
+`captureReady()` skips the POST until every field in `formFields` has a value,
+and the forms behave exactly as they do with no endpoint at all. That is also
+what makes the key safe to remove in a hurry.
 
-The key is public by design: it names an inbox, it does not open one. That is
-why it lives in this file — a static host has no secret store to read from, and
-anything the browser must send is visible to anyone who looks.
+The key is public by design — Web3Forms says so on the page that issues it: it
+names an inbox, it does not open one. That is why it lives in this file. A
+static host has no secret store to read from, and anything the browser must send
+is visible to anyone who looks; pretending otherwise would be theatre.
 
 **Using Formspree instead?** Its id goes in the URL and it needs nothing in the
 body, so `formEndpoint: "https://formspree.io/f/xxxxxxx"` with
