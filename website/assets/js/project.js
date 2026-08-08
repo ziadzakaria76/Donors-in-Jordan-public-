@@ -231,8 +231,13 @@
   function renderGallery() {
     if (!$("#p-gallery")) return;
     if (!project.gallery?.length) { dropSection("#p-gallery"); return; }
+    /* Caption each image by what it is, falling back to numbering it. The
+       fallback is not decorative: this project's gallery mixes 3D studies of
+       the elevations with photographs of the entrance as built, and "image 5
+       of 8" tells a buyer nothing about which one they are looking at. */
+    const captions = window.DATA.IMAGE_CAPTIONS || {};
     const items = project.gallery.map((name, i) => ({
-      name, caption: `${tx(project.name)} — ${i + 1}`,
+      name, caption: captions[name] ? tx(captions[name]) : `${tx(project.name)} — ${i + 1}`,
     }));
     $("#p-gallery").innerHTML = items.map((item, i) => `
       <button class="gallery-item" data-lb="${i}">

@@ -136,31 +136,7 @@
     const box = $("#gallery-grid");
     if (!box) return;
 
-    const CAPTIONS = {
-      "sherman2-exterior-day": { ar: "جنرال شيرمان ٢ — الواجهة من الشارع", en: "General Sherman 2 — the building from the street" },
-      "sherman2-exterior-dusk": { ar: "جنرال شيرمان ٢ — المبنى عند المغيب", en: "General Sherman 2 — the building at dusk" },
-      "sherman2-entrance": { ar: "جنرال شيرمان ٢ — المدخل الرئيسي", en: "General Sherman 2 — the main entrance" },
-      "sherman2-lobby-1": { ar: "جنرال شيرمان ٢ — المدخل بارتفاع طابقين", en: "General Sherman 2 — the double-height lobby" },
-      "sherman2-lobby-2": { ar: "جنرال شيرمان ٢ — بهو المدخل", en: "General Sherman 2 — entrance hall" },
-      "sherman2-lobby-3": { ar: "جنرال شيرمان ٢ — المصعد والمداخل", en: "General Sherman 2 — lift and apartment doors" },
-      "sherman2-lobby-4": { ar: "جنرال شيرمان ٢ — تفاصيل المدخل", en: "General Sherman 2 — entrance detail" },
-      "sherman2-living-1": { ar: "جنرال شيرمان ٢ — الصالون وأرضيات الرخام", en: "General Sherman 2 — reception room with marble floors" },
-      "sherman2-living-2": { ar: "جنرال شيرمان ٢ — المعيشة", en: "General Sherman 2 — living area" },
-      "sherman2-living-3": { ar: "جنرال شيرمان ٢ — مساحة الاستقبال", en: "General Sherman 2 — reception space" },
-      "sherman2-interior-1": { ar: "جنرال شيرمان ٢ — غرفة نوم", en: "General Sherman 2 — bedroom" },
-      "sherman2-interior-2": { ar: "جنرال شيرمان ٢ — غرفة بأرضية خشبية", en: "General Sherman 2 — room with wood flooring" },
-      "sherman2-interior-3": { ar: "جنرال شيرمان ٢ — الحمّام", en: "General Sherman 2 — bathroom" },
-      "sherman2-interior-4": { ar: "جنرال شيرمان ٢ — ممر الغرف", en: "General Sherman 2 — bedroom corridor" },
-      "sherman2-interior-5": { ar: "جنرال شيرمان ٢ — الممر الداخلي", en: "General Sherman 2 — internal corridor" },
-      "sherman2-interior-6": { ar: "جنرال شيرمان ٢ — باب الشقة", en: "General Sherman 2 — apartment entrance door" },
-      "sherman2-interior-7": { ar: "جنرال شيرمان ٢ — تشطيبات الأبواب", en: "General Sherman 2 — door finishes" },
-      "sherman1-1": { ar: "جنرال شيرمان ١ — المشروع المُسلَّم", en: "General Sherman 1 — the delivered scheme" },
-      "sherman1-3": { ar: "جنرال شيرمان ١ — الواجهة", en: "General Sherman 1 — elevation" },
-      "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع", en: "General Sherman 3 — the scheme's design" },
-      "sherman3-2": { ar: "جنرال شيرمان ٣ — تصميم الواجهة", en: "General Sherman 3 — elevation design" },
-      "sherman3-3": { ar: "جنرال شيرمان ٣ — المدخل والإنارة ليلاً", en: "General Sherman 3 — the entrance and its lighting at night" },
-      "sherman3-4": { ar: "جنرال شيرمان ٣ — المشروع ليلاً", en: "General Sherman 3 — the scheme at night" },
-    };
+    const CAPTIONS = window.DATA.IMAGE_CAPTIONS;
 
     const build = (filter = "") => {
       const names = Object.keys(CAPTIONS).filter((n) => !filter || n.includes(filter));
