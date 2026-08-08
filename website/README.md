@@ -450,6 +450,12 @@ website/
   inside Arabic text.
 - **No external requests at runtime.** Fonts are self-hosted; the only
   third-party embed is the Google Maps iframe on the contact and project pages.
+- **Unit deep links.** A card on the units page links to
+  `project.html?id=<project>#unit-<project>-<code>`. The project page shows only
+  its first nine units, so it pulls the requested one to the front if the list
+  would otherwise cut it, then scrolls to it and marks it `.card--targeted` —
+  the browser cannot do that itself, because it resolves the fragment while
+  parsing, long before the cards are rendered.
 - **Accessibility.** Semantic landmarks, one `h1` per page, a skip link, labelled
   form controls, visible focus rings, a focus-trapped dialog, keyboard-navigable
   lightbox, and `prefers-reduced-motion` support.

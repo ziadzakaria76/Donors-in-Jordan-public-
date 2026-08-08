@@ -125,17 +125,49 @@
 
   /* ---------------------------------------------------------------- units */
 
+  /** The unit named by a `#unit-…` hash, if it belongs to this project. */
+  function hashUnitId() {
+    const m = /^#unit-(.+)$/.exec(decodeURIComponent(location.hash));
+    return m && units.some((u) => u.id === m[1]) ? m[1] : null;
+  }
+
   function renderUnits() {
     if (!$("#p-units")) return;
     if (!units.length) { dropSection("#p-units"); return; }
     const list = [...units].sort((a, b) =>
       (a.status === "sold") - (b.status === "sold") || (a.price || 0) - (b.price || 0));
-    $("#p-units").innerHTML = list.slice(0, 9).map(unitCard).join("");
+    /* Cards arrive here from units.html as `project.html?id=…#unit-…`, and the
+       page shows only the first nine. A schedule of fourteen can therefore be
+       asked for a unit that this list would cut, so the requested one is
+       pulled to the front rather than dropped — otherwise the link lands on a
+       page that does not contain what was clicked. */
+    let shown = list.slice(0, 9);
+    const wanted = hashUnitId();
+    if (wanted && !shown.some((u) => u.id === wanted)) {
+      shown = [list.find((u) => u.id === wanted), ...shown.slice(0, 8)];
+    }
+    $("#p-units").innerHTML = shown.map(unitCard).join("");
     const more = $("#p-units-more");
     if (list.length > 9) {
       more.hidden = false;
       more.href = `${BASE}units.html?project=${project.id}&status=`;
     } else { more.hidden = true; }
+  }
+
+  /**
+   * Scroll to the unit the URL asked for.
+   *
+   * The browser resolves a fragment while parsing, which is long before these
+   * cards exist, so a `#unit-…` link would otherwise land at the top of the
+   * page with no sign of the unit that was clicked.
+   */
+  function focusHashUnit() {
+    const id = hashUnitId();
+    if (!id) return;
+    const card = document.getElementById(`unit-${id}`);
+    if (!card) return;
+    card.classList.add("card--targeted");
+    card.scrollIntoView({ block: "center", behavior: "auto" });
   }
 
   /* ----------------------------------------------------------- floorplans */
@@ -224,13 +256,10 @@
   function renderAll() {
     setCanonical(); renderHero(); renderAbout(); renderMatrix(); renderUnits(); renderPlans();
     renderNearby(); renderMap(); renderGallery(); renderRelated();
-    // Deep links from the units page: ?id=…#unit-<id>
-    const hash = location.hash.slice(1);
-    if (hash.startsWith("unit-")) {
-      const btn = document.querySelector(`[data-enquire="${hash.replace("unit-", "")}"]`);
-      btn?.scrollIntoView({ block: "center", behavior: "smooth" });
-    }
     initReveals();
+    /* After initReveals, so the card is not mid-animation when we scroll it
+       into view. Deep links from the units page: ?id=…#unit-<id> */
+    focusHashUnit();
   }
 
   document.addEventListener("click", (e) => {

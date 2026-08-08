@@ -284,6 +284,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), border-color 0.3s;
 }
 .card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: transparent; }
+/* The card a `#unit-…` deep link asked for. Arriving from the units page mid-
+   grid, nothing else would say which of nine cards was clicked. */
+.card--targeted { border-color: var(--brass); box-shadow: 0 0 0 3px var(--brass-soft); }
 .card__media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: var(--stone); }
 .card__media img { inline-size: 100%; block-size: 100%; object-fit: cover; transition: transform 0.7s var(--ease); }
 .card:hover .card__media img { transform: scale(1.045); }

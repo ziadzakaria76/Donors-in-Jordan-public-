@@ -223,7 +223,11 @@
   </div>
 </footer>
 
-<a class="wa-fab" href="#" data-wa target="_blank" rel="noopener">
+<!-- Below 560px the label is hidden and only the glyph remains, so the link
+     needs a name of its own or it reaches a screen reader as its raw wa.me
+     URL. Same string as the visible label, so the two never disagree. -->
+<a class="wa-fab" href="#" data-wa target="_blank" rel="noopener"
+   aria-label="واتساب" data-i18n-attr="aria-label:cta.whatsapp">
   <span data-icon="whatsapp"></span><span data-i18n="cta.whatsapp">واتساب</span>
 </a>
 
