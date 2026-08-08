@@ -158,17 +158,46 @@ rather than left for someone to render by accident. Add the real one to
 details pre-written, and offers an email link as a backup. That needs no
 backend and puts the lead on the phone immediately.
 
-To *also* keep a server-side record, paste an endpoint into
-`COMPANY.formEndpoint` in `assets/js/data.js`:
+To *also* keep a server-side record, fill in `COMPANY.formEndpoint` in
+`assets/js/data.js`. Two services are wired up; pick one.
+
+**Formspree** — put the form id in the URL, nothing else:
 
 ```js
-formEndpoint: "https://formspree.io/f/xxxxxxx",   // or Web3Forms, Basin, …
+formEndpoint: "https://formspree.io/f/xxxxxxx",
+formFields: {},
 ```
 
+**Web3Forms** — one fixed URL, and the access key goes in the body:
+
+```js
+formEndpoint: "https://api.web3forms.com/submit",
+formFields: { access_key: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" },
+```
+
+Either key is public by design: it names an inbox, it does not open one. That
+is why it lives in this file — a static host has no secret store to read from,
+and anything the browser must send is visible to anyone who looks.
+
 With that set, each submission still opens WhatsApp **and** is POSTed to the
-endpoint. WhatsApp is the delivery; the endpoint is the record. A hidden
-`_gotcha` honeypot field is already included and is respected by those
-services.
+endpoint. WhatsApp is the delivery; the endpoint is the record.
+
+### What the endpoint receives
+
+The visible fields are not enough on their own. Both forms ask the same four
+questions, so a captured unit enquiry would otherwise be indistinguishable from
+a general one — no unit, no price, no sign which of twenty-seven was meant.
+`enquiryPayload` adds what the page already knows:
+
+| Field | Value |
+| --- | --- |
+| `name`, `phone`, `email`, `message`, `consent` | what the visitor typed |
+| `unit` | the unit's title and summary, on the unit dialog only |
+| `project` | the chosen project, on the contact form only |
+| `subject`, `_subject` | the enquiry's heading — the same string under both names, because Web3Forms reads `subject` and Formspree reads `_subject` |
+| `page` | the full URL the enquiry came from |
+| `language` | `ar` or `en` — which language they were reading |
+| `_gotcha` | the honeypot, left in deliberately: both services use it to drop bots |
 
 Two details in `submitForm` matter if you edit it:
 
