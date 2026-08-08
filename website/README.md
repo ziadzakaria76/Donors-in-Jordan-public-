@@ -221,6 +221,29 @@ Two details in `submitForm` matter if you edit it:
 `assets/js/data.js` is the only file you need for content changes. Every piece
 of text is a `{ ar, en }` pair.
 
+### Checking an edit
+
+```bash
+npm run check
+```
+
+Reads `data.js` and asserts what the rest of the site assumes about it: that
+every image and floor plan it names exists at the widths the manifest promises,
+that unit ids are unique, that every orientation, type, district, amenity and
+status resolves to a label, that an available unit carries a price, that a plan
+shared by several units describes units of one size, that both languages are
+filled in together, and that `COMPANY.domain`, `build-pages.mjs`, `sitemap.xml`
+and `robots.txt` all name the same site.
+
+None of those throw on their own. A mistyped orientation renders a blank where
+the aspect goes; an available unit with no price shows as unsellable; a plan
+name with a typo fetches a drawing nobody made. The site degrades politely and
+says nothing, which is the worst way for a price list to be wrong.
+
+It also prints whatever is still marked `«REPLACE»`, so the go-live list is
+something you run rather than something you remember. CI runs it on every pull
+request.
+
 ### Projects and units
 
 Each project carries its own schedule of units, stated one by one, exactly as

@@ -1,0 +1,201 @@
+/**
+ * Check the content file against the files and pages around it.
+ *
+ *   cd website && npm run check
+ *
+ * assets/js/data.js is meant to be edited by whoever is selling the units, not
+ * only by whoever wrote the site. That is the point of keeping every price and
+ * every unit in one plain file — and it is also the risk: a typo there is not a
+ * syntax error, it is a page that renders a blank orientation, a plan tab that
+ * fetches a drawing nobody made, or a "coming soon" project quietly holding
+ * fourteen units for sale.
+ *
+ * None of that throws. The site degrades politely and says nothing, which is
+ * the worst way for a price list to be wrong. So the invariants the code relies
+ * on are asserted here instead, and CI runs it on every pull request.
+ *
+ * Every check below exists because breaking it produces something a visitor
+ * would see. Nothing here is style.
+ *
+ * No dependencies, no network, no browser — this is the cheap gate. The
+ * expensive one is a person opening the pages.
+ */
+
+import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const img = (name) => existsSync(resolve(ROOT, "assets/img", name));
+const read = (rel) => readFileSync(resolve(ROOT, rel), "utf8");
+
+const DATA = (await import(resolve(ROOT, "assets/js/data.js"))).default;
+const { COMPANY, PROJECTS, DISTRICTS, AMENITIES, ORIENTATIONS, UNIT_TYPES, PROJECT_STATUS } = DATA;
+
+const errors = [];
+const notes = [];
+const check = (ok, message) => { if (!ok) errors.push(message); };
+
+/* --------------------------------------------------------------- images
+   picture() offers the browser only the widths the manifest lists, and
+   project.js asks for plan drawings at a hard-coded 800 and 1280. Either one
+   naming a file that is not there is a 404 in front of a buyer. */
+
+const referenced = new Set();
+for (const p of PROJECTS) {
+  referenced.add(p.image);
+  for (const g of p.gallery || []) referenced.add(g);
+  for (const u of p.units || []) if (u.plan) referenced.add(u.plan);
+}
+
+const manifest = read("assets/js/img-manifest.js");
+const widthsOf = (name) => {
+  const m = new RegExp(`"${name}": \\[([\\d, ]+)\\]`).exec(manifest);
+  return m ? m[1].split(",").map((n) => Number(n.trim())) : null;
+};
+
+for (const name of referenced) {
+  const widths = widthsOf(name);
+  check(widths, `data.js references the image "${name}", which img-manifest.js does not list — run \`npm run manifest\``);
+  for (const w of widths || []) {
+    check(img(`${name}-${w}.webp`), `img-manifest.js promises assets/img/${name}-${w}.webp, which is not on disk`);
+  }
+}
+
+for (const p of PROJECTS) {
+  for (const u of p.units || []) {
+    if (!u.plan) continue;
+    for (const w of [800, 1280]) {
+      check(img(`${u.plan}-${w}.webp`),
+        `${p.id} unit ${u.code}: project.js will request ${u.plan}-${w}.webp, which is not on disk`);
+    }
+  }
+}
+
+/* The manifest is generated, so it can be regenerated and compared. A stale one
+   is the failure that put 404s in the gallery in the first place. */
+{
+  const onDisk = {};
+  for (const file of readdirSync(resolve(ROOT, "assets/img"))) {
+    const m = /^(.+)-(\d+)\.webp$/.exec(file);
+    if (m) (onDisk[m[1]] ??= []).push(Number(m[2]));
+  }
+  for (const [name, widths] of Object.entries(onDisk)) {
+    widths.sort((a, b) => a - b);
+    const listed = widthsOf(name);
+    check(listed && listed.join() === widths.join(),
+      `img-manifest.js is out of date for "${name}" (disk has ${widths.join(", ")}, manifest has ${listed ? listed.join(", ") : "nothing"}) — run \`npm run manifest\``);
+  }
+}
+
+/* ---------------------------------------------------------------- units */
+
+const seen = new Set();
+for (const p of PROJECTS) {
+  check(DISTRICTS[p.district], `${p.id}: district "${p.district}" has no label in DISTRICTS`);
+  if (p.status) check(PROJECT_STATUS[p.status], `${p.id}: status "${p.status}" has no label in PROJECT_STATUS`);
+  for (const a of p.amenities || []) check(AMENITIES[a], `${p.id}: amenity "${a}" has no label in AMENITIES`);
+
+  for (const u of p.units || []) {
+    const at = `${p.id} unit ${u.code}`;
+    const id = `${p.id}-${u.code}`;
+    check(!seen.has(id), `duplicate unit id ${id} — unit ids are element ids on the project page, so two of them break the deep link to both`);
+    seen.add(id);
+
+    check(ORIENTATIONS[u.orientation], `${at}: orientation "${u.orientation}" has no label — the card would render a blank where the aspect goes`);
+    check(UNIT_TYPES[u.type], `${at}: type "${u.type}" has no label`);
+    check(u.floorLabel?.ar && u.floorLabel?.en, `${at}: floorLabel is missing a language`);
+    check(Number.isFinite(u.area) && u.area > 0, `${at}: area is ${u.area}`);
+    check(Number.isFinite(u.outdoor ?? 0) && (u.outdoor ?? 0) >= 0, `${at}: outdoor is ${u.outdoor}`);
+    check(u.beds > 0 && u.baths > 0, `${at}: beds/baths are ${u.beds}/${u.baths}`);
+    check(["available", "reserved", "sold"].includes(u.status), `${at}: status "${u.status}" is not available, reserved or sold`);
+
+    /* An available unit with no price renders as sold: unitCard treats a
+       missing price as unsellable, so the schedule would hide it. */
+    if (u.status === "available") check(u.price > 0, `${at}: is available but carries no price, so the site will show it as unsellable`);
+    if (u.type === "roof") check((u.outdoor ?? 0) > 0, `${at}: is typed "roof" but has no outdoor area`);
+
+    /* Plan tabs are labelled by area, so one drawing shared by units of
+       different sizes would label itself with only the first unit's. */
+    const sharing = (p.units || []).filter((x) => x.plan && x.plan === u.plan);
+    check(sharing.every((x) => x.area === u.area),
+      `${p.id}: plan ${u.plan} is shared by units of different areas (${[...new Set(sharing.map((x) => x.area))].join(", ")})`);
+  }
+
+  if (p.status === "selling") {
+    check((p.units || []).some((u) => u.status === "available"),
+      `${p.id}: is marked "selling" but no unit is available`);
+  }
+}
+
+/* ------------------------------------------------------ both languages */
+
+const walk = (node, at) => {
+  if (!node || typeof node !== "object") return;
+  const keys = Object.keys(node);
+  if (keys.includes("ar") || keys.includes("en")) {
+    check(node.ar !== undefined && node.en !== undefined,
+      `${at}: bilingual text is missing "${node.ar === undefined ? "ar" : "en"}"`);
+    if (typeof node.ar === "string" && typeof node.en === "string") {
+      check(!!node.ar.trim() === !!node.en.trim(), `${at}: one language is filled in and the other is empty`);
+    }
+    return;
+  }
+  for (const [key, value] of Object.entries(node)) walk(value, `${at}.${key}`);
+};
+walk(PROJECTS, "PROJECTS");
+walk(DATA.PROCESS, "PROCESS");
+walk(DATA.FAQS, "FAQS");
+
+/* ------------------------------------------------------- one domain, everywhere
+   The canonical tags, the sitemap and robots.txt are written in three different
+   places from three different sources. They only point search engines at one
+   site if all three agree, and disagreeing is silent. */
+
+const domain = COMPANY.domain.replace(/\/$/, "");
+const site = /const SITE = "([^"]+)"/.exec(read("tools/build-pages.mjs"))?.[1];
+check(site === domain, `tools/build-pages.mjs stamps canonical tags for ${site}, but COMPANY.domain is ${domain}`);
+
+const robots = read("robots.txt");
+check(robots.includes(`${domain}/sitemap.xml`), `robots.txt does not point at ${domain}/sitemap.xml`);
+
+const sitemap = read("sitemap.xml");
+const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+for (const loc of locs) check(loc.startsWith(domain), `sitemap.xml lists ${loc}, which is not on ${domain}`);
+
+for (const file of readdirSync(ROOT)) {
+  if (!file.endsWith(".html") || file === "404.html") continue;
+  const path = file === "index.html" ? "/" : `/${file}`;
+  check(locs.some((l) => new URL(l).pathname === path), `sitemap.xml does not list ${file}`);
+}
+/* One HTML file serves every project, so each needs its own sitemap entry or
+   search engines are offered a page that renders nothing without an id. */
+for (const p of PROJECTS) {
+  check(locs.some((l) => l.includes(`id=${p.id}`)), `sitemap.xml does not list project ${p.id}`);
+}
+
+/* ------------------------------------------------------------ unfinished
+   Not failures. «REPLACE» marks something true that nobody has supplied yet,
+   and printing them turns the go-live list into something you run. */
+
+for (const line of read("assets/js/data.js").match(/^.*«REPLACE».*$/gm) || []) {
+  const text = line.trim().replace(/^\/?\*+\s*/, "");
+  if (text.startsWith("by accident.")) continue;   // the file header explaining the marker
+  notes.push(text);
+}
+
+/* ------------------------------------------------------------------ out */
+
+if (errors.length) {
+  console.error(`\n  ✗ ${errors.length} problem${errors.length === 1 ? "" : "s"} in the content:\n`);
+  for (const e of errors) console.error(`    - ${e}`);
+  console.error("");
+  process.exit(1);
+}
+
+const units = PROJECTS.reduce((n, p) => n + (p.units || []).length, 0);
+console.log(`  ✓ ${PROJECTS.length} projects, ${units} units, ${referenced.size} images — content checks pass`);
+if (notes.length) {
+  console.log(`\n  Still to supply (${notes.length}):`);
+  for (const n of notes) console.log(`    · ${n}`);
+}
