@@ -130,8 +130,10 @@ claim the company has not made. Search for `«REPLACE»` in `assets/js/data.js`.
 - **Founding year** — `COMPANY.founded` is `null` and no page states a year,
   because the one that was here was invented. Set it and the About page can
   state it.
-- **Form endpoint** — `COMPANY.formEndpoint` is empty, so enquiries go to
-  WhatsApp with an email fallback. See *Where the form submissions go* below.
+- **Web3Forms access key** — `COMPANY.formFields.access_key` is empty, so no
+  copy of each enquiry is recorded yet. Every form still delivers to WhatsApp
+  with an email fallback in the meantime. See *Where the form submissions go*
+  below.
 
 The **commercial registration is gone**, not blank: an invented registration
 number is a claim about a real company's legal standing, so it was deleted
