@@ -332,37 +332,51 @@ function showStatus(form, kind, key, extra = "") {
   box.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
+/* Every enquiry goes to WhatsApp, and a copy is captured server-side when
+   COMPANY.formEndpoint is set. WhatsApp is the delivery; the endpoint is the
+   record. That ordering is deliberate — see below. */
 async function submitForm(form) {
   const { COMPANY } = window.DATA;
-  const btn = form.querySelector('[type="submit"]');
-  const original = btn?.textContent;
   const message = formToMessage(form);
-
-  if (COMPANY.formEndpoint) {
-    try {
-      if (btn) { btn.disabled = true; btn.textContent = t("form.sending"); }
-      const res = await fetch(COMPANY.formEndpoint, {
-        method: "POST",
-        headers: { Accept: "application/json" },
-        body: new FormData(form),
-      });
-      if (!res.ok) throw new Error(String(res.status));
-      form.reset();
-      showStatus(form, "ok", "form.okPosted");
-    } catch {
-      const mail = `mailto:${COMPANY.salesEmail}?subject=${encodeURIComponent(form.dataset.subject || "Enquiry")}&body=${encodeURIComponent(message)}`;
-      showStatus(form, "err", "form.errSend", `<a class="link-arrow" href="${mail}">${t("form.emailFallback")}</a>`);
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = original; }
-    }
-    return;
-  }
-
-  // No endpoint configured: hand the enquiry to WhatsApp, keep email as backup.
-  window.open(waLink(message), "_blank", "noopener");
   const mail = `mailto:${COMPANY.salesEmail}?subject=${encodeURIComponent(form.dataset.subject || "Enquiry")}&body=${encodeURIComponent(message)}`;
-  showStatus(form, "ok", "form.okWhatsapp", `<a class="link-arrow" href="${mail}">${t("form.emailFallback")}</a>`);
+  const emailLink = `<a class="link-arrow" href="${mail}">${t("form.emailFallback")}</a>`;
+
+  // Read the fields before anything else: the form is reset further down, and
+  // an awaited POST would otherwise send an empty body.
+  const data = COMPANY.formEndpoint ? new FormData(form) : null;
+
+  // Open WhatsApp FIRST, synchronously. window.open only survives inside the
+  // user gesture that triggered the submit; awaiting the fetch before this
+  // would spend that gesture and the browser would block the tab as a pop-up.
+  // A blocked tab is the one failure the visitor can see, so it is reported.
+  //
+  // The "noopener" feature is NOT passed, because with it window.open returns
+  // null unconditionally — which would make every submission look blocked.
+  // Clearing .opener on the new window gives the same protection and still
+  // returns a handle, so a genuine block stays distinguishable.
+  const opened = window.open(waLink(message), "_blank");
+  if (opened) { try { opened.opener = null; } catch { /* cross-origin: already isolated */ } }
+  showStatus(form, opened ? "ok" : "err", opened ? "form.okWhatsapp" : "form.errSend", emailLink);
   form.reset();
+
+  if (!data) return;
+
+  // The enquiry has already been delivered by this point, so a failed POST
+  // loses a copy, not a lead. It is logged rather than shown: telling someone
+  // their message failed when it did not would cost a real enquiry.
+  // keepalive lets the request outlive the tab if switching to WhatsApp
+  // suspends the page, which is the normal case on a phone.
+  try {
+    const res = await fetch(COMPANY.formEndpoint, {
+      method: "POST",
+      headers: { Accept: "application/json" },
+      body: data,
+      keepalive: true,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    console.warn("Enquiry copy was not captured:", err);
+  }
 }
 
 function initForms() {

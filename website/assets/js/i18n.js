@@ -16,16 +16,16 @@ const T = {
   "home.eyebrow": { ar: "تطوير عقاري في مرج الحمام", en: "Residential development in Marj Al-Hamam" },
   "home.heroTitle": { ar: "شققٌ مبنيّة لتُسكن، لا لتُباع فقط.", en: "Apartments built to be lived in, not only sold." },
   "home.heroSub": {
-    ar: "ثلاثة مشاريع في مرج الحمام: واحد مُسلَّم، وواحد متاح للبيع الآن، وثالث قادم. تشطيبات مذكورة بالاسم، ومواصفات مكتوبة.",
-    en: "Three schemes in Marj Al-Hamam: one delivered, one selling now, a third on the way. Finishes named, specifications written down.",
+    ar: "ثلاثة مشاريع في مرج الحمام: واحد مُسلَّم، واثنان متاحان للبيع الآن. تشطيبات مذكورة بالاسم، ومواصفات مكتوبة.",
+    en: "Three schemes in Marj Al-Hamam: one delivered, two selling now. Finishes named, specifications written down.",
   },
   "home.searchBtn": { ar: "اعرض الوحدات", en: "Show units" },
   "home.scroll": { ar: "تابع", en: "Scroll" },
   "home.projectsEyebrow": { ar: "المشاريع", en: "Projects" },
   "home.projectsTitle": { ar: "ثلاثة مشاريع في مرج الحمام", en: "Three schemes in Marj Al-Hamam" },
   "home.projectsLead": {
-    ar: "مشروعٌ مُسلَّم، ومشروعٌ متاح للبيع الآن، وثالثٌ قيد التصميم.",
-    en: "One scheme delivered, one selling now, and a third in design.",
+    ar: "مشروعٌ مُسلَّم، ومشروعان متاحان للبيع الآن.",
+    en: "One scheme delivered, and two selling now.",
   },
   "home.whyEyebrow": { ar: "لماذا جنرال شيرمان", en: "Why General Sherman" },
   "home.whyTitle": { ar: "ما نعد به مكتوبٌ في العقد", en: "What we promise is written into the contract" },
@@ -180,7 +180,6 @@ const T = {
   "form.preferred": { ar: "طريقة التواصل المفضّلة", en: "Preferred contact method" },
   "form.optional": { ar: "اختياري", en: "optional" },
   "form.send": { ar: "إرسال الطلب", en: "Send enquiry" },
-  "form.sending": { ar: "جارٍ الإرسال…", en: "Sending…" },
   "form.consent": {
     ar: "أوافق على أن تتواصل معي جنرال شيرمان بخصوص هذا الطلب.",
     en: "I agree to be contacted by General Sherman about this enquiry.",
@@ -194,10 +193,6 @@ const T = {
   "form.okWhatsapp": {
     ar: "فتحنا محادثة واتساب بتفاصيل طلبك — أرسلها لنا وسيتواصل معك فريق المبيعات خلال يوم عمل واحد.",
     en: "We have opened a WhatsApp chat with your details — send it and our sales team will reply within one working day.",
-  },
-  "form.okPosted": {
-    ar: "شكراً لك. وصلنا طلبك وسيتواصل معك فريق المبيعات خلال يوم عمل واحد.",
-    en: "Thank you. We have your enquiry and our sales team will be in touch within one working day.",
   },
   "form.errSend": {
     ar: "تعذّر إرسال الطلب. يمكنك مراسلتنا على واتساب أو الاتصال بنا مباشرةً.",

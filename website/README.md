@@ -154,18 +154,31 @@ rather than left for someone to render by accident. Add the real one to
 
 ### Where the form submissions go
 
-Out of the box there is no backend: submitting a form opens WhatsApp with the
-enquiry pre-written, and offers an email fallback. To collect submissions
-server-side instead, paste a form endpoint into `COMPANY.formEndpoint` in
-`assets/js/data.js`:
+**Every enquiry goes to WhatsApp.** Submitting a form opens WhatsApp with the
+details pre-written, and offers an email link as a backup. That needs no
+backend and puts the lead on the phone immediately.
+
+To *also* keep a server-side record, paste an endpoint into
+`COMPANY.formEndpoint` in `assets/js/data.js`:
 
 ```js
 formEndpoint: "https://formspree.io/f/xxxxxxx",   // or Web3Forms, Basin, …
 ```
 
-Every form then POSTs there, with the WhatsApp/email path kept as the fallback
-if the request fails. A hidden `_gotcha` honeypot field is already included and
-is respected by those services.
+With that set, each submission still opens WhatsApp **and** is POSTed to the
+endpoint. WhatsApp is the delivery; the endpoint is the record. A hidden
+`_gotcha` honeypot field is already included and is respected by those
+services.
+
+Two details in `submitForm` matter if you edit it:
+
+- **WhatsApp is opened before the POST is awaited.** `window.open` only works
+  inside the user gesture that submitted the form. Awaiting `fetch` first
+  spends that gesture, and the browser blocks the WhatsApp tab as a pop-up.
+- **A failed POST is logged, not shown.** By the time it runs, the enquiry has
+  already been delivered — a failure loses the copy, not the lead. Telling
+  someone their message failed when it did not is how you lose a real enquiry.
+  A *blocked WhatsApp tab* is shown, because that one did cost them something.
 
 ---
 
@@ -329,10 +342,13 @@ Add `status: "selling" | "delivered" | "upcoming"` to a project to show one; a
 ## Images
 
 Every photograph on the site is the company's own, lifted out of the General
-Sherman 2 sales brochure (PDF) along with the nine unit floor plans, and
-converted to WebP at several widths. `sherman1-*`, `sherman2-*` and `sherman3-*`
-are photographs and 3D studies of the three schemes; `plan-a` … `plan-i` are the
-architect's drawings for each unit model.
+Sherman 2 and General Sherman 3 sales brochures (PDF) along with the unit floor
+plans, and converted to WebP at several widths. `sherman1-*`, `sherman2-*` and
+`sherman3-*` are photographs and 3D studies of the three schemes; `plan-a` …
+`plan-i` are the architect's drawings for each General Sherman 2 unit model, and
+`plan-3a` … `plan-3j` for General Sherman 3. Each `plan-3*` drawing is cropped
+straight from its brochure page, so it carries the model's room-dimension
+schedule underneath the plan, as published.
 
 To add more, drop files into `assets/img/` named `<name>-480.webp`,
 `<name>-800.webp`, `<name>-1280.webp`, `<name>-1920.webp`, reference `<name>`

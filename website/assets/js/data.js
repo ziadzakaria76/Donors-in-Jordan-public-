@@ -4,7 +4,7 @@
 
    WHAT IS REAL HERE: the company name and logo, the phone, WhatsApp and email,
    and the projects and their unit schedules, which come from the sales
-   brochure. The invented content that this file once carried — the payment
+   brochures. The invented content that this file once carried — the payment
    plans, the track-record figures, the testimonials, the founding year and the
    commercial registration — has been removed rather than left to be published
    by accident. Anything still marked «REPLACE» is unfinished, not false.
@@ -72,6 +72,93 @@ const DISTRICTS = {
    -------------------------------------------------------------------------- */
 
 const PROJECTS = [
+  {
+    id: "sherman-3",
+    name: { ar: "جنرال شيرمان ٣", en: "General Sherman 3" },
+    district: "marj-al-hamam",
+    status: "selling",
+    image: "sherman3-1",
+    address: {
+      ar: "مرج الحمام — بالقرب من دوار الكتاب",
+      en: "Marj Al-Hamam — near Al-Kitab Circle",
+    },
+    mapQuery: "Al Kitab Circle, Marj Al Hamam, Amman, Jordan",
+    tagline: {
+      ar: "أربع عشرة شقة في مرج الحمام، بأسعار تبدأ من ٩٠،٠٠٠ دينار",
+      en: "Fourteen apartments in Marj Al-Hamam, from 90,000 JOD",
+    },
+    description: {
+      ar: "يتميّز المشروع بموقعه الاستراتيجي الحيوي، إذ يقع على شارعين بواجهتين شرقية وغربية، مما يمنحه تهوية وإضاءة طبيعية ممتازة. كما يقع بالقرب من مجموعة من الخدمات الأساسية، مثل المؤسسات التعليمية والمرافق الصحية، بالإضافة إلى قربه من مراكز التسوق التي تسهّل الوصول إلى احتياجات السكان اليومية. ويبرز المشروع أيضاً من خلال التشطيبات الفاخرة عالية الجودة التي توفر الراحة والفخامة. الصور المعروضة تصاميم ثلاثية الأبعاد للمشروع.",
+      en: "The building stands on two streets, with an east and a west frontage that give it exceptional natural light and cross-ventilation. It sits close to schools and universities, health facilities, and the shopping that covers daily needs — and its finishes are the other half of the argument, specified by name throughout. The images shown are 3D design studies.",
+    },
+    highlights: [
+      { ar: "موقع سكني مميز وهادئ، ومدخل مميز للمشروع", en: "A quiet residential setting, with a distinctive entrance to the building" },
+      { ar: "المشروع بالكامل حجر رويشد قاسي نخب أول، معزول بوليسترين", en: "Clad throughout in first-grade hard Ruwaished stone, fully polystyrene-insulated" },
+      { ar: "الشقة بالكامل بورسلان سعودي ٨٠×١٦٠ سم", en: "Saudi porcelain throughout each apartment, in 80 × 160 cm format" },
+      { ar: "تركيب تدفئة غاز مركزي من شركة جو غاز، وتأسيس نحاس للتكييف", en: "Central gas heating installed by JoGas, and copper pipework prepared for air conditioning" },
+      { ar: "مصعد إيطالي من مصاعد استرا مكفول ٢٤ شهراً", en: "Italian Astra lift, guaranteed for 24 months" },
+      { ar: "كراج ومستودع خاصّان لكل شقة", en: "A private garage bay and a private store for every apartment" },
+      { ar: "أبواب أمان رئيسية تركية نخب أول، وأبواب داخلية خشب سويد نخب أول ملبس قشرة جوز ودهان إيطالي", en: "First-grade Turkish security entrance doors; internal doors in first-grade Swedish timber with walnut veneer and Italian lacquer" },
+      { ar: "شبابيك ألمنيوم دبل جلاس بمقطع فلسطيني خاص وأباجورات كهربائية", en: "Double-glazed aluminium windows on a bespoke Palestinian profile, with electric shutters" },
+      { ar: "أطقم حمامات معلّقة تركية ومغاسل بورسلان فاخرة", en: "Turkish wall-hung sanitaryware and porcelain basins" },
+      { ar: "كاميرات مراقبة للعمارة وإنتركم كاميرا مع ACCESS POINT", en: "Building CCTV, and video intercom with access point" },
+      { ar: "خاصية تغيير لون إضاءة السبوت: أبيض، صحراوي، كول", en: "Spot lighting switchable between white, warm and cool" },
+      { ar: "خزّانا مياه مع مضخة", en: "Two water tanks with a pump" },
+    ],
+    amenities: ["elevator", "parking", "storage", "security"],
+    /* Drive times as published in the project brochure. */
+    nearby: [
+      {
+        group: { ar: "الخدمات التعليمية", en: "Education" },
+        items: [
+          { name: { ar: "مدارس كوفنتري", en: "Coventry Schools" }, mins: 4 },
+          { name: { ar: "مدارس كراون أكاديمي", en: "Crown Academy Schools" }, mins: 5 },
+          { name: { ar: "كلية لومينوس", en: "Luminus College" }, mins: 8 },
+          { name: { ar: "جامعة البتراء", en: "University of Petra" }, mins: 10 },
+        ],
+      },
+      {
+        group: { ar: "المراكز الصحية", en: "Health" },
+        items: [
+          { name: { ar: "مستشفى الأندلس (قيد الإنشاء)", en: "Al-Andalus Hospital (under construction)" }, mins: 4 },
+          { name: { ar: "عيادات هيلث كير", en: "Health Care Clinics" }, mins: 9 },
+          { name: { ar: "مستشفى دار السلام", en: "Dar Al-Salam Hospital" }, mins: 18 },
+          { name: { ar: "مستشفى الحمايدة", en: "Al-Hamaydeh Hospital" }, mins: 23 },
+        ],
+      },
+      {
+        group: { ar: "الخدمات ومراكز التسوّق", en: "Services and shopping" },
+        items: [
+          { name: { ar: "دوار الجندي — مرج الحمام", en: "Al-Jundi Circle — Marj Al-Hamam" }, mins: 6 },
+          { name: { ar: "دوار الدلة — مرج الحمام", en: "Al-Dallah Circle — Marj Al-Hamam" }, mins: 9 },
+          { name: { ar: "دوار عبدون", en: "Abdoun Circle" }, mins: 15 },
+          { name: { ar: "الدوار السابع", en: "7th Circle" }, mins: 18 },
+        ],
+      },
+    ],
+    gallery: ["sherman3-1", "sherman3-2", "sherman3-3", "sherman3-4"],
+    /* The brochure's schedule of fourteen apartments. Every one is priced, so
+       every one is available; the brochure marks none as sold. Bedroom and
+       bathroom counts come from each plan's own model page (A–J), not from the
+       summary page — model A is a four-bedroom with six bathrooms, model B a
+       three-bedroom with four, and the rest are three and three. */
+    units: [
+      { code: "1",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "southwest", area: 235, outdoor: 170, beds: 4, baths: 6, type: "apartment", plan: "plan-3a", price: 151000, status: "available" },
+      { code: "2",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "northeast", area: 193, outdoor: 120, beds: 3, baths: 4, type: "apartment", plan: "plan-3b", price: 129000, status: "available" },
+      { code: "3",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "south",     area: 151, outdoor: 30,  beds: 3, baths: 3, type: "apartment", plan: "plan-3c", price: 107000, status: "available" },
+      { code: "4",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3d", price: 98000,  status: "available" },
+      { code: "5",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "north",     area: 153, outdoor: 70,  beds: 3, baths: 3, type: "apartment", plan: "plan-3e", price: 115000, status: "available" },
+      { code: "6",  floor: 1, floorLabel: { ar: "الطابق الأول", en: "First floor" },   orientation: "south",     area: 151, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3f", price: 90000,  status: "available" },
+      { code: "7",  floor: 1, floorLabel: { ar: "الطابق الأول", en: "First floor" },   orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3g", price: 90000,  status: "available" },
+      { code: "8",  floor: 1, floorLabel: { ar: "الطابق الأول", en: "First floor" },   orientation: "north",     area: 153, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3h", price: 92000,  status: "available" },
+      { code: "9",  floor: 2, floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "south",     area: 151, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3f", price: 90000,  status: "available" },
+      { code: "10", floor: 2, floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3g", price: 90000,  status: "available" },
+      { code: "11", floor: 2, floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "north",     area: 153, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3h", price: 92000,  status: "available" },
+      { code: "12", floor: 3, floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "south", area: 186, outdoor: 120, beds: 3, baths: 3, type: "roof",      plan: "plan-3i", price: 131000, status: "available" },
+      { code: "13", floor: 3, floorLabel: { ar: "الطابق الثالث", en: "Third floor" },  orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3g", price: 90000,  status: "available" },
+      { code: "14", floor: 3, floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "north", area: 186, outdoor: 110, beds: 3, baths: 3, type: "roof",      plan: "plan-3j", price: 131000, status: "available" },
+    ],
+  },
   {
     id: "sherman-2",
     name: { ar: "جنرال شيرمان ٢", en: "General Sherman 2" },
@@ -173,20 +260,6 @@ const PROJECTS = [
       en: "General Sherman Housing's first scheme, delivered in full. Details are available on request.",
     },
     gallery: ["sherman1-1", "sherman1-2", "sherman1-3", "sherman1-4"],
-    units: [],
-  },
-  {
-    id: "sherman-3",
-    name: { ar: "جنرال شيرمان ٣", en: "General Sherman 3" },
-    district: "marj-al-hamam",
-    status: "upcoming",
-    image: "sherman3-1",
-    tagline: { ar: "مشروعنا القادم — التصاميم جاهزة", en: "Our next scheme — designs complete" },
-    description: {
-      ar: "المشروع القادم لشركة جنرال شيرمان للإسكان. الصور المعروضة تصاميم ثلاثية الأبعاد للمشروع. للاستفسار عن مواعيد الطرح والأسعار تواصل معنا.",
-      en: "The next General Sherman Housing scheme. The images shown are 3D design studies. Contact us about release dates and pricing.",
-    },
-    gallery: ["sherman3-1", "sherman3-2", "sherman3-3", "sherman3-4"],
     units: [],
   },
 ];
@@ -322,6 +395,7 @@ const ORIENTATIONS = {
   west: { ar: "غربية", en: "West facing" },
   northeast: { ar: "شمالية شرقية", en: "North-east facing" },
   southeast: { ar: "جنوبية شرقية", en: "South-east facing" },
+  southwest: { ar: "جنوبية غربية", en: "South-west facing" },
 };
 
 const PROJECT_STATUS = {

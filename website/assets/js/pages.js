@@ -156,7 +156,7 @@
       "sherman2-interior-7": { ar: "جنرال شيرمان ٢ — تشطيبات الأبواب", en: "General Sherman 2 — door finishes" },
       "sherman1-1": { ar: "جنرال شيرمان ١ — المشروع المُسلَّم", en: "General Sherman 1 — the delivered scheme" },
       "sherman1-3": { ar: "جنرال شيرمان ١ — الواجهة", en: "General Sherman 1 — elevation" },
-      "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع القادم", en: "General Sherman 3 — design of the coming scheme" },
+      "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع", en: "General Sherman 3 — the scheme's design" },
       "sherman3-2": { ar: "جنرال شيرمان ٣ — تصميم الواجهة", en: "General Sherman 3 — elevation design" },
       "sherman3-4": { ar: "جنرال شيرمان ٣ — المشروع ليلاً", en: "General Sherman 3 — the scheme at night" },
     };
