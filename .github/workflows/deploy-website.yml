@@ -79,6 +79,20 @@ jobs:
         run: node tools/check-content.mjs
         working-directory: website
 
+      # Put a content hash in every CSS and JS URL before uploading. The prices
+      # live in assets/js/data.js under a filename that never changes, so
+      # without this a cached copy of the price list can outlive a deploy with
+      # no way to reach it -- which is how the General Sherman 3 schedule went
+      # live while the site kept showing "coming soon".
+      #
+      # It runs here rather than being committed because a committed stamp goes
+      # stale the moment someone edits data.js and forgets to re-run it, which
+      # is the same bug with an extra step. The checkout is disposable, so the
+      # repository keeps plain, openable files.
+      - name: Version the asset URLs
+        run: node tools/stamp-assets.mjs
+        working-directory: website
+
       # --branch decides production vs preview, and getting it wrong is the
       # quiet failure this whole workflow exists to end: a preview deployment
       # succeeds, goes green, prints a URL, and leaves the custom domain on the
