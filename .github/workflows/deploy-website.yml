@@ -1,0 +1,90 @@
+name: deploy website
+
+# Publish website/ to Cloudflare Pages on every push to main.
+#
+# Why this exists rather than the dashboard's Git integration: a Git connection
+# is a setting in someone's account. You cannot see it in the repository, you
+# cannot review a change to it, and when it is off nothing anywhere says so --
+# main just quietly stops reaching the site, which is exactly what happened. The
+# schedule for General Sherman 3 sat merged on main while the live page still
+# advertised it as a coming project with no units.
+#
+# A workflow is the opposite: it is in the diff, it leaves a log per commit, and
+# it fails loudly. Actions runners have unrestricted egress, so this works from
+# CI even though the agent that wrote it cannot reach Cloudflare at all.
+#
+# It uses `wrangler pages deploy`, which uploads to a Pages project whether that
+# project was created as Direct Upload or connected to Git.
+#
+# IF YOU ALSO CONNECT THE PROJECT TO GIT you will get two deployments per push.
+# Pick one. This one is recommended, because it is visible here.
+
+on:
+  push:
+    branches: [main]
+    # Only when something the site is built from actually changed. The other
+    # project in this repository shares main and must not trigger deploys.
+    paths:
+      - "website/**"
+      - ".github/workflows/deploy-website.yml"
+  # Lets you redeploy from the Actions tab without an empty commit -- which is
+  # what you want the day the live site is stale and you need it pushed again.
+  workflow_dispatch:
+
+# Never let two deploys race to be "latest".
+concurrency:
+  group: deploy-website
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://general-sherman-housing.com
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Say what is missing, by name, before spending a deploy on finding out.
+      # A token without the Cloudflare Pages:Edit permission fails here with a
+      # 403 from the API and no explanation of which permission it wanted.
+      - name: Check the deploy credentials are present
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          missing=""
+          [ -n "$TOKEN" ]   || missing="$missing\n  - secret CLOUDFLARE_API_TOKEN (My Profile -> API Tokens -> Create Token -> Cloudflare Pages: Edit)"
+          [ -n "$ACCOUNT" ] || missing="$missing\n  - secret CLOUDFLARE_ACCOUNT_ID (Cloudflare dashboard sidebar, or the hex string in the dashboard URL)"
+          [ -n "$PROJECT" ] || missing="$missing\n  - variable CLOUDFLARE_PAGES_PROJECT (the exact Pages project name, as spelled in Workers & Pages)"
+          if [ -n "$missing" ]; then
+            printf 'Cannot deploy. Add these under Settings -> Secrets and variables -> Actions:%b\n' "$missing"
+            printf '\nCLOUDFLARE_PAGES_PROJECT is a *variable*, not a secret: a wrong name does not fail,\nit silently creates a second Pages project that no domain points at.\n'
+            exit 1
+          fi
+
+      # Never publish a content file the checker rejects. A missing floor plan
+      # or a price dropped from an available unit would otherwise go live.
+      - name: Check the site content
+        run: node tools/check-content.mjs
+        working-directory: website
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages deploy website \
+            --project-name="${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
+            --branch=main \
+            --commit-dirty=true

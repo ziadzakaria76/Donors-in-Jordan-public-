@@ -32,13 +32,49 @@ The site is a folder of static files. Publish `website/` as the site root.
 
 | Host | What to do |
 | --- | --- |
-| **Cloudflare Pages** | The domain is already at Cloudflare, so this is the shortest path — see below. |
+| **Cloudflare Pages** | What the site actually uses. Deployed from CI, not the dashboard — see below. |
 | **Netlify** | Drag the `website/` folder onto the Netlify dashboard, or connect the repo and set **base directory** `website`, **publish directory** `website`, and leave the build command empty. `netlify.toml` already sets caching and the 404 page. |
 | **Vercel** | Import the repo, set **root directory** to `website`, framework preset **Other**, no build command. `vercel.json` sets the caching headers. |
 | **cPanel / any shared host** | Upload the contents of `website/` into `public_html/` over FTP. Nothing else to configure. |
 | **GitHub Pages** | Push, then set Pages to serve from the branch and the `/website` folder. |
 
 ### Cloudflare Pages
+
+Deployment is driven by
+[`.github/workflows/deploy-website.yml`](../.github/workflows/deploy-website.yml),
+not by the dashboard's Git integration. It publishes `website/` on every push to
+`main` that touches it, and has a **Run workflow** button for redeploying on
+demand.
+
+That is deliberate. A Git connection is a setting inside someone's account: you
+cannot see it from the repository, you cannot review a change to it, and when it
+is off, nothing says so — `main` simply stops reaching the site. That is not
+hypothetical here. The General Sherman 3 schedule sat merged on `main` while the
+live page still advertised it as a coming project with no units, and the only
+clue was a screenshot. A workflow is in the diff, leaves a log per commit, and
+fails loudly.
+
+It needs three values under **Settings → Secrets and variables → Actions**:
+
+| Name | Kind | Where it comes from |
+| --- | --- | --- |
+| `CLOUDFLARE_API_TOKEN` | secret | My Profile → API Tokens → Create Token → **Cloudflare Pages: Edit** |
+| `CLOUDFLARE_ACCOUNT_ID` | secret | Cloudflare sidebar, or the hex string in the dashboard URL |
+| `CLOUDFLARE_PAGES_PROJECT` | **variable** | the Pages project name, spelled exactly as in Workers & Pages |
+
+The workflow checks all three are present and names any that are missing before
+it spends a deploy finding out. It also runs `npm run check` first, so a content
+file that fails its own tests never reaches the site.
+
+`CLOUDFLARE_PAGES_PROJECT` is a variable rather than a secret on purpose: a
+wrong project name does not fail, it silently creates a *second* Pages project
+that no domain points at, and you would rather be able to read it back.
+
+**If you also connect the project to Git in the dashboard, every push deploys
+twice.** Pick one.
+
+<details>
+<summary>Setting the project up in the dashboard by hand</summary>
 
 **Workers & Pages → Create → Pages → Connect to Git**, pick the repo, then:
 
@@ -63,14 +99,16 @@ deployments). Otherwise every branch is built and published at a public preview
 URL, including work in progress and branches with no `website/` directory at
 all.
 
-A Direct Upload project cannot be converted to a Git-connected one. If the
-project was created by dragging a folder in, make a new project connected to
-Git, check it on its `*.pages.dev` URL, then move the custom domain across and
-delete the old project.
+A Direct Upload project cannot be converted to a Git-connected one. That is a
+reason to prefer the workflow above: `wrangler pages deploy` publishes to a
+project of either kind, so a project created by dragging a folder in does not
+have to be rebuilt.
 
 Then **Custom domains → Set up a custom domain**, add `general-sherman-housing.com`
 and `www.general-sherman-housing.com`. Cloudflare writes the DNS itself, since it
 is also the registrar, and issues the certificate.
+
+</details>
 
 ### Caching, and why images are not cached forever
 
