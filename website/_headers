@@ -19,16 +19,26 @@
 /assets/img/*
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
-# CSS and JS are deliberately left on the default (revalidate every time).
-# main.css and app.js are unversioned names, so caching them hard would strand
-# visitors on old markup after a deploy.
-
-# HTML must never be cached hard. These pages carry the prices, the
-# availability and the contact details; a stale one is a wrong one, and a
-# corrected page that visitors cannot see is the failure mode that matters.
+# Nothing that carries content may be cached hard, and on this site that means
+# the JavaScript as much as the HTML.
+#
+# This used to say CSS and JS were "deliberately left on the default
+# (revalidate every time)" and protect only the HTML, on the reasoning that the
+# pages carry the prices. They do not. Every price, every unit and every phone
+# number lives in assets/js/data.js -- the pages are empty shells that data.js
+# fills in. Leaving that file to a platform default, whatever it happens to be,
+# is leaving the price list to a platform default. It is stated here instead.
+#
+# The filenames carry no content hash, so a hard cache on any of them strands a
+# visitor on old markup, old styles or old prices after a deploy, with no way
+# to tell them otherwise.
 /
   Cache-Control: public, max-age=0, must-revalidate
 /*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/css/*
   Cache-Control: public, max-age=0, must-revalidate
 
 # frame-ancestors: the site embeds a map, but is never itself meant to be

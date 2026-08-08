@@ -81,8 +81,16 @@ is also the registrar, and issues the certificate.
 | --- | --- | --- |
 | `assets/fonts/*` | 1 year, `immutable` | a woff2 subset is never re-cut under the same name |
 | `assets/img/*` | 1 week, revalidated | filenames carry no content hash, and images **do** get re-rendered in place |
-| `*.html` | `max-age=0, must-revalidate` | these pages carry prices, availability and contact details |
-| CSS and JS | default (revalidate) | `main.css` and `app.js` are unversioned names |
+| `*.html` | `max-age=0, must-revalidate` | the shells the content is rendered into |
+| `assets/js/*`, `assets/css/*` | `max-age=0, must-revalidate` | **the prices live here**, not in the HTML |
+
+The JS rule is the one that is easy to get wrong, and this file got it wrong
+until it was caught. It used to leave CSS and JS "on the default (revalidate
+every time)" and protect only the HTML, reasoning that the pages carry the
+prices. They do not: every price, unit and phone number is in
+`assets/js/data.js`, and the pages are shells it fills in. Leaving that file to
+whatever a host happens to default to is leaving the price list to a platform
+default — so it is stated, not assumed.
 
 The image rule is the one that looks wrong and is not. `immutable` would be
 correct if filenames were content-hashed; they are not —

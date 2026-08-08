@@ -174,6 +174,26 @@ for (const p of PROJECTS) {
   check(locs.some((l) => l.includes(`id=${p.id}`)), `sitemap.xml does not list project ${p.id}`);
 }
 
+/* ------------------------------------------- three hosts, one cache policy
+   _headers, netlify.toml and vercel.json say the same thing in three
+   syntaxes, and a rule added to one and forgotten in the others is invisible
+   until someone deploys to that host. The path that matters most is
+   assets/js: the prices are in data.js, so caching it hard caches the price
+   list. That was the actual mistake here once. */
+
+for (const [file, needles] of [
+  ["_headers", ["/assets/js/*", "/assets/css/*", "/*.html"]],
+  ["netlify.toml", ["/assets/js/*", "/assets/css/*", "/*.html"]],
+  ["vercel.json", ["/assets/js/(.*)", "/assets/css/(.*)", "/(.*).html"]],
+]) {
+  const text = read(file);
+  for (const needle of needles) {
+    check(text.includes(needle), `${file} has no cache rule for ${needle} — the three host configs must stay in step`);
+  }
+  check((text.match(/max-age=0, must-revalidate/g) || []).length >= needles.length,
+    `${file} names ${needles.length} paths that must revalidate but sets the policy on fewer`);
+}
+
 /* ------------------------------------------------------------ unfinished
    Not failures. «REPLACE» marks something true that nobody has supplied yet,
    and printing them turns the go-live list into something you run. */
