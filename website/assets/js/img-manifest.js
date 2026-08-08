@@ -5,6 +5,16 @@
    browser a srcset it can actually fetch. A name missing from this map falls
    back to all four widths. */
 const IMG_VARIANTS = {
+  "plan-3a": [800, 1280],
+  "plan-3b": [800, 1280],
+  "plan-3c": [800, 1280],
+  "plan-3d": [800, 1280],
+  "plan-3e": [800, 1280],
+  "plan-3f": [800, 1280],
+  "plan-3g": [800, 1280],
+  "plan-3h": [800, 1280],
+  "plan-3i": [800, 1280],
+  "plan-3j": [800, 1280],
   "plan-a": [800, 1280],
   "plan-b": [800, 1280],
   "plan-c": [800, 1280],
