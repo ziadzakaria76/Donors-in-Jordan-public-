@@ -447,7 +447,11 @@ Add `status: "selling" | "delivered" | "upcoming"` to a project to show one; a
 Every photograph on the site is the company's own, lifted out of the General
 Sherman 2 and General Sherman 3 sales brochures (PDF) along with the unit floor
 plans, and converted to WebP at several widths. `sherman1-*`, `sherman2-*` and
-`sherman3-*` are photographs and 3D studies of the three schemes; `plan-a` …
+`sherman3-*` are photographs and 3D studies of the three schemes — note that
+General Sherman 3 is now **both**: `sherman3-1` … `sherman3-4` are 3D studies of
+the elevations, `sherman3-lobby-*` are photographs of the entrance as built, and
+the gallery note and the project description both say so rather than describing
+all of them as renders. `plan-a` …
 `plan-i` are the architect's drawings for each General Sherman 2 unit model, and
 `plan-3a` … `plan-3j` for General Sherman 3. Each `plan-3*` drawing is cropped
 straight from its brochure page, so it carries the model's room-dimension
@@ -455,7 +459,9 @@ schedule underneath the plan, as published.
 
 To add more, drop files into `assets/img/` named `<name>-480.webp`,
 `<name>-800.webp`, `<name>-1280.webp`, `<name>-1920.webp`, reference `<name>`
-from `data.js` (`image:` and `gallery:`), then run:
+from `data.js` (`image:` and `gallery:`), give it a caption in
+`IMAGE_CAPTIONS` — which is what the site gallery builds itself from, and what
+a project page uses to caption its images instead of numbering them — then run:
 
 ```bash
 npm run manifest

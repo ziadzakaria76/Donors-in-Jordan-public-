@@ -260,8 +260,8 @@ const T = {
   "gallery.lobbies": { ar: "المداخل", en: "Lobbies" },
   "gallery.interiors": { ar: "المساحات الداخلية", en: "Interiors" },
   "gallery.note": {
-    ar: "صور المشاريع المُسلَّمة فوتوغرافية. صور مشروع جنرال شيرمان ٣ تصاميم ثلاثية الأبعاد وقد تختلف عن التنفيذ النهائي.",
-    en: "Photographs are of the delivered schemes. Images of General Sherman 3 are 3D design studies and may differ from the built result.",
+    ar: "جميع الصور فوتوغرافية، عدا صور واجهات جنرال شيرمان ٣ فهي تصاميم ثلاثية الأبعاد وقد تختلف عن التنفيذ النهائي.",
+    en: "Photographs throughout, except the General Sherman 3 elevations, which are 3D design studies and may differ from the built result.",
   },
 
   /* about */

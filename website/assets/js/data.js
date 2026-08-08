@@ -100,8 +100,8 @@ const PROJECTS = [
       en: "Fourteen apartments in Marj Al-Hamam, from 90,000 JOD",
     },
     description: {
-      ar: "يتميّز المشروع بموقعه الاستراتيجي الحيوي، إذ يقع على شارعين بواجهتين شرقية وغربية، مما يمنحه تهوية وإضاءة طبيعية ممتازة. كما يقع بالقرب من مجموعة من الخدمات الأساسية، مثل المؤسسات التعليمية والمرافق الصحية، بالإضافة إلى قربه من مراكز التسوق التي تسهّل الوصول إلى احتياجات السكان اليومية. ويبرز المشروع أيضاً من خلال التشطيبات الفاخرة عالية الجودة التي توفر الراحة والفخامة. الصور المعروضة تصاميم ثلاثية الأبعاد للمشروع.",
-      en: "The building stands on two streets, with an east and a west frontage that give it exceptional natural light and cross-ventilation. It sits close to schools and universities, health facilities, and the shopping that covers daily needs — and its finishes are the other half of the argument, specified by name throughout. The images shown are 3D design studies.",
+      ar: "يتميّز المشروع بموقعه الاستراتيجي الحيوي، إذ يقع على شارعين بواجهتين شرقية وغربية، مما يمنحه تهوية وإضاءة طبيعية ممتازة. كما يقع بالقرب من مجموعة من الخدمات الأساسية، مثل المؤسسات التعليمية والمرافق الصحية، بالإضافة إلى قربه من مراكز التسوق التي تسهّل الوصول إلى احتياجات السكان اليومية. ويبرز المشروع أيضاً من خلال التشطيبات الفاخرة عالية الجودة التي توفر الراحة والفخامة. صور الواجهات تصاميم ثلاثية الأبعاد، أما صور المدخل فهي من التنفيذ.",
+      en: "The building stands on two streets, with an east and a west frontage that give it exceptional natural light and cross-ventilation. It sits close to schools and universities, health facilities, and the shopping that covers daily needs — and its finishes are the other half of the argument, specified by name throughout. The elevation images are 3D design studies; the entrance photographs are of the building as built.",
     },
     highlights: [
       { ar: "موقع سكني مميز وهادئ، ومدخل مميز للمشروع", en: "A quiet residential setting, with a distinctive entrance to the building" },
@@ -148,7 +148,13 @@ const PROJECTS = [
         ],
       },
     ],
-    gallery: ["sherman3-1", "sherman3-2", "sherman3-3", "sherman3-4"],
+    /* Exteriors first, then the entrance as it has actually been built. The
+       two are different kinds of image and the captions say so — see the
+       gallery note in i18n.js. */
+    gallery: [
+      "sherman3-1", "sherman3-2", "sherman3-3", "sherman3-4",
+      "sherman3-lobby-1", "sherman3-lobby-2", "sherman3-lobby-3", "sherman3-lobby-4",
+    ],
     /* The brochure's schedule of fourteen apartments. Every one is priced, so
        every one is available; the brochure marks none as sold. Bedroom and
        bathroom counts come from each plan's own model page (A–J), not from the
@@ -276,6 +282,48 @@ const PROJECTS = [
   },
 ];
 
+
+/* ------------------------------------------------------- image captions
+   What each photograph is, in both languages. Lives here rather than in the
+   gallery renderer because it is content, and because two pages need it: the
+   gallery page builds itself from these keys, and a project page uses them to
+   caption its own images instead of numbering them. A numbered caption was
+   fine while a project's gallery was four images of one kind; General Sherman
+   3 now mixes 3D studies of the elevations with photographs of the entrance as
+   built, and "image 5 of 8" does not tell a buyer which is which.
+
+   An image with no entry here still renders — the project page falls back to
+   numbering it — so this map is a caption list, not a permission list. */
+
+const IMAGE_CAPTIONS = {
+    "sherman2-exterior-day": { ar: "جنرال شيرمان ٢ — الواجهة من الشارع", en: "General Sherman 2 — the building from the street" },
+    "sherman2-exterior-dusk": { ar: "جنرال شيرمان ٢ — المبنى عند المغيب", en: "General Sherman 2 — the building at dusk" },
+    "sherman2-entrance": { ar: "جنرال شيرمان ٢ — المدخل الرئيسي", en: "General Sherman 2 — the main entrance" },
+    "sherman2-lobby-1": { ar: "جنرال شيرمان ٢ — المدخل بارتفاع طابقين", en: "General Sherman 2 — the double-height lobby" },
+    "sherman2-lobby-2": { ar: "جنرال شيرمان ٢ — بهو المدخل", en: "General Sherman 2 — entrance hall" },
+    "sherman2-lobby-3": { ar: "جنرال شيرمان ٢ — المصعد والمداخل", en: "General Sherman 2 — lift and apartment doors" },
+    "sherman2-lobby-4": { ar: "جنرال شيرمان ٢ — تفاصيل المدخل", en: "General Sherman 2 — entrance detail" },
+    "sherman2-living-1": { ar: "جنرال شيرمان ٢ — الصالون وأرضيات الرخام", en: "General Sherman 2 — reception room with marble floors" },
+    "sherman2-living-2": { ar: "جنرال شيرمان ٢ — المعيشة", en: "General Sherman 2 — living area" },
+    "sherman2-living-3": { ar: "جنرال شيرمان ٢ — مساحة الاستقبال", en: "General Sherman 2 — reception space" },
+    "sherman2-interior-1": { ar: "جنرال شيرمان ٢ — غرفة نوم", en: "General Sherman 2 — bedroom" },
+    "sherman2-interior-2": { ar: "جنرال شيرمان ٢ — غرفة بأرضية خشبية", en: "General Sherman 2 — room with wood flooring" },
+    "sherman2-interior-3": { ar: "جنرال شيرمان ٢ — الحمّام", en: "General Sherman 2 — bathroom" },
+    "sherman2-interior-4": { ar: "جنرال شيرمان ٢ — ممر الغرف", en: "General Sherman 2 — bedroom corridor" },
+    "sherman2-interior-5": { ar: "جنرال شيرمان ٢ — الممر الداخلي", en: "General Sherman 2 — internal corridor" },
+    "sherman2-interior-6": { ar: "جنرال شيرمان ٢ — باب الشقة", en: "General Sherman 2 — apartment entrance door" },
+    "sherman2-interior-7": { ar: "جنرال شيرمان ٢ — تشطيبات الأبواب", en: "General Sherman 2 — door finishes" },
+    "sherman1-1": { ar: "جنرال شيرمان ١ — المشروع المُسلَّم", en: "General Sherman 1 — the delivered scheme" },
+    "sherman1-3": { ar: "جنرال شيرمان ١ — الواجهة", en: "General Sherman 1 — elevation" },
+    "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع", en: "General Sherman 3 — the scheme's design" },
+    "sherman3-2": { ar: "جنرال شيرمان ٣ — تصميم الواجهة", en: "General Sherman 3 — elevation design" },
+    "sherman3-3": { ar: "جنرال شيرمان ٣ — المدخل والإنارة ليلاً", en: "General Sherman 3 — the entrance and its lighting at night" },
+    "sherman3-4": { ar: "جنرال شيرمان ٣ — المشروع ليلاً", en: "General Sherman 3 — the scheme at night" },
+    "sherman3-lobby-1": { ar: "جنرال شيرمان ٣ — مدخل العمارة", en: "General Sherman 3 — the building entrance" },
+    "sherman3-lobby-2": { ar: "جنرال شيرمان ٣ — بهو المدخل", en: "General Sherman 3 — the entrance hall" },
+    "sherman3-lobby-3": { ar: "جنرال شيرمان ٣ — تشطيبات المدخل", en: "General Sherman 3 — entrance finishes" },
+    "sherman3-lobby-4": { ar: "جنرال شيرمان ٣ — المدخل من الدرج", en: "General Sherman 3 — the entrance from the stair" },
+};
 
 /* ---------------------------------------------------------------- amenities */
 
@@ -420,7 +468,7 @@ const PROJECT_STATUS = {
 
 const DATA = {
   COMPANY, DISTRICTS, PROJECTS, UNITS, AMENITIES, TESTIMONIALS,
-  PROCESS, FAQS, UNIT_TYPES, ORIENTATIONS, PROJECT_STATUS,
+  PROCESS, FAQS, UNIT_TYPES, ORIENTATIONS, PROJECT_STATUS, IMAGE_CAPTIONS,
 };
 
 if (typeof window !== "undefined") window.DATA = DATA;
