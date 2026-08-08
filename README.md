@@ -26,7 +26,7 @@ cd website
 python3 -m http.server 8080
 ```
 
-The site is deployed to <https://generalshermanhousing.com> through Cloudflare
+The site is deployed to <https://general-sherman-housing.com> through Cloudflare
 Pages, publishing the contents of `website/`.
 
 Deliberately not documented twice: everything about the site lives in

@@ -28,7 +28,7 @@ const COMPANY = {
      so Google sees one address, not two. This string must stay in step with
      SITE in tools/build-pages.mjs, which stamps the canonical, og:url and
      hreflang tags into every page, and with sitemap.xml and robots.txt. */
-  domain: "https://generalshermanhousing.com",
+  domain: "https://general-sherman-housing.com",
   /* Deliberately blank. The footer's address line, the contact page's office
      row and the office map are all removed while these are empty; fill either
      one in and restore the markup (README → "Removed sections") to bring the

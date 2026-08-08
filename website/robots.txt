@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://generalshermanhousing.com/sitemap.xml
+Sitemap: https://general-sherman-housing.com/sitemap.xml

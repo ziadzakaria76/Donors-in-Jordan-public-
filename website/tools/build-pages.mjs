@@ -44,7 +44,7 @@ const LIGHTBOX = `<div class="modal modal--lightbox" id="lightbox" role="dialog"
   </div>
 </div>`;
 
-const SITE = "https://generalshermanhousing.com";
+const SITE = "https://general-sherman-housing.com";
 
 function head({ file, title, desc, keywords = "", noindex = false }) {
   const url = `${SITE}/${file === "index.html" ? "" : file}`;
