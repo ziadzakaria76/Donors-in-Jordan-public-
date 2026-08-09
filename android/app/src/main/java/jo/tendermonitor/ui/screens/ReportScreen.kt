@@ -25,6 +25,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import jo.tendermonitor.data.report.Opportunity
@@ -301,13 +303,29 @@ private fun OpportunityRow(tender: Opportunity, onOpenUrl: (String) -> Unit) {
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            Text(
-                "%.0f".format(tender.score),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = scoreColor(tender.score),
-                modifier = Modifier.width(38.dp),
-            )
+            // The score as a tinted badge rather than a loose number.
+            //
+            // This list is read by scanning down the left edge, and a bare
+            // figure in a fixed-width column gives the eye no anchor -- the
+            // colour was carrying the whole signal and only on the glyph
+            // itself. A filled shape of the same colour is legible at a
+            // glance and stays legible for someone who cannot separate the
+            // reds from the greens, because the number is still the number.
+            Surface(
+                color = scoreColor(tender.score).copy(alpha = 0.14f),
+                contentColor = scoreColor(tender.score),
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.width(42.dp),
+            ) {
+                Text(
+                    "%.0f".format(tender.score),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(vertical = 5.dp),
+                )
+            }
+            Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 // The notice's own words, in the notice's own direction.
                 //
