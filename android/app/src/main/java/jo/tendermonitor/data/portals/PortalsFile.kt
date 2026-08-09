@@ -1,5 +1,6 @@
 package jo.tendermonitor.data.portals
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -30,6 +31,12 @@ object PortalsFile {
     /** The path in the repository. Also what the commit message names. */
     const val PATH = "jordan_tender_monitor/portals.json"
 
+    // prettyPrintIndent is still marked experimental. Opted in explicitly
+    // rather than left as a warning: the two-space indent is what keeps a
+    // portals.json edited from a phone diffing cleanly against one edited by
+    // hand, and an unannotated experimental call is the kind that disappears
+    // in a library upgrade with no warning that the formatting changed.
+    @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = false

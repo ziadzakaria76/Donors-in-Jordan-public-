@@ -509,6 +509,49 @@ def test_every_policy_decision_is_one_the_app_actually_makes():
           f"never called outside its own tests: {unused}")
 
 
+def test_an_arabic_notice_is_rendered_right_to_left():
+    """The pipeline detects Arabic. Every renderer has to act on it.
+
+    `language` is decided once, in the pipeline, and travels with each
+    opportunity. The e-mail applies class="rtl" and the Word pack has its own
+    branch -- and the app parsed the field into its model and used it nowhere,
+    so an Arabic title rendered left-to-right with its punctuation, figures and
+    any Latin fragment in the wrong visual place.
+
+    That is not hypothetical: the Saudi Fund publishes in Arabic and the
+    pipeline deliberately keeps it in the original rather than translating.
+
+    The failure is invisible to every other test. The document carried the
+    field, the app parsed it, the screen rendered without error, and the result
+    was simply wrong for the reader.
+    """
+    document = _report_document()
+    languages = {t.get("language") for t in document["tenders"]}
+    check("ar" in languages,
+          "rtl: the fixtures include an Arabic notice to render",
+          f"languages present: {languages}")
+
+    report_screen = (APP / "ui" / "screens" / "ReportScreen.kt").read_text(
+        encoding="utf-8")
+
+    check("language" in report_screen,
+          "rtl: the screen consults the notice's language at all",
+          "the field arrives and is ignored, which is how it renders backwards")
+    check("LayoutDirection.Rtl" in report_screen,
+          "rtl: and re-bases the text right-to-left for Arabic")
+    check("LocalLayoutDirection" in report_screen,
+          "rtl: through the layout direction, so bidi ordering is the "
+          "framework's job rather than a manual guess")
+
+    # The e-mail and the Word pack already do this. If either stopped, the
+    # phone would be the only renderer getting it right, which is its own kind
+    # of inconsistency.
+    reporter_source = (Path(__file__).resolve().parent.parent / "agents"
+                       / "reporter.py").read_text(encoding="utf-8")
+    check('== "ar"' in reporter_source,
+          "rtl: the pipeline's own renderers still branch on Arabic")
+
+
 def test_the_apps_workflow_inputs_match_the_workflow():
     """A choice input is matched literally. A typo is a 422 at the moment you tap Run."""
     import io
@@ -552,5 +595,6 @@ TESTS = [
     test_the_forms_rules_are_the_rules_the_loader_enforces,
     test_the_app_can_find_the_files_the_run_actually_produces,
     test_every_policy_decision_is_one_the_app_actually_makes,
+    test_an_arabic_notice_is_rendered_right_to_left,
     test_the_apps_workflow_inputs_match_the_workflow,
 ]

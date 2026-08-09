@@ -29,13 +29,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import jo.tendermonitor.data.report.Opportunity
 import jo.tendermonitor.ui.ProblemCard
@@ -306,7 +309,34 @@ private fun OpportunityRow(tender: Opportunity, onOpenUrl: (String) -> Unit) {
                 modifier = Modifier.width(38.dp),
             )
             Column(Modifier.weight(1f)) {
-                Text(tender.title, style = MaterialTheme.typography.bodyLarge)
+                // The notice's own words, in the notice's own direction.
+                //
+                // The pipeline detects Arabic and records it per opportunity;
+                // the e-mail applies class="rtl" and the Word pack has its own
+                // branch. This screen ignored the field entirely, so an Arabic
+                // title rendered left-to-right, putting its punctuation and any
+                // Latin fragment or figure in the wrong visual place. Saudi Fund
+                // publishes in Arabic and the pipeline deliberately keeps it in
+                // the original, so this is not a hypothetical row.
+                //
+                // Only the title is re-based. Everything else on this row --
+                // portal name, sector, the deadline sentence, the flags -- is
+                // written by this app in English, and forcing those right would
+                // be wrong in the opposite direction.
+                val ambient = LocalLayoutDirection.current
+                val direction =
+                    if (tender.language.equals("ar", ignoreCase = true)) {
+                        LayoutDirection.Rtl
+                    } else {
+                        ambient
+                    }
+                CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                    Text(
+                        tender.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     buildString {

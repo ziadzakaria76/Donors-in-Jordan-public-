@@ -13,7 +13,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Article
+// Auto-mirrored: the manifest declares supportsRtl, so on an Arabic device the
+// navigation bar flips -- and a document icon that keeps its spine on the left
+// while everything around it moves is the detail that makes a mirrored layout
+// look broken. The others here (a play triangle, a folder, a cog, sliders, a
+// server stack) have no auto-mirrored variant because they do not read
+// directionally.
+import androidx.compose.material.icons.automirrored.filled.Article
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PlayArrow
@@ -171,7 +177,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Tab(val label: String, val icon: ImageVector) {
-    LATEST("Latest", Icons.Filled.Article),
+    LATEST("Latest", Icons.AutoMirrored.Filled.Article),
     RUN("Run", Icons.Filled.PlayArrow),
     HEALTH("Health", Icons.Filled.Dns),
     PORTALS("Portals", Icons.Filled.Tune),
