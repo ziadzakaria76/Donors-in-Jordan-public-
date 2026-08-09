@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -298,7 +299,10 @@ private fun runLabel(run: WorkflowRun): String = when {
     else -> run.conclusion ?: "done"
 }
 
-private fun runColor(run: WorkflowRun) = when {
+// @Composable because the status colours now resolve per theme: a mid-tone
+// green picked to sit on white is close to unreadable on a dark surface.
+@Composable
+private fun runColor(run: WorkflowRun): Color = when {
     run.isRunning -> StatusColors.warning
     run.conclusion == "success" -> StatusColors.ok
     run.conclusion == "failure" -> StatusColors.broken

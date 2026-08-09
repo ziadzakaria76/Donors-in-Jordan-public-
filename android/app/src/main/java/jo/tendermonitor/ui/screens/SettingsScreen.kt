@@ -115,31 +115,54 @@ fun SettingsScreen(
 
                 Spacer(Modifier.height(12.dp))
                 HorizontalDivider()
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "The exact permissions this app needs",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    "A fine-grained personal access token, scoped to this ONE " +
-                        "repository, with:\n" +
-                        "  • Actions: Read and write — to start a run and read its files\n" +
-                        "  • Contents: Read and write — to edit the portal list\n" +
-                        "\nNothing else. No organisation permissions, no other " +
-                        "repositories. If you only want to read runs and never edit " +
-                        "portals, Contents can be Read-only.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "It is stored in EncryptedSharedPreferences, whose key is held by " +
-                        "the Android Keystore. It is not in the APK, not in any log " +
-                        "line, and it is stripped out of every error this app shows.",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+
+                // Folded away by default.
+                //
+                // This is reference material: it answers "what do I tick on
+                // GitHub", which is a question you have exactly once, and
+                // then it sits on top of the controls forever. Leaving it
+                // open made the card mostly prose and pushed the token field
+                // -- the only thing anyone comes here to touch -- into a
+                // corner of a wall of text.
+                //
+                // Folded, not deleted. The permissions this app asks for are
+                // the one thing a person should be able to check for
+                // themselves without leaving the screen or trusting a README
+                // they have not read.
+                var permissionsOpen by remember { mutableStateOf(false) }
+                TextButton(
+                    onClick = { permissionsOpen = !permissionsOpen },
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(
+                        if (permissionsOpen) {
+                            "Hide the exact permissions this app needs"
+                        } else {
+                            "The exact permissions this app needs"
+                        }
+                    )
+                }
+
+                if (permissionsOpen) {
+                    Text(
+                        "A fine-grained personal access token, scoped to this ONE " +
+                            "repository, with:\n" +
+                            "  • Actions: Read and write — to start a run and read its files\n" +
+                            "  • Contents: Read and write — to edit the portal list\n" +
+                            "\nNothing else. No organisation permissions, no other " +
+                            "repositories. If you only want to read runs and never edit " +
+                            "portals, Contents can be Read-only.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "It is stored in EncryptedSharedPreferences, whose key is held by " +
+                            "the Android Keystore. It is not in the APK, not in any log " +
+                            "line, and it is stripped out of every error this app shows.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
