@@ -8,6 +8,18 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Runnable by hand, against any branch.
+  #
+  # Not a convenience. GitHub has twice stopped turning pushes into check runs
+  # on this repository -- not queued, not failed, never created -- which leaves
+  # a pull request showing green ticks from an older commit and nothing
+  # anywhere saying the newer ones were never tested. The Android workflows
+  # could be dispatched through that outage and this one could not, so the
+  # Python suite was the only thing with no way to be run at all.
+  #
+  # A workflow that can only be started by an event is a workflow you cannot
+  # recover when the event system is the thing that is broken.
+  workflow_dispatch:
 
 jobs:
   test:

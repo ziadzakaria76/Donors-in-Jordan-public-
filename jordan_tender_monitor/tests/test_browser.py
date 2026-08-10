@@ -852,6 +852,37 @@ def test_the_release_workflow_cannot_silently_skip_a_release():
               f"release: {name} checks out enough history for it to be right")
 
 
+def test_every_workflow_can_be_started_by_hand():
+    """An event-only workflow cannot be recovered when events are the fault.
+
+    GitHub has twice stopped turning pushes on this repository into check runs
+    -- not queued, not failed, never created. A pull request then shows green
+    ticks from an older commit and nothing anywhere says the newer ones were
+    never tested, which is the exact shape of silent failure this codebase is
+    written against.
+
+    During the second outage the Android workflows could be dispatched by hand
+    and the Python suite could not, because it declared only push and
+    pull_request. So the one suite that proves the pipeline correct was the one
+    thing with no way to be run at all.
+    """
+    import io
+
+    workflows = sorted(
+        (ROOT.parent / ".github" / "workflows").glob("*.yml"))
+    check(len(workflows) >= 4, "dispatch: the workflow directory was found",
+          f"got {[w.name for w in workflows]}")
+
+    for path in workflows:
+        document = yaml().safe_load(io.open(path, encoding="utf-8").read())
+        # 'on' is YAML 1.1's boolean true.
+        triggers = document.get("on") or document.get(True) or {}
+        check("workflow_dispatch" in triggers,
+              f"dispatch: {path.name} can be started by hand",
+              f"its triggers are {sorted(triggers)} -- during an event-system "
+              f"outage there would be no way to run it")
+
+
 def test_ci_installs_the_test_only_dependencies_the_suite_needs():
     """The workflow checks need PyYAML, and CI has to install it.
 
@@ -1064,6 +1095,7 @@ TESTS = [
     test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at,
     test_every_workflow_file_is_structurally_valid_yaml,
     test_the_release_workflow_cannot_silently_skip_a_release,
+    test_every_workflow_can_be_started_by_hand,
     test_ci_installs_the_test_only_dependencies_the_suite_needs,
     test_the_emulator_workflow_covers_what_no_jvm_test_can,
     test_the_instrumented_tests_exist_and_cover_the_untestable_three,
