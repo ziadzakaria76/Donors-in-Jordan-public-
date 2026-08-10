@@ -35,7 +35,11 @@ log = logging.getLogger("gulftrack.adapters.workable")
 API_ROOT = "https://apply.workable.com/api/v3/accounts"
 BOARD_ROOT = "https://apply.workable.com"
 
-MAX_PAGES = 20
+# The board pages ten at a time, so this is a ceiling of roughly 600 postings.
+# The first live run set this to 20 and silently stopped at 200 of Qiddiya's
+# 278 — the guard fired as designed and logged it, but the ceiling was simply
+# too low for a giga-project employer.
+MAX_PAGES = 60
 
 # Workable is an API rather than someone's marketing site, so a four-second gap
 # between calls is unnecessarily slow for the per-job description fetches.

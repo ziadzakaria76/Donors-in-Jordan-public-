@@ -212,7 +212,11 @@ signals:
   - id: hospitality_resort
     label: "Hospitality / resort delivery"
     weight: 12
-    fields: [title, description]
+    # Title only. Searching the description made this fire on every Qiddiya
+    # role — Risk, Finance, Project Management — because their standard company
+    # blurb mentions hospitality. A genuine hospitality delivery role says so
+    # in its title; boilerplate is not scope.
+    fields: [title]
     keywords: [hospitality, resort, hotel, "mixed-use resort"]
     keywords_ar: [الضيافة, منتجع, فندق]
 

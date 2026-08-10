@@ -398,3 +398,32 @@ def test_arabic_employer_name_resolves_to_the_tier_1_target(engine):
     ))
     assert result.employer_tier == 1, "Arabic employer names must match the target list"
     assert any(c.signal_id == "employer_tier" for c in result.components)
+
+
+def test_company_boilerplate_does_not_fire_a_scope_signal(engine):
+    """Regression from the first live scan.
+
+    Every Qiddiya director role — Risk, Finance, Project Management — scored
+    'Hospitality / resort delivery +12' because the word appears in the
+    employer's standard company blurb rather than in the role's scope.
+    """
+    result = engine.score(posting(
+        title="Director - Risk",
+        employer="Qiddiya Investment Company",
+        location="Riyadh",
+        description=(
+            "Qiddiya is building a world-class entertainment, sports and "
+            "hospitality destination. The Director of Risk will own the "
+            "enterprise risk register."
+        ),
+    ))
+    assert not any(c.signal_id == "hospitality_resort" for c in result.components)
+
+
+def test_a_genuine_hospitality_delivery_role_still_scores(engine):
+    result = engine.score(posting(
+        title="Director of Development - Hospitality",
+        employer="Qiddiya Investment Company",
+        location="Riyadh",
+    ))
+    assert any(c.signal_id == "hospitality_resort" for c in result.components)
