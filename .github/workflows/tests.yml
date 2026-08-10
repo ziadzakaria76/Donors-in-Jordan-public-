@@ -43,6 +43,43 @@ jobs:
       - name: Pipeline self-test on fixtures
         run: python jordan_tender_monitor/run.py --self-test
 
+  # The Android app's business rules -- funnel maths, budget allocation, fee
+  # calculation, SLA timing across time zones, the discount guard. They live in
+  # a pure-Kotlin module with no Android dependency, which is what lets them run
+  # here in a minute and a half with no SDK and no emulator.
+  #
+  # This job is also the answer to the build problem described in
+  # gs3_marketing_ops/DECISIONS.md (D-1). The agent that wrote this cannot reach
+  # dl.google.com, so it cannot resolve the Android Gradle Plugin or AndroidX at
+  # all. Actions runners have unrestricted egress. So when :app is added to
+  # settings.gradle.kts, this is the job that compiles it -- add
+  # `./gradlew assembleDebug` below and the APK builds here even though it
+  # cannot be built locally.
+  #
+  # `check` is deliberately the whole gate rather than just `test`: it carries
+  # the 80% coverage floor and verifyStrings, which fails the build on a
+  # hardcoded UI string, on a key present in one language and missing from the
+  # other, and on a phrase the company must not put in writing.
+  marketing-ops:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Tests, coverage floor and the bilingual guard
+        run: ./gradlew check --no-daemon
+        working-directory: gs3_marketing_ops
+
+      - name: Report the actual coverage figure
+        run: ./gradlew coverage --no-daemon
+        working-directory: gs3_marketing_ops
+
   # The website is the other, unrelated project in this repository. Its content
   # file is meant to be edited by whoever is selling the units, and a mistake
   # there does not throw -- it renders a blank orientation, or a plan tab that
