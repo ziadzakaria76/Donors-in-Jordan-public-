@@ -38,9 +38,11 @@ ATS_MARKERS: tuple[tuple[str, str], ...] = (
     ("myworkdayjobs.com", "Workday"),
     ("workdayjobs.com", "Workday"),
     ("/wday/cxs/", "Workday"),
+    # hcmUI is the recruiting product; fscmUI is finance and supplier
+    # registration. Matching the bare oraclecloud.com host conflated the two
+    # and put Expo 2030 down as an ATS it does not have.
     ("hcmui/candidateexperience", "Oracle Recruiting Cloud"),
     ("recruitingcejobrequisitions", "Oracle Recruiting Cloud"),
-    ("oraclecloud.com", "Oracle Cloud (HCM likely)"),
     ("successfactors.com", "SAP SuccessFactors"),
     ("successfactors.eu", "SAP SuccessFactors"),
     ("jobs.sap.com", "SAP SuccessFactors"),
@@ -194,6 +196,89 @@ def probe(client: httpx.Client, url: str) -> dict:
     }
 
 
+# Candidate endpoints for the platforms the page probe actually confirmed.
+# Every one of these is a guess about request shape; the point of running them
+# is to find out which is real rather than to ship an adapter built on a hunch.
+API_CANDIDATES: tuple[tuple[str, str, str, dict | None], ...] = (
+    # Qiddiya — Workable board apply.workable.com/qiddiya-investment-company-1
+    ("qiddiya/workable", "GET",
+     "https://apply.workable.com/api/v3/accounts/qiddiya-investment-company-1/jobs", None),
+    ("qiddiya/workable", "POST",
+     "https://apply.workable.com/api/v3/accounts/qiddiya-investment-company-1/jobs",
+     {"query": "", "location": [], "department": [], "worktype": [], "remote": []}),
+    ("qiddiya/workable-spi", "GET",
+     "https://apply.workable.com/spi/v3/accounts/qiddiya-investment-company-1/jobs", None),
+
+    # ROSHN — Oracle tenant confirmed by the page probe; the REST call 403'd, so
+    # try the variations that differ in how the finder and headers are formed.
+    ("roshn/oracle-plain", "GET",
+     "https://fa-epph-saasfaprod1.fa.ocs.oraclecloud.com/hcmRestApi/resources/latest"
+     "/recruitingCEJobRequisitions?onlyData=true"
+     "&finder=findReqs;siteNumber=CX_1,limit=5", None),
+    ("roshn/oracle-11.13", "GET",
+     "https://fa-epph-saasfaprod1.fa.ocs.oraclecloud.com/hcmRestApi/resources/11.13.18.05"
+     "/recruitingCEJobRequisitions?onlyData=true"
+     "&finder=findReqs;siteNumber=CX_1,limit=5", None),
+
+    # Diriyah — SuccessFactors instance career23.sapsf.com, company thediriyah.
+    ("diriyah/sapsf-rss", "GET",
+     "https://career23.sapsf.com/careers?company=thediriyah&rss=true", None),
+    ("diriyah/sapsf-search", "GET",
+     "https://career23.sapsf.com/search?company=thediriyah", None),
+
+    # Johnson Controls — Workday tenant jci, site JCI, on wd5.
+    ("jci/workday", "POST",
+     "https://jci.wd5.myworkdayjobs.com/wday/cxs/jci/JCI/jobs",
+     {"appliedFacets": {}, "limit": 5, "offset": 0, "searchText": "Saudi"}),
+)
+
+
+def probe_apis() -> list[dict]:
+    """Call each candidate endpoint once and report exactly what came back.
+
+    No retries and no politeness delay: this is a handful of one-off requests
+    to find the real shape, not a scan.
+    """
+    results = []
+    with httpx.Client(
+        timeout=TIMEOUT,
+        follow_redirects=True,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json, text/xml;q=0.9, */*;q=0.5",
+        },
+    ) as client:
+        for label, method, url, body in API_CANDIDATES:
+            entry = {"label": label, "method": method, "url": url}
+            try:
+                if method == "POST":
+                    response = client.post(url, json=body)
+                else:
+                    response = client.get(url)
+            except httpx.HTTPError as exc:
+                entry["error"] = f"{type(exc).__name__}: {exc}"
+                results.append(entry)
+                continue
+
+            entry["status"] = response.status_code
+            entry["content_type"] = response.headers.get("content-type", "")
+            text = response.text
+            entry["bytes"] = len(response.content)
+            try:
+                payload = response.json()
+            except ValueError:
+                entry["json"] = False
+                entry["snippet"] = text[:400]
+            else:
+                entry["json"] = True
+                entry["top_level_keys"] = (
+                    sorted(payload)[:15] if isinstance(payload, dict) else "list"
+                )
+                entry["snippet"] = json.dumps(payload, ensure_ascii=False)[:900]
+            results.append(entry)
+    return results
+
+
 def probe_oracle_live() -> dict:
     """Call ROSHN's Oracle endpoint exactly as the adapter would."""
     from app.adapters.oracle_orc import ROSHN, OracleRecruitingAdapter
@@ -229,7 +314,23 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--oracle", action="store_true",
                         help="also run the ROSHN Oracle adapter against the live tenant")
+    parser.add_argument("--api-probe", action="store_true",
+                        help="call candidate ATS API endpoints and report what each returns")
+    parser.add_argument("--skip-pages", action="store_true",
+                        help="skip the page sweep; useful when only the API probe is wanted")
     args = parser.parse_args()
+
+    if args.api_probe:
+        print("## Candidate API endpoints\n")
+        for entry in probe_apis():
+            print(f"### {entry['label']} — {entry['method']}")
+            print(f"`{entry['url']}`\n")
+            print("```json")
+            print(json.dumps(entry, indent=2, ensure_ascii=False)[:2500])
+            print("```\n")
+
+    if args.skip_pages:
+        return 0
 
     client = httpx.Client(
         timeout=TIMEOUT,

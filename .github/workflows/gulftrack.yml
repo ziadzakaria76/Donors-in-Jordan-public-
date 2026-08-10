@@ -26,6 +26,14 @@ on:
         description: "Also run the ROSHN Oracle adapter against the live tenant"
         type: boolean
         default: false
+      api_probe:
+        description: "Call candidate ATS API endpoints and report what each returns"
+        type: boolean
+        default: false
+      skip_pages:
+        description: "Skip the page sweep (use with api_probe alone)"
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -73,7 +81,7 @@ jobs:
   # following redirects to see which platform serves them. Nothing is submitted,
   # no account is used, nothing is stored.
   recon:
-    if: github.event_name == 'workflow_dispatch' && inputs.recon
+    if: github.event_name == 'workflow_dispatch' && (inputs.recon || inputs.api_probe)
     runs-on: ubuntu-latest
 
     defaults:
@@ -96,5 +104,8 @@ jobs:
 
       - name: Probe target employers
         run: |
-          python tools/recon.py ${{ inputs.oracle_live && '--oracle' || '' }} \
+          python tools/recon.py \
+            ${{ inputs.oracle_live && '--oracle' || '' }} \
+            ${{ inputs.api_probe && '--api-probe' || '' }} \
+            ${{ inputs.skip_pages && '--skip-pages' || '' }} \
             | tee "$GITHUB_STEP_SUMMARY"
