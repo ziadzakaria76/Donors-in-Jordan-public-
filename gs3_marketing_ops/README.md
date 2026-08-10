@@ -15,14 +15,19 @@ one network host.**
 
 ```
 ./gradlew check      ->  BUILD SUCCESSFUL
-                         118 tests passing, 99.3% line coverage (gate: 80%)
+                         209 tests passing, 98.6% line coverage (gate: 80%)
                          verifyStrings: 88 keys, both locales in step
 ```
 
-`:domain` is pure Kotlin with no Android dependency, so it builds here today:
-the funnel maths, budget allocation and seasonal normalisation, fee and
-instalment calculators, the SLA engine with its time zones, the discount guard
-and the campaign-code builder are all written and under test.
+`:domain` is pure Kotlin with no Android dependency, so it builds here today.
+Under test: the unit schedule and its totals · price per m² · the discount
+guard and the incentive ladder · price escalation · both funnel models and the
+four diagnostic rules · budget allocation, seasonal normalisation, cost per lead
+and the stop rules · the SLA engine with its time zones · fee and instalment
+calculators · the campaign code and UTM builder · the lead pipeline with its
+mandatory loss reasons · the WhatsApp link builder · CSV export · the dashboard
+"today" list · the non-Jordanian journey and its eligibility gate · content
+pillar balance · and the weekly and monthly reports.
 
 `:app` cannot be built yet. This environment's egress policy refuses
 `dl.google.com`, the single host serving both the Android SDK and every

@@ -194,6 +194,40 @@ the brief leaves open, decided here:
 
 Ramadan and Eid dates are user-settable per year, never hardcoded.
 
+### D-8 — Any text matching folds Arabic-Indic digits first
+
+Found by a failing test, and it would have shipped as a quiet nuisance.
+
+The app offers ٠-٩ as a numerals setting, so an Arabic ad reasonably reads
+«شقة ١٥١ م² … بسعر ٩٠٬٠٠٠ د.أ» while the unit record holds `151` and `90000`.
+The ad-copy checklist compared the two literally, reported the area and price as
+missing from correct copy, and would have taught the writer to ignore the
+checklist — which is worse than not having one.
+
+The rule, which applies anywhere the app matches typed text against stored
+numbers: **fold Arabic-Indic (and extended Arabic-Indic) digits to Western and
+drop grouping separators on both sides before comparing.** `CopyRuleChecker.foldDigits`
+is the implementation and is tested directly.
+
+The same failure has an Arabic-morphology twin, fixed alongside it: markers for
+Arabic phrases match on stems, not whole words. The company's own site writes
+«صور الواجهات تصاميم ثلاثية الأبعاد», and neither «تصميم» nor «ثلاثي الأبعاد» is a
+substring of that. Matching «تصام»/«تصمي» and «ثلاثي» catches singular and
+plural, masculine and feminine, without needing a morphological analyser.
+
+### D-9 — Funnel counts are cumulative reach, and a lost lead keeps its history
+
+A lead standing at Negotiation has passed through Qualified and Viewing.
+Counting only where each lead stands *now* reports a conversion of zero on a
+pipeline that is working perfectly, so the funnel report counts every stage a
+lead reached.
+
+The consequence for lost leads is the one that matters: a lead lost after a
+viewing still counts toward the viewing stage. Dropping it instead would mean
+losing a buyer retroactively *improves* the viewing-to-offer rate — the report
+would look better the more sales were lost. Where a lead's furthest stage was
+never recorded, it counts as having reached the enquiry stage and no further.
+
 ---
 
 ## 3. Milestone 0.5 — the discovery interview
