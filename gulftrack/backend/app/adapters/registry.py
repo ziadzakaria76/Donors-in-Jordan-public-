@@ -98,9 +98,14 @@ def unverified_sources() -> list[SourceAdapter]:
     machine, so nothing here has been checked against what a tenant actually
     returns. They are kept out of the default scan on purpose.
     """
-    from app.adapters.oracle_orc import oracle_adapters
+    from app.adapters.workable import workable_adapters
 
-    return list(oracle_adapters())
+    # The Oracle adapter is deliberately absent. ROSHN's tenant sits behind
+    # Oracle's WAF, which answered "W4S-101: Blocked by WAF4SaaS" to every
+    # variation of the REST call. The tenant and site number were right; the
+    # API simply is not open to a non-browser client, and getting past a WAF
+    # is evasion rather than engineering. ROSHN becomes a deep-link source.
+    return list(workable_adapters())
 
 
 def fetch_sources() -> list[SourceAdapter]:

@@ -34,6 +34,10 @@ on:
         description: "Skip the page sweep (use with api_probe alone)"
         type: boolean
         default: false
+      verify_live:
+        description: "Run the real scan against live sources and print scored matches"
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -109,3 +113,31 @@ jobs:
             ${{ inputs.api_probe && '--api-probe' || '' }} \
             ${{ inputs.skip_pages && '--skip-pages' || '' }} \
             | tee "$GITHUB_STEP_SUMMARY"
+
+  # The check that decides whether an adapter may join the default scan.
+  # Passing tests is not the bar: the bar is a successful run against the live
+  # site with the field mapping visibly correct in the output.
+  verify-live:
+    if: github.event_name == 'workflow_dispatch' && inputs.verify_live
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: gulftrack/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: gulftrack/backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Scan live sources and score the results
+        run: python tools/verify_live.py | tee "$GITHUB_STEP_SUMMARY"

@@ -123,6 +123,29 @@ class PoliteClient:
     def get(
         self, url: str, *, params: dict | None = None, headers: dict | None = None
     ) -> httpx.Response:
+        return self._request("GET", url, params=params, headers=headers)
+
+    def post(
+        self, url: str, *, json_body: Any = None, headers: dict | None = None
+    ) -> httpx.Response:
+        """POST, under the same politeness rules as GET.
+
+        Several job boards serve their search results only over POST — the
+        Workable board API returns "Not Found" to a GET. That is a read, not a
+        submission, and nothing in this client is capable of submitting an
+        application.
+        """
+        return self._request("POST", url, json_body=json_body, headers=headers)
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: dict | None = None,
+        json_body: Any = None,
+        headers: dict | None = None,
+    ) -> httpx.Response:
         domain = urlparse(url).netloc
         state = self._state(domain)
 
@@ -134,7 +157,9 @@ class PoliteClient:
             for attempt in range(1, MAX_ATTEMPTS + 1):
                 self._wait_turn(state)
                 try:
-                    response = self._client.get(url, params=params, headers=headers)
+                    response = self._client.request(
+                        method, url, params=params, json=json_body, headers=headers,
+                    )
                 except httpx.HTTPError as exc:
                     last_error = exc
                     log.warning("%s attempt %s failed: %s", url, attempt, exc)
@@ -160,7 +185,18 @@ class PoliteClient:
             raise FetchFailed(f"{url} failed after {MAX_ATTEMPTS} attempts: {last_error}")
 
     def get_json(self, url: str, *, params: dict | None = None) -> Any:
-        response = self.get(url, params=params, headers={"Accept": "application/json"})
+        return self._as_json(
+            self.get(url, params=params, headers={"Accept": "application/json"}), url
+        )
+
+    def post_json(self, url: str, *, json_body: Any = None) -> Any:
+        return self._as_json(
+            self.post(url, json_body=json_body, headers={"Accept": "application/json"}),
+            url,
+        )
+
+    @staticmethod
+    def _as_json(response: httpx.Response, url: str) -> Any:
         try:
             return response.json()
         except ValueError as exc:
