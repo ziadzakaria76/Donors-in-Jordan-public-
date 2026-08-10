@@ -1,0 +1,100 @@
+name: gulftrack
+
+# GulfTrack is a separate product living here temporarily. Its workflow is kept
+# in its own file rather than added to tests.yml so that when the project moves
+# to a dedicated repository, this file moves with it and nothing has to be
+# unpicked from the other project's CI.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gulftrack/**"
+      - ".github/workflows/gulftrack.yml"
+  pull_request:
+    paths:
+      - "gulftrack/**"
+      - ".github/workflows/gulftrack.yml"
+  # The reconnaissance job is manual only. See the comment on it below.
+  workflow_dispatch:
+    inputs:
+      recon:
+        description: "Identify which ATS each target employer runs"
+        type: boolean
+        default: false
+      oracle_live:
+        description: "Also run the ROSHN Oracle adapter against the live tenant"
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    defaults:
+      run:
+        working-directory: gulftrack/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: gulftrack/backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyflakes
+
+      - name: Lint
+        run: python -m pyflakes app tools run_scan.py
+
+      # The suite makes no network calls: HTTP is exercised through a mock
+      # transport and the database is SQLite in memory. It is safe anywhere.
+      - name: Test suite
+        run: python -m pytest -q
+
+  # Reconnaissance is manual, never scheduled, and never runs on a pull request.
+  #
+  # It exists because the environment GulfTrack is developed in can reach GitHub
+  # and package registries only, so no careers page is reachable from there.
+  # Actions runners have unrestricted egress, which is the same reason the
+  # tender monitor in this repository runs from CI.
+  #
+  # It is read-only: a couple of dozen GET requests to public careers pages,
+  # following redirects to see which platform serves them. Nothing is submitted,
+  # no account is used, nothing is stored.
+  recon:
+    if: github.event_name == 'workflow_dispatch' && inputs.recon
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: gulftrack/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: gulftrack/backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Probe target employers
+        run: |
+          python tools/recon.py ${{ inputs.oracle_live && '--oracle' || '' }} \
+            | tee "$GITHUB_STEP_SUMMARY"
