@@ -91,13 +91,30 @@ def deep_link_sources() -> list[DeepLinkSource]:
     ]
 
 
-def fetch_sources() -> list[SourceAdapter]:
-    """Sources that are actually scraped.
+def unverified_sources() -> list[SourceAdapter]:
+    """Adapters written against documented API shapes but never run live.
 
-    Empty until the build environment can reach the internet and each adapter
-    has been run against the live site. Returning an empty list is the honest
-    answer; a list of never-executed adapters would not be.
+    They are real code with real tests, but no request has ever left this
+    machine, so nothing here has been checked against what a tenant actually
+    returns. They are kept out of the default scan on purpose.
     """
+    from app.adapters.oracle_orc import oracle_adapters
+
+    return list(oracle_adapters())
+
+
+def fetch_sources() -> list[SourceAdapter]:
+    """Sources the scheduled scan will actually call.
+
+    Empty by default. An adapter joins this list once it has completed a
+    successful run against the live site and its field mapping has been checked
+    — not merely once it has been written. Set GULFTRACK_ALLOW_UNVERIFIED=1 to
+    include the unverified adapters while doing that first live check.
+    """
+    import os
+
+    if os.environ.get("GULFTRACK_ALLOW_UNVERIFIED") == "1":
+        return unverified_sources()
     return []
 
 
