@@ -1,0 +1,392 @@
+# GulfTrack candidate profile.
+#
+# This file is the SEED. On first boot it is loaded into the database, and from
+# then on the database is authoritative — every weight and keyword below is
+# editable from the app's Settings screen without touching this file.
+#
+# Weights are integers. A job's raw score is the sum of the contributions of
+# every signal that fires, then clamped to 0..100 for display. The uncapped raw
+# score is retained so the breakdown always reconciles.
+
+profile_key: fadi
+display_name: "Fadi — Senior Construction & Operations Executive"
+
+candidate:
+  years_experience: 28
+  nationality: Jordanian
+  residence: Riyadh
+  iqama_transferable: true
+  accreditations: [SCE, PMP]
+  languages: [Arabic, English]
+
+salary:
+  currency: SAR
+  target_min: 60000
+  target_max: 80000
+  # Below this, the job is flagged "below target" — flagged, never hidden.
+  below_target_threshold: 55000
+  below_target_penalty: -15
+
+thresholds:
+  # Feed presentation bands. Also drive the Excel conditional colours.
+  strong: 80
+  moderate: 60
+  # Cover letters are auto-drafted at or above this score (Batch C default).
+  autodraft_cover_letter: 70
+  # FM roles are suppressed unless they clear this bar (section 3).
+  fm_rescue_floor: 75
+
+# ---------------------------------------------------------------------------
+# Lanes. A job is assigned to a lane by title match; employer match breaks ties.
+# ---------------------------------------------------------------------------
+lanes:
+  A:
+    label: "Contractor Operations / GM"
+    titles:
+      - Operations Director
+      - Operations Manager
+      - General Manager Projects
+      - Projects Director
+      - Director of Operations
+      - MEP Operations Director
+      - Construction Director
+      - Deputy GM Operations
+    titles_ar:
+      - مدير العمليات
+      - مدير عام المشاريع
+      - مدير المشاريع
+      - مدير الإنشاءات
+      - نائب المدير العام للعمليات
+  B:
+    label: "Client-Side / Developer Delivery"
+    titles:
+      - Delivery Director
+      - Project Director
+      - Programme Director
+      - Program Director
+      - Director of Project Delivery
+      - Head of MEP Delivery
+      - Stadium Delivery Director
+      - Director of Development
+      - Head of Asset Delivery
+      - Technical Director MEP
+    titles_ar:
+      - مدير التسليم
+      - مدير البرنامج
+      - مدير التطوير
+      - المدير الفني
+
+# ---------------------------------------------------------------------------
+# Target employers, tiered. Tier 1 is the priority list from the brief.
+# ---------------------------------------------------------------------------
+employers:
+  A:
+    tier_1:
+      - {name: "Nesma & Partners", aliases: ["Nesma and Partners", "Nesma Partners", "نسما وشركاه", "نسما"]}
+      - {name: "El Seif Engineering", aliases: ["El Seif", "ElSeif", "Al Seif Engineering", "السيف للهندسة", "السيف"]}
+      - {name: "Al Bawani", aliases: ["AlBawani", "Al Bawani Company", "البواني"]}
+      - {name: "Almabani General Contractors", aliases: ["Almabani", "Al Mabani", "المباني العامة", "المباني"]}
+      - {name: "Alfanar Construction", aliases: ["Alfanar", "Al Fanar", "الفنار"]}
+      - {name: "Saudi Tabreed", aliases: ["Tabreed Saudi", "Saudi Tabreed District Cooling", "تبريد السعودية", "تبريد"]}
+      - {name: "City Cool", aliases: ["CityCool"]}
+      - {name: "Johnson Controls Arabia", aliases: ["JCA", "Johnson Controls Saudi", "جونسون كنترولز"]}
+      - {name: "Marafiq", aliases: ["Power and Water Utility Company for Jubail and Yanbu", "مرافق"]}
+      - {name: "Zamil Air Conditioning", aliases: ["Zamil AC", "Zamil Airconditioning", "الزامل للتكييف", "الزامل"]}
+      - {name: "Modern Building Leaders", aliases: ["MBL"]}
+      - {name: "SAMA Contracting", aliases: ["Sama Contracting Company"]}
+      - {name: "Hassan Allam Saudi", aliases: ["Hassan Allam", "Hassan Allam Holding", "حسن علام"]}
+      - {name: "Al Rashid Trading & Contracting", aliases: ["ARTAR", "Al Rashid Trading and Contracting", "الراشد للتجارة والمقاولات"]}
+      - {name: "Alkifah Contracting", aliases: ["Al Kifah", "Alkifah Holding", "الكفاح"]}
+  B:
+    tier_1:
+      - {name: "Qiddiya Investment Company", aliases: ["Qiddiya", "QIC", "القدية"]}
+      - {name: "Diriyah Company", aliases: ["Diriyah", "DGDA", "Diriyah Gate Development Authority", "الدرعية", "بوابة الدرعية"]}
+      - {name: "ROSHN Group", aliases: ["ROSHN", "Roshn Real Estate", "روشن"]}
+      - {name: "Expo 2030 Riyadh Company", aliases: ["Expo 2030 Riyadh", "Expo 2030", "إكسبو 2030 الرياض"]}
+      - {name: "Jeddah Central Development Company", aliases: ["Jeddah Central", "JCDC", "جدة المركزية", "وسط جدة"]}
+      - {name: "New Murabba", aliases: ["New Murabba Development Company", "NMDC", "المربع الجديد"]}
+      - {name: "King Salman Park Development Company", aliases: ["King Salman Park", "KSPDC", "حديقة الملك سلمان"]}
+      - {name: "Saudi Entertainment Ventures", aliases: ["SEVEN", "Saudi Entertainment Ventures SEVEN", "السعودية للترفيه", "سفن"]}
+      - {name: "KAFD DMC", aliases: ["KAFD", "King Abdullah Financial District", "مركز الملك عبدالله المالي"]}
+      - {name: "Soudah Development", aliases: ["Soudah", "Soudah Development Company", "تطوير السودة", "السودة"]}
+      - {name: "Royal Commission for Riyadh City", aliases: ["RCRC", "Royal Commission Riyadh", "الهيئة الملكية لمدينة الرياض"]}
+
+  # In scope despite the blanket PMC/consultancy exclusion, for claims and
+  # entitlement fit (section 3).
+  consultancy_exception:
+    - {name: "Hill International", aliases: ["Hill Intl"]}
+
+employer_tier_bonus:
+  tier_1: 12
+  tier_2: 6
+  tier_3: 0
+
+title_match:
+  # An exact lane title in the job title — the single strongest structural fit.
+  lane_title: 20
+  # No exact lane title, but plainly a senior role (Director, Head of, GM).
+  seniority_generic: 10
+
+# ---------------------------------------------------------------------------
+# Signals. Each fires at most once per job regardless of how many of its
+# keywords match — repetition in a job ad is not evidence of fit.
+# ---------------------------------------------------------------------------
+signals:
+
+  # --- Strong positives -----------------------------------------------------
+  - id: stadium_venue
+    label: "Stadium / sports venue delivery"
+    weight: 25
+    fields: [title, description]
+    keywords: [stadium, "sports venue", arena, "sporting venue", "venue delivery"]
+    keywords_ar: [ملعب, استاد, "منشأة رياضية"]
+
+  - id: fifa_worldcup
+    label: "FIFA / World Cup / Expo experience match"
+    weight: 22
+    fields: [title, description]
+    keywords: [fifa, "world cup", "expo 2030", "expo 2020", "mega event"]
+    keywords_ar: ["كأس العالم", إكسبو]
+
+  - id: district_cooling
+    label: "District cooling / energy centre"
+    weight: 22
+    fields: [title, description]
+    keywords:
+      - "district cooling"
+      - "energy centre"
+      - "energy center"
+      - "energy transfer station"
+      - "chilled water"
+      - "cooling plant"
+    keywords_ar: ["تبريد المناطق", "محطة تبريد", "المياه المبردة"]
+
+  - id: ets_abbrev
+    label: "ETS (energy transfer station)"
+    weight: 10
+    fields: [title, description]
+    keywords: [ets]
+
+  - id: outdoor_cooling
+    label: "Outdoor / spectator cooling"
+    weight: 18
+    fields: [title, description]
+    keywords: ["outdoor cooling", "spectator cooling", "pitch cooling", "bowl cooling"]
+    keywords_ar: ["التبريد الخارجي"]
+
+  - id: mep
+    label: "MEP scope"
+    weight: 18
+    fields: [title, description]
+    keywords: [mep, "mechanical electrical plumbing", hvac, "building services"]
+    keywords_ar: ["الأعمال الكهروميكانيكية", "تكييف"]
+
+  - id: design_build
+    label: "Design & Build"
+    weight: 14
+    fields: [title, description]
+    keywords: ["design and build", "design & build", "design-build", "epc", "turnkey"]
+    keywords_ar: ["تصميم وتنفيذ", "تسليم مفتاح"]
+
+  - id: commissioning
+    label: "Commissioning"
+    weight: 10
+    fields: [title, description]
+    keywords: [commissioning, "testing and commissioning", "t&c", handover]
+    keywords_ar: [التشغيل, "الاختبار والتشغيل"]
+
+  - id: fidic_claims
+    label: "FIDIC / EOT / claims / arbitration"
+    weight: 16
+    fields: [title, description]
+    keywords: [fidic, "extension of time", eot, claims, arbitration, "contractual entitlement", adjudication]
+    keywords_ar: [فيديك, "تمديد المدة", مطالبات, تحكيم]
+
+  - id: pnl
+    label: "P&L / commercial ownership"
+    weight: 12
+    fields: [title, description]
+    keywords: ["p&l", "profit and loss", "profit & loss", "budget ownership", "commercial accountability"]
+    keywords_ar: ["الأرباح والخسائر"]
+
+  - id: hospitality_resort
+    label: "Hospitality / resort delivery"
+    weight: 12
+    fields: [title, description]
+    keywords: [hospitality, resort, hotel, "mixed-use resort"]
+    keywords_ar: [الضيافة, منتجع, فندق]
+
+  # --- Moderate positives ---------------------------------------------------
+  - id: giga_project
+    label: "Giga-project / large programme"
+    weight: 8
+    fields: [title, description]
+    keywords: ["giga project", "giga-project", "mega project", "mega-project", "multi-billion"]
+    keywords_ar: ["مشروع عملاق"]
+
+  - id: infrastructure_utilities
+    label: "Infrastructure / utilities"
+    weight: 6
+    fields: [title, description]
+    keywords: [infrastructure, utilities, "mixed-use", masterplan, "master plan"]
+    keywords_ar: ["البنية التحتية", "المرافق"]
+
+  - id: pmo_controls
+    label: "PMO / project controls / procurement"
+    weight: 6
+    fields: [title, description]
+    keywords: [pmo, "project controls", procurement, "value engineering", "cost control"]
+    keywords_ar: ["مكتب إدارة المشاريع", "المشتريات"]
+
+  - id: sce_mention
+    label: "SCE accreditation required — candidate holds it"
+    weight: 8
+    fields: [description]
+    keywords: ["saudi council of engineers", sce, "sce accreditation", "sce registration"]
+    keywords_ar: ["الهيئة السعودية للمهندسين"]
+
+  - id: iqama_transferable
+    label: "Transferable Iqama / local candidates — candidate qualifies"
+    weight: 8
+    fields: [description]
+    keywords: ["transferable iqama", "transferrable iqama", "local candidates", "locally available", "iqama transfer"]
+    keywords_ar: ["إقامة قابلة للنقل", "نقل كفالة"]
+
+  # --- Negatives ------------------------------------------------------------
+  - id: fm_primary
+    label: "Facilities management as primary scope"
+    weight: -30
+    fields: [title]
+    keywords: ["facilities management", "facility management", fm, "soft services", "hard services"]
+    keywords_ar: ["إدارة المرافق"]
+
+  - id: below_director
+    label: "Below director level"
+    weight: -35
+    fields: [title]
+    keywords:
+      - "site engineer"
+      - "project engineer"
+      - "site manager"
+      - "senior engineer"
+      - "planning engineer"
+      - "qa/qc"
+      - "quality engineer"
+      - "foreman"
+      - "supervisor"
+      - "coordinator"
+      - "officer"
+      - "specialist"
+      - "graduate"
+      - "intern"
+    keywords_ar: ["مهندس موقع", "مهندس مشروع", "مشرف", "منسق"]
+
+  - id: out_of_sector
+    label: "Out-of-profile sector (oil & gas / marine / rail)"
+    weight: -30
+    fields: [title, description]
+    keywords:
+      - "oil and gas"
+      - "oil & gas"
+      - refinery
+      - petrochemical
+      - upstream
+      - downstream
+      - offshore
+      - marine
+      - "rail signalling"
+      - "rail signaling"
+      - drilling
+      - pipeline
+    keywords_ar: ["النفط والغاز", "مصفاة", "البتروكيماويات"]
+
+  - id: pmc_consultancy
+    label: "PMC / consultancy role"
+    weight: -20
+    fields: [title, description]
+    keywords: ["project management consultancy", "pmc", "consultancy services", "client representative consultancy"]
+    # Suppressed when the employer is on the consultancy_exception list.
+    suppressed_by_employer_exception: true
+
+  - id: neom_risk
+    label: "NEOM — hiring risk, deprioritised"
+    weight: -25
+    fields: [title, description, employer, location]
+    keywords: [neom, "the line", trojena, oxagon, sindalah]
+    keywords_ar: [نيوم]
+    flag: high_risk_employer
+
+  # --- Location -------------------------------------------------------------
+  - id: loc_riyadh
+    label: "Riyadh"
+    weight: 12
+    fields: [location, title, description]
+    keywords: [riyadh]
+    keywords_ar: [الرياض]
+    group: location
+
+  - id: loc_jeddah
+    label: "Jeddah"
+    weight: 9
+    fields: [location, title, description]
+    keywords: [jeddah, jaddah]
+    keywords_ar: [جدة]
+    group: location
+
+  - id: loc_khobar_dammam
+    label: "Al Khobar / Dammam"
+    weight: 7
+    fields: [location, title, description]
+    keywords: [khobar, dammam, dhahran, "eastern province"]
+    keywords_ar: [الخبر, الدمام, الظهران]
+    group: location
+
+  - id: loc_abha
+    label: "Abha"
+    weight: 5
+    fields: [location, title, description]
+    keywords: [abha, asir, soudah]
+    keywords_ar: [أبها, عسير]
+    group: location
+
+  - id: loc_makkah_madinah
+    label: "Makkah / Madinah"
+    weight: 4
+    fields: [location, title, description]
+    keywords: [makkah, mecca, madinah, medina]
+    keywords_ar: [مكة, المدينة]
+    group: location
+
+# ---------------------------------------------------------------------------
+# Hard exclusions. These do not score — they remove a job from the feed, with
+# the reason recorded so nothing disappears silently.
+# ---------------------------------------------------------------------------
+exclusions:
+  - id: saudi_nationals_only
+    label: "Reserved for Saudi nationals"
+    fields: [title, description]
+    keywords:
+      - "saudi nationals only"
+      - "saudis only"
+      - "saudi national only"
+      - "for saudi nationals"
+      - "saudi candidates only"
+      - "nitaqat"
+      - "saudization requirement"
+      - "saudi nationality is required"
+    keywords_ar:
+      - "سعودي الجنسية"
+      - "للسعوديين فقط"
+      - "سعوديين فقط"
+      - "الجنسية السعودية"
+      - نطاقات
+
+# ---------------------------------------------------------------------------
+# Warm route. Applied by the network module (section 8): any job at an employer
+# where a contact is known gets this uplift and is pinned above equivalently
+# scored cold jobs.
+# ---------------------------------------------------------------------------
+warm_route:
+  uplift: 15
+  label: "Warm route available"
+  pin_above_equivalent: true
