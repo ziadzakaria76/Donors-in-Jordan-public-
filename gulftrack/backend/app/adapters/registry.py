@@ -92,35 +92,33 @@ def deep_link_sources() -> list[DeepLinkSource]:
 
 
 def unverified_sources() -> list[SourceAdapter]:
-    """Adapters written against documented API shapes but never run live.
+    """Adapters written but not yet proven against the live site.
 
-    They are real code with real tests, but no request has ever left this
-    machine, so nothing here has been checked against what a tenant actually
-    returns. They are kept out of the default scan on purpose.
+    Empty right now. The Oracle adapter is deliberately absent from the
+    codebase's active set: ROSHN's tenant sits behind Oracle's WAF, which
+    answered "W4S-101: Blocked by WAF4SaaS" to every variation of the REST
+    call. The tenant host and site number were right; the API simply is not
+    open to a non-browser client, and getting past a WAF is evasion rather
+    than engineering. ROSHN is a deep-link source instead.
     """
-    from app.adapters.workable import workable_adapters
-
-    # The Oracle adapter is deliberately absent. ROSHN's tenant sits behind
-    # Oracle's WAF, which answered "W4S-101: Blocked by WAF4SaaS" to every
-    # variation of the REST call. The tenant and site number were right; the
-    # API simply is not open to a non-browser client, and getting past a WAF
-    # is evasion rather than engineering. ROSHN becomes a deep-link source.
-    return list(workable_adapters())
+    return []
 
 
 def fetch_sources() -> list[SourceAdapter]:
-    """Sources the scheduled scan will actually call.
+    """Sources the scheduled scan actually calls.
 
-    Empty by default. An adapter joins this list once it has completed a
-    successful run against the live site and its field mapping has been checked
-    — not merely once it has been written. Set GULFTRACK_ALLOW_UNVERIFIED=1 to
-    include the unverified adapters while doing that first live check.
+    An adapter joins this list once it has completed a successful run against
+    the live site with its field mapping checked in the output — not merely
+    once it has been written and tested. Two adapters have failed that bar
+    already: Oracle on a WAF block, and this one on a 400 caused by a request
+    field that unit tests happily accepted.
+
+    Verified 10 August 2026: a live scan returned all 278 of Qiddiya's
+    postings, every score reconciling with its breakdown.
     """
-    import os
+    from app.adapters.workable import workable_adapters
 
-    if os.environ.get("GULFTRACK_ALLOW_UNVERIFIED") == "1":
-        return unverified_sources()
-    return []
+    return list(workable_adapters())
 
 
 def all_sources() -> list[SourceAdapter]:

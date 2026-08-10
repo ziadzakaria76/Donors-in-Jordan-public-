@@ -15,9 +15,42 @@ Two rules override everything else in this codebase:
 
 ## State
 
-M1 in progress. Complete and tested: the candidate profile, the scoring engine,
-the source-adapter contract. Not yet built: adapters, database persistence, API,
-front end.
+M1 complete. Scoring engine, candidate profile, database, scan runner with an
+overlap lock, source-health tracking, API, match feed, polite HTTP client, and
+one live source.
+
+Live source: Qiddiya Investment Company, via its Workable board. Verified
+10 August 2026 — a real scan returned all 278 postings, every score
+reconciling with its breakdown.
+
+Not built yet: CV handling (M3), exports (M4), Assisted Apply (M5), the full
+network module (M6), push notifications and PWA packaging (M7).
+
+### Employers investigated, and what runs their careers pages
+
+| Employer | Platform | Status |
+| --- | --- | --- |
+| Qiddiya | Workable | **Live.** Their own site is bot-protected; the board is not |
+| Diriyah | SAP SuccessFactors (`thediriyah`) | Serves HTML, not the RSS asked for |
+| ROSHN | Oracle Recruiting | API behind a WAF — deep-link only |
+| Nesma & Partners | SAP SuccessFactors | Not yet attempted |
+| Johnson Controls | Workday (`jci`, site `JCI`) | Endpoint works; query returns nothing yet |
+| SEVEN, Soudah, DGDA | — | Bot challenge. Deep-link candidates |
+| Others | — | Unidentified, unreachable, or no careers page found |
+
+Reconnaissance runs from GitHub Actions, because the development environment
+cannot reach any of these hosts. See `tools/recon.py`.
+
+### The bar for an adapter
+
+Passing tests is not the bar. An adapter joins the scan only after a successful
+run against the live site with its field mapping checked in the output, via
+`tools/verify_live.py`. Two adapters have failed that bar after passing their
+tests: Oracle on a WAF block, and Workable on a 400 caused by one request field
+the unit tests happily accepted.
+
+No attempt is made to defeat bot protection. Employers that challenge an
+honest, rate-limited, identified client become deep-link sources instead.
 
 ## Layout
 
