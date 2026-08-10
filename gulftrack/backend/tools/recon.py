@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -71,7 +73,7 @@ class Target:
 TARGETS: tuple[Target, ...] = (
     # Lane B — client-side / developer delivery
     Target("Qiddiya Investment Company", "B",
-           ("https://careers.qiddiya.com/", "https://qiddiya.com/careers/")),
+           ("https://qiddiya.com/careers/", "https://apply.workable.com/qiddiya-investment-company-1/")),
     Target("Diriyah Company", "B",
            ("https://www.diriyahcompany.sa/en/careers", "https://www.dgda.gov.sa/en/careers")),
     Target("ROSHN Group", "B", ("https://www.roshn.sa/careers",)),
@@ -82,7 +84,8 @@ TARGETS: tuple[Target, ...] = (
     Target("New Murabba", "B",
            ("https://newmurabba.com/en/careers", "https://newmurabba.com/")),
     Target("King Salman Park Development Company", "B",
-           ("https://www.kingsalmanpark.sa/en/careers", "https://www.kingsalmanpark.sa/")),
+           ("https://kingsalmanpark.com/en/careers", "https://kingsalmanpark.com/",
+            "https://www.ksp.sa/")),
     Target("Saudi Entertainment Ventures (SEVEN)", "B",
            ("https://seven.sa/en/careers", "https://seven.sa/")),
     Target("KAFD DMC", "B", ("https://www.kafd.sa/en/careers", "https://www.kafd.sa/")),
@@ -94,17 +97,20 @@ TARGETS: tuple[Target, ...] = (
     # Lane A — contractor operations
     Target("Nesma & Partners", "A", ("https://careers.nesmapartners.com/",)),
     Target("El Seif Engineering", "A",
-           ("https://www.elseif.com.sa/careers", "https://www.elseif.com.sa/")),
-    Target("Al Bawani", "A", ("https://www.albawani.net/careers", "https://www.albawani.net/")),
+           ("https://elseif.com.sa/career", "https://elseif.com.sa/careers", "https://elseif.com.sa/")),
+    Target("Al Bawani", "A", ("https://albawani.com/en/careers", "https://albawani.com/en/")),
     Target("Almabani General Contractors", "A",
            ("https://www.almabani.com/careers", "https://www.almabani.com/")),
-    Target("Alfanar Construction", "A", ("https://www.alfanar.com/careers",)),
+    Target("Alfanar Construction", "A",
+           ("https://www.alfanar.com/en/careers", "https://www.alfanar.com/")),
     Target("Saudi Tabreed", "A",
-           ("https://www.saudi-tabreed.com.sa/careers", "https://www.saudi-tabreed.com.sa/")),
+           ("https://saudi-tabreed.com/careers", "https://saudi-tabreed.com/",
+            "https://www.sauditabreed.com/")),
     Target("Marafiq", "A", ("https://www.marafiq.com.sa/en/careers", "https://www.marafiq.com.sa/")),
     Target("Zamil Air Conditioning", "A",
            ("https://www.zamilac.com/careers", "https://www.zamilac.com/")),
-    Target("Alkifah Contracting", "A", ("https://alkifah.com/en/careers", "https://alkifah.com/")),
+    Target("Alkifah Contracting", "A",
+           ("https://www.alkifah.com.sa/en/careers", "https://www.alkifah.com.sa/")),
     Target("Hassan Allam Saudi", "A",
            ("https://hassanallam.com/careers/", "https://hassanallam.com/")),
     Target("Johnson Controls Arabia", "A", ("https://www.johnsoncontrols.com/careers",)),
@@ -119,6 +125,52 @@ def detect(final_url: str, body: str) -> str | None:
     return None
 
 
+# Hosts worth extracting in full when they appear inside a page. Knowing an
+# employer is "on Oracle" is not actionable; knowing the exact tenant host and
+# site number is what an adapter needs.
+ATS_HOST_PATTERN = re.compile(
+    r"https?://[\w.\-]*(?:"
+    r"myworkdayjobs\.com|myworkdaysite\.com|oraclecloud\.com|successfactors\.(?:com|eu)"
+    r"|taleo\.net|greenhouse\.io|workable\.com|lever\.co|smartrecruiters\.com"
+    r"|icims\.com|bamboohr\.com|ashbyhq\.com|teamtailor\.com|zohorecruit\.com"
+    r")[^\s\"'<>\\)]*",
+    re.IGNORECASE,
+)
+
+# A careers page frequently links out to the real portal rather than embedding
+# it. Anything whose text or href looks like a job listing is worth reporting.
+CAREER_LINK_PATTERN = re.compile(
+    r"https?://[\w.\-]+/[^\s\"'<>\\)]*(?:job|career|vacan|recruit|apply|employment)"
+    r"[^\s\"'<>\\)]*",
+    re.IGNORECASE,
+)
+
+
+def extract_ats_urls(body: str, limit: int = 6) -> list[str]:
+    """Exact ATS URLs embedded in the page, deduplicated, longest first.
+
+    The longest match usually carries the site number or board token, which is
+    the part an adapter cannot guess.
+    """
+    found = {m.group(0).rstrip(".,;") for m in ATS_HOST_PATTERN.finditer(body)}
+    return sorted(found, key=len, reverse=True)[:limit]
+
+
+def extract_career_links(body: str, own_host: str, limit: int = 6) -> list[str]:
+    """Off-site links that look like a jobs portal.
+
+    Restricted to other hosts: a link back into the same site tells us nothing
+    we did not already have.
+    """
+    found = set()
+    for match in CAREER_LINK_PATTERN.finditer(body):
+        url = match.group(0).rstrip(".,;")
+        host = urlparse(url).netloc.lower()
+        if host and own_host.lower().lstrip("www.") not in host:
+            found.add(url)
+    return sorted(found, key=len, reverse=True)[:limit]
+
+
 def probe(client: httpx.Client, url: str) -> dict:
     try:
         response = client.get(url)
@@ -126,11 +178,18 @@ def probe(client: httpx.Client, url: str) -> dict:
         return {"url": url, "error": f"{type(exc).__name__}: {exc}"}
 
     body = response.text[:400_000]
+    # A short body behind a 403 is a bot challenge, not a careers page. Saying
+    # so is more useful than reporting "not identified".
+    blocked = response.status_code == 403 and len(response.content) < 20_000
+
     return {
         "url": url,
         "status": response.status_code,
         "final_url": str(response.url),
         "ats": detect(str(response.url), body),
+        "ats_urls": extract_ats_urls(body),
+        "career_links": extract_career_links(body, urlparse(url).netloc),
+        "bot_challenge": blocked,
         "bytes": len(response.content),
     }
 
@@ -179,7 +238,7 @@ def main() -> int:
     )
 
     print("## ATS reconnaissance\n")
-    print("| Employer | Lane | Result | Platform | Final URL |")
+    print("| Employer | Lane | Result | Platform | Exact portal URL or final URL |")
     print("| --- | --- | --- | --- | --- |")
 
     findings: list[dict] = []
@@ -188,9 +247,11 @@ def main() -> int:
         for url in target.urls:
             result = probe(client, url)
             findings.append({"employer": target.employer, **result})
-            if result.get("ats"):
+            if result.get("ats_urls"):
                 best = result
                 break
+            if result.get("ats") and best is None:
+                best = result
             if best is None or (
                 result.get("status") == 200 and best.get("status") != 200
             ):
@@ -199,12 +260,15 @@ def main() -> int:
         assert best is not None
         if best.get("error"):
             outcome, platform = "unreachable", best["error"][:60]
+        elif best.get("bot_challenge"):
+            outcome, platform = "HTTP 403", "bot challenge — needs a browser"
         elif best.get("ats"):
             outcome, platform = f"HTTP {best['status']}", best["ats"]
         else:
             outcome, platform = f"HTTP {best['status']}", "not identified"
 
-        final = best.get("final_url", best["url"])
+        exact = (best.get("ats_urls") or [None])[0]
+        final = exact or best.get("final_url", best["url"])
         print(f"| {target.employer} | {target.lane} | {outcome} | {platform} | {final[:90]} |")
 
     client.close()
