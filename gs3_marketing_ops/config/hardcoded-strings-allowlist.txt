@@ -1,0 +1,7 @@
+# Genuine exceptions to the no-hardcoded-strings rule, one `path:line` per line.
+#
+# A string belongs here only if no user ever reads it: a debug log, a test tag,
+# a BuildConfig key. If a person can see it on a screen, it belongs in
+# strings.xml and values-ar/strings.xml instead.
+#
+# Empty for now — no Composables exist yet.

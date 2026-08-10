@@ -1,0 +1,19 @@
+# Every version is pinned explicitly. Nothing here says "latest", and nothing is
+# bumped in the middle of a milestone. On a conflict, step DOWN to the last
+# known-good combination — never forward into a release candidate.
+#
+# The Android half of this matrix is written down in DECISIONS.md → D-2 but is
+# not listed here yet, because a version that cannot be resolved cannot be
+# pinned honestly. It moves here the first time it resolves.
+
+[versions]
+kotlin = "2.1.21"
+junit = "5.11.4"
+jacoco = "0.8.12"
+
+[libraries]
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.11.4" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

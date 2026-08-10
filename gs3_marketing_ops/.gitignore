@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# The wrapper JAR and properties ARE committed on purpose: without them a fresh
+# clone cannot build, which defeats the point of a wrapper.
+
+# Signing material. The keystore never enters version control -- anyone with it
+# can publish an update as this company. Keep it offline; losing it means the
+# app can never be updated again, only reinstalled from scratch.
+*.jks
+*.keystore
+keystore.properties
+
+# Android Studio
+.idea/
+*.iml
+captures/

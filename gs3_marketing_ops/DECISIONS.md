@@ -69,32 +69,54 @@ binary into the build of an app that will hold client contact details.
 `android.googlesource.com` too if source-level dependencies are ever needed).
 Nothing else about the plan changes, and no work already done is wasted.
 
-### D-2 — Version matrix: proposed, pinned on first successful resolve
+### D-2 — Version matrix
 
 The brief forbids "latest stable" and requires an explicit matrix (§2.3 trap 1).
-The matrix below is the intended pin, but it is **proposed, not verified** —
-verifying it means resolving it, and resolution is exactly what D-1 blocks. It
-is recorded now so the first build after the network fix has a fixed target
-rather than a fresh guess, and it will be re-recorded as *confirmed* with real
-`./gradlew` output the moment it resolves.
+The Kotlin half is **confirmed** — it resolves and compiles here. The Android
+half is still **proposed**, because verifying it means resolving it and
+resolution is exactly what D-1 blocks; it will be re-recorded as confirmed with
+real `./gradlew` output the moment the host is allowed.
 
-| Component | Proposed pin | Note |
+| Component | Pin | Status |
 | --- | --- | --- |
-| Android Gradle Plugin | 8.13.x | stable 8.x line. **Not** 9.x — still release-candidate per §2.3 |
-| Gradle | 8.14.3 | matches the installed toolchain; wrapper committed |
-| JDK | 21 | installed and confirmed |
-| Kotlin | 2.2.x | pinned exactly in `libs.versions.toml` |
-| KSP | matched to the Kotlin pin | version is Kotlin-coupled; never chosen independently |
-| compileSdk / targetSdk | 36 | §2.1 — non-negotiable |
-| minSdk | 26 | |
-| Compose | via BOM | one BOM pin, no per-artifact versions |
-| Room, Hilt, WorkManager, DataStore | pinned individually | Room and Hilt compilers via **KSP**; `kotlin-kapt` appears nowhere |
-| SQLCipher | `net.zetetic:sqlcipher-android` | not the deprecated `android-database-sqlcipher` |
-| Robolectric + Roborazzi | pinned | JVM-only; no emulator is needed or available |
+| JDK | 21.0.10 | ✅ confirmed |
+| Gradle | 8.14.3 (wrapper committed) | ✅ confirmed |
+| Kotlin | 2.1.21 | ✅ confirmed — compiles with `allWarningsAsErrors` |
+| JUnit 5 | 5.11.4 | ✅ confirmed — permitted for the pure-Kotlin module by §2 |
+| JaCoCo | 0.8.12 | ✅ confirmed |
+| Android Gradle Plugin | 8.13.x | proposed. Stable 8.x line, **not** 9.x — still release-candidate per §2.3 |
+| KSP | matched to the Kotlin pin | proposed. Kotlin-coupled; never chosen independently |
+| compileSdk / targetSdk | 36 | proposed. §2.1 — non-negotiable |
+| minSdk | 26 | proposed |
+| Compose | via BOM | proposed. One BOM pin, no per-artifact versions |
+| Room, Hilt, WorkManager, DataStore | pinned individually | proposed. Compilers via **KSP**; `kotlin-kapt` appears nowhere |
+| SQLCipher | `net.zetetic:sqlcipher-android` | proposed. Not the deprecated `android-database-sqlcipher` |
+| Robolectric + Roborazzi | pinned | proposed. JVM-only; no emulator is needed or available |
 
 Standing rule: on a version conflict, **step down** to the last known-good
 combination. Never step forward into a release candidate, and never bump a
 dependency in the middle of a milestone.
+
+### D-7 — Build the pure-Kotlin domain first, while the Android half waits
+
+D-1 blocks Android, but it does not block everything. The business rules the
+brief actually cares about — funnel maths, budget allocation and seasonal
+normalisation, fee calculation, SLA timing across time zones, price-per-m², the
+discount guard, the campaign-code builder — are pure functions over plain data
+with no Android dependency at all. Kotlin, JUnit and JaCoCo all come from Maven
+Central, which is reachable.
+
+So `:domain` was built and tested for real rather than waiting: 118 tests
+passing at 99.3% line coverage, against the ≥80% gate. `verifyStrings` likewise
+needs no Android plugin, so the bilingual guard runs today and was proved to
+fail on all three of its cases.
+
+This is not merely making use of the time. It front-loads the work most likely
+to be wrong — arithmetic and time zones — into the place where it is cheapest to
+test, and it means the Android milestones, when they start, are wiring a proven
+core to screens rather than inventing and debugging both at once. `google()` is
+deliberately absent from `settings.gradle.kts` until `:app` exists, so today's
+build does not fail on a repository it has no need for yet.
 
 ---
 
@@ -174,15 +196,53 @@ Ramadan and Eid dates are user-settable per year, never hardcoded.
 
 ---
 
-## 3. Open questions put to the owner
+## 3. Milestone 0.5 — the discovery interview
 
-Milestone 0.5 batches A, B and C, plus the two blockers in section 0 above.
-Recorded here as they are answered. An unanswered question becomes its default
-after one follow-up, and is written back here as an assumption with its date.
+Batch A was put to the owner on 2026-08-10 with its recommended defaults. The
+owner replied "continue", which under the brief's own rule — *apply the default,
+record it as an assumption, and move on; never stall the build waiting for an
+answer* — means the defaults stand for all three batches.
 
-| Ref | Question | Answer | Date |
-| --- | --- | --- | --- |
-| A1–A6 | Batch A — users, permissions, first-launch language, unit statuses, target | Not yet asked / pending | — |
-| B1–B6 | Batch B — working days and hours, lead ownership, loss reasons, sources, tone, brokers | Pending | — |
-| C1–C6 | Batch C — logo, app name, theme, numerals, distribution, assessed-value default | Pending | — |
-| D-3 | Is 45 JOD the target per raw lead (as the budget arithmetic implies) or per qualified lead (as the brief's wording says)? | Pending | — |
+They are assumptions, not answers. Every one is reversible, and any of them can
+be corrected without rework so long as it is corrected before the milestone that
+depends on it (noted in the last column).
+
+### Batch A — who uses this and what it holds
+
+| Ref | Decision (default applied 2026-08-10) | Reversible until |
+| --- | --- | --- |
+| A1 | 2–3 users, no roles, no approval flow in v1 | Milestone 4 |
+| A2 | The app opens in **Arabic** on first launch | Milestone 1 |
+| A3 | Individual phones; encrypted backup files exchanged by hand, no merge | Milestone 8 |
+| A4 | The final agreed price and discount **are** stored, with app lock on by default | Milestone 2 |
+| A5 | Three unit statuses only — Available, Reserved, Contracted | Milestone 2 |
+| A6 | Annual target 11 of 14 units, 3 of them from the external track | Milestone 2 |
+
+### Batch B — how the team works
+
+| Ref | Decision | Reversible until |
+| --- | --- | --- |
+| B1 | **Saturday–Thursday, 09:00–18:00 Asia/Amman; Friday the weekend.** Not the proposed Sunday–Thursday — see D-5; the company publishes Saturday–Thursday on its own website. Editable in Settings | Milestone 4 |
+| B2 | The same salesperson handles both tracks | Milestone 4 |
+| B3 | Loss reasons as specified — ten, single-select, mandatory | Milestone 4 |
+| B4 | Lead sources as specified | Milestone 2 |
+| B5 | Modern Standard Arabic for expatriate and non-Jordanian templates; light Jordanian dialect for local buyers | Milestone 6 |
+| B6 | No broker module — "broker" is a lead source and nothing more | — |
+
+### Batch C — look, feel and delivery
+
+| Ref | Decision | Reversible until |
+| --- | --- | --- |
+| C1 | Palette per §4, with a typographic gold wordmark until a logo file arrives | Milestone 9 |
+| C2 | «تسويق شيرمان ٣» / "GS3 Marketing" | Milestone 10 |
+| C3 | Theme follows the phone | Milestone 1 |
+| C4 | Western digits by default, toggleable | Milestone 1 |
+| C5 | Sideloaded APK first; the app stays Play-ready at targetSdk 36 | Milestone 10 |
+| C6 | Assessed value defaults to 100% of sale price — the conservative direction — editable per unit | Milestone 7 |
+
+### Still genuinely open
+
+| Ref | Question | Status |
+| --- | --- | --- |
+| D-3 | Is 45 JOD the target per **raw** lead (as the budget arithmetic implies) or per **qualified** lead (as the brief's wording says)? Implemented as 45 raw / 150 qualified / 200 stop threshold, all editable in Settings | Awaiting confirmation — no rework either way |
+| B-1, B-2 | The two blocking questions in section 0 | Awaiting a written answer. Not defaultable |

@@ -10,26 +10,57 @@ same Arabic wording, and nothing else — no code, no build, no deployment.
 
 ## Status
 
-**Not yet building.** The plan and the decisions are written; no application
-code exists, because none can be compiled here yet.
+**The business rules are built, tested and green. The Android app is blocked on
+one network host.**
 
-This environment's egress policy refuses `dl.google.com`, which is the single
-host serving both the Android SDK and every Google-hosted Maven artifact — the
-Android Gradle Plugin, AndroidX, Compose, Room, WorkManager and Hilt included.
-`maven.google.com` resolves but only redirects there, and Maven Central does not
-mirror any of it. Rather than pull build plugins from an unofficial mirror into
-an app that will hold client contact details, the blocked host is reported and
-the build waits.
+```
+./gradlew check      ->  BUILD SUCCESSFUL
+                         118 tests passing, 99.3% line coverage (gate: 80%)
+                         verifyStrings: 88 keys, both locales in step
+```
+
+`:domain` is pure Kotlin with no Android dependency, so it builds here today:
+the funnel maths, budget allocation and seasonal normalisation, fee and
+instalment calculators, the SLA engine with its time zones, the discount guard
+and the campaign-code builder are all written and under test.
+
+`:app` cannot be built yet. This environment's egress policy refuses
+`dl.google.com`, the single host serving both the Android SDK and every
+Google-hosted Maven artifact — the Android Gradle Plugin, AndroidX, Compose,
+Room, WorkManager and Hilt included. `maven.google.com` resolves but only
+redirects there, and Maven Central mirrors none of it. Rather than pull build
+plugins from an unofficial mirror into an app that will hold client contact
+details, the blocked host is reported and that half waits.
 
 **To unblock: allow `dl.google.com` for this environment.** Nothing else in the
-plan changes.
+plan changes, and nothing built so far is wasted — the Android milestones wire
+screens to a core that is already proven.
 
-## What is here
+## Layout
 
-| File | What it holds |
+| Path | What it holds |
 | --- | --- |
+| `domain/` | Pure-Kotlin business rules and their tests. No Android, no emulator, runs on the JVM |
+| `app/src/main/res/` | The two string files. Arabic is authored; English is derived from it for anything client-facing |
+| `config/` | The allowlist for `verifyStrings` |
 | [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) | Module shape, the eleven milestones, and the four risks that would otherwise produce an app that looks finished and is not |
-| [`DECISIONS.md`](DECISIONS.md) | Every decision with its date: the environment finding, the pinned version matrix, the verification of the brief's own figures, and the answers to the discovery interview as they arrive |
+| [`DECISIONS.md`](DECISIONS.md) | Every decision with its date: the environment finding, the version matrix, the verification of the brief's figures, and the discovery-interview answers |
+
+## Running it
+
+```bash
+cd gs3_marketing_ops
+./gradlew check        # tests, coverage gate, and the bilingual guard
+./gradlew coverage     # prints the actual coverage percentage
+./gradlew verifyStrings
+```
+
+`verifyStrings` fails the build on three things, and each was proved to fail
+before being relied on: a user-visible string hardcoded in a Composable, a key
+present in one locale and missing from the other, and a forbidden phrase —
+«إعفاء من الرسوم» / "fee exemption", "guaranteed approval", "guaranteed return".
+The company contributes toward registration fees; it cannot exempt anyone from
+them, and the build will not let the app say otherwise.
 
 ## Verified before writing any code
 
