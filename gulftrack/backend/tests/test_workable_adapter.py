@@ -162,8 +162,10 @@ def test_the_list_is_requested_by_post_because_get_returns_not_found():
 
     url, body = client.posts[0]
     assert url == "https://apply.workable.com/api/v3/accounts/test-account-1/jobs"
-    assert body["limit"] == 100
     assert "token" not in body, "the first page carries no cursor"
+    # The endpoint 400s on an unexpected key, so the body must stay exactly the
+    # shape that was verified against the live board.
+    assert set(body) == {"query", "location", "department", "worktype", "remote"}
 
 
 def test_paging_follows_the_next_page_token():

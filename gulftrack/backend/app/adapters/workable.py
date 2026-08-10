@@ -35,7 +35,6 @@ log = logging.getLogger("gulftrack.adapters.workable")
 API_ROOT = "https://apply.workable.com/api/v3/accounts"
 BOARD_ROOT = "https://apply.workable.com"
 
-PAGE_LIMIT = 100
 MAX_PAGES = 20
 
 # Workable is an API rather than someone's marketing site, so a four-second gap
@@ -194,9 +193,12 @@ class WorkableAdapter:
         token: str | None = None
 
         for page in range(MAX_PAGES):
+            # Exactly the body the API probe saw return HTTP 200. An earlier
+            # version added "limit", which the endpoint rejected with a 400 —
+            # so the request stays as verified rather than as assumed.
             body: dict[str, Any] = {
                 "query": "", "location": [], "department": [],
-                "worktype": [], "remote": [], "limit": PAGE_LIMIT,
+                "worktype": [], "remote": [],
             }
             if token:
                 body["token"] = token
