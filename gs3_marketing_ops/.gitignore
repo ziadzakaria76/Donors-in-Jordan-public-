@@ -17,3 +17,17 @@ keystore.properties
 .idea/
 *.iml
 captures/
+
+# Re-include this module's sources.
+#
+# The repository root ignores `**/data/*` and `**/output/*` to keep the tender
+# monitor's local state out of version control. Those patterns are unanchored,
+# so they also match `app/src/main/kotlin/.../leads/data/` — every feature's
+# data layer, which this app is organised around (ui/data split per feature).
+#
+# Without these two lines `git add` silently skips those files, the branch
+# builds locally and fails in CI, and the error message points at a missing
+# class rather than at a .gitignore. Found by `git check-ignore`, not by
+# guessing; there is a test for it in tools/, run by CI.
+!app/src/**
+!domain/src/**

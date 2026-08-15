@@ -107,8 +107,8 @@
     <!-- الإعدادات -->
     <string name="settings_language">اللغة</string>
     <string name="settings_numerals">الأرقام</string>
-    <string name="settings_numerals_western">٠١٢٣٤٥٦٧٨٩ غربية (0-9)</string>
-    <string name="settings_numerals_arabic">أرقام عربية (٠-٩)</string>
+    <string name="settings_numerals_western">أرقام غربية (0–9)</string>
+    <string name="settings_numerals_arabic">أرقام عربية (٠–٩)</string>
     <string name="settings_show_hijri">إظهار التاريخ الهجري</string>
     <string name="settings_theme">المظهر</string>
     <string name="settings_business_hours">أيام وساعات العمل</string>
@@ -118,6 +118,14 @@
     <string name="empty_leads_title">لا يوجد عملاء بعد</string>
     <string name="empty_leads_body">أضف أول استفسار لتبدأ مهلة الردّ بالعمل.</string>
     <string name="empty_leads_action">إضافة عميل</string>
+    <string name="empty_dashboard_title">لا شيء يستدعي المتابعة اليوم</string>
+    <string name="empty_dashboard_body">ستظهر هنا مهامّ اليوم والمهل المقتربة على الردّ والمتابعة.</string>
+    <string name="empty_inventory_title">لم تُضَف الشقق بعد</string>
+    <string name="empty_inventory_body">ستظهر هنا شقق المشروع الأربع عشرة بمساحاتها وأسعارها وحالة كلٍّ منها.</string>
+    <string name="empty_campaigns_title">لا توجد حملات بعد</string>
+    <string name="empty_campaigns_body">أنشئ حملة لتتبّع الإنفاق وكلفة العميل المحتمل لكل مسار.</string>
+    <string name="empty_more_title">أدوات إضافية</string>
+    <string name="empty_more_body">الحاسبات وخطّة المحتوى والتقارير والإعدادات.</string>
 
     <!-- تشخيص الأداء -->
     <string name="diagnosis_pricing_or_imagery">مشاهدات كثيرة واستفسارات قليلة: المشكلة في السعر أو الصور، لا في الطلب.</string>

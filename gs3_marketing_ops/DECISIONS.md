@@ -69,13 +69,32 @@ binary into the build of an app that will hold client contact details.
 `android.googlesource.com` too if source-level dependencies are ever needed).
 Nothing else about the plan changes, and no work already done is wasted.
 
+#### D-1 is resolved (2026-08-15)
+
+The row above and this decision are left as written, because they are the record
+of what was true on 10 August. They are no longer true. On an environment
+created specifically to unblock this work, with `dl.google.com` and
+`maven.google.com` on a custom allowlist **extending** rather than replacing the
+default package-manager list:
+
+| Check | Result |
+| --- | --- |
+| `curl -o /dev/null -w "%{http_code}" https://dl.google.com/` | **302** — Google's own redirect to `/chrome`, with `server: downloads`, not a proxy denial |
+| `curl … /android/repository/repository2-3.xml` | **200**, 408,907 bytes — a real artefact, not an error page |
+| `curl … https://repo1.maven.org/maven2/` | **200** — the existing Kotlin build is unaffected |
+| Android SDK | ✅ `platform-tools` 37.0.1, `platforms;android-36` rev 2, `build-tools;36.0.0`; licences accepted non-interactively |
+
+Both halves of that allowlist mattered. Had Maven Central been refused, it would
+have meant the "also include the default list of common package managers" box
+was left unticked and Custom had *replaced* the trusted list rather than
+extended it — which would have broken the Kotlin build that was already green.
+It was not refused.
+
 ### D-2 — Version matrix
 
 The brief forbids "latest stable" and requires an explicit matrix (§2.3 trap 1).
-The Kotlin half is **confirmed** — it resolves and compiles here. The Android
-half is still **proposed**, because verifying it means resolving it and
-resolution is exactly what D-1 blocks; it will be re-recorded as confirmed with
-real `./gradlew` output the moment the host is allowed.
+Everything below is now **confirmed**: it resolves, it compiles, and it produces
+an APK. Nothing here is marked proposed any more.
 
 | Component | Pin | Status |
 | --- | --- | --- |
@@ -84,14 +103,27 @@ real `./gradlew` output the moment the host is allowed.
 | Kotlin | 2.1.21 | ✅ confirmed — compiles with `allWarningsAsErrors` |
 | JUnit 5 | 5.11.4 | ✅ confirmed — permitted for the pure-Kotlin module by §2 |
 | JaCoCo | 0.8.12 | ✅ confirmed |
-| Android Gradle Plugin | 8.13.x | proposed. Stable 8.x line, **not** 9.x — still release-candidate per §2.3 |
-| KSP | matched to the Kotlin pin | proposed. Kotlin-coupled; never chosen independently |
-| compileSdk / targetSdk | 36 | proposed. §2.1 — non-negotiable |
-| minSdk | 26 | proposed |
-| Compose | via BOM | proposed. One BOM pin, no per-artifact versions |
-| Room, Hilt, WorkManager, DataStore | pinned individually | proposed. Compilers via **KSP**; `kotlin-kapt` appears nowhere |
-| SQLCipher | `net.zetetic:sqlcipher-android` | proposed. Not the deprecated `android-database-sqlcipher` |
-| Robolectric + Roborazzi | pinned | proposed. JVM-only; no emulator is needed or available |
+| Android Gradle Plugin | **8.13.2** | ✅ confirmed. The newest *stable* 8.x. 9.x exists and is out of scope |
+| KSP | **2.1.21-2.0.2** | ✅ confirmed. Prefix is the Kotlin pin by construction. `kotlin-kapt` appears nowhere |
+| compileSdk / targetSdk | **36** | ✅ confirmed by `aapt2 dump badging`: `compileSdkVersion='36'`, `targetSdkVersion:'36'` |
+| minSdk | **26** | ✅ confirmed — `minSdkVersion:'26'` |
+| Compose | BOM **2025.06.01** | ✅ confirmed. One BOM pin; no Compose artifact carries its own version |
+| Compose compiler | Kotlin plugin 2.1.21 | ✅ confirmed. Since Kotlin 2.0 it *is* the Kotlin version, so it cannot drift |
+| Material3 adaptive | **1.1.0** | ✅ confirmed. Versioned separately from the BOM |
+| AndroidX core / activity / lifecycle / navigation / window | 1.16.0 / 1.10.1 / 2.9.1 / 2.9.0 / 1.4.0 | ✅ confirmed |
+| Room | **2.7.2** | ✅ confirmed. Compiler via KSP |
+| WorkManager / DataStore | 2.10.2 / 1.1.7 | ✅ confirmed |
+| Hilt | **2.56.2** (+ `hilt-navigation-compose` 1.2.0) | ✅ confirmed. Compiler via KSP |
+| SQLCipher | `net.zetetic:sqlcipher-android` | not yet pinned — arrives with the encrypted store at Milestone 8 |
+| Robolectric + Roborazzi | not yet pinned | arrive at Milestone 1, where the first screenshot test is written |
+
+**Why these are not the newest of each.** The anchor is Kotlin 2.1.21, which was
+already confirmed against `:domain`. A library compiled by a *newer* Kotlin
+carries metadata this compiler refuses to read, so "newest of each" is not a
+combination that builds — it is a set of numbers that looks current. The
+AndroidX and Compose pins are therefore chosen from Kotlin 2.1.21's own era.
+They are old on purpose: this is the step-down rule applied deliberately rather
+than an accident of picking stale versions.
 
 Standing rule: on a version conflict, **step down** to the last known-good
 combination. Never step forward into a release candidate, and never bump a
@@ -227,6 +259,66 @@ viewing still counts toward the viewing stage. Dropping it instead would mean
 losing a buyer retroactively *improves* the viewing-to-offer rate — the report
 would look better the more sales were lost. Where a lead's furthest stage was
 never recorded, it counts as having reached the enquiry stage and no further.
+
+### D-10 — `UnusedResources` reports but does not fail the build, until Milestone 10
+
+Android Lint runs with `warningsAsErrors = true`, which is the right default and
+is why `abortOnError` is on. It promotes `UnusedResources` to an error, and that
+one check does not fit how this project is built.
+
+The Arabic string file is the **specification**, authored ahead of the screens
+that read it — that is the whole point of "Arabic is the original text, not a
+translation". At Milestone 0 there are five screens and 96 keys, so 80 keys are
+correctly reported as unused: every one belongs to a screen scheduled for a
+later milestone. Under `warningsAsErrors` that means each milestone's build
+fails on account of the milestones not yet written.
+
+The three ways out, and why this one:
+
+- delete the unused keys and re-add them per milestone — destroys authored
+  Arabic, and reduces the string file from a specification to a changelog;
+- add a lint **baseline** — hides today's findings from tomorrow, and would
+  swallow genuinely unused keys added later. No baseline file exists in this
+  project, deliberately;
+- **downgrade this one check to informational, and put back its teeth at
+  Milestone 10.** Chosen. It still runs, and every key it finds is still listed
+  in `lint-results-debug.html`, which CI uploads on every run.
+
+At Milestone 10 every screen exists, so an unused key means a key nobody wired
+up — a real defect — and `informational += setOf("UnusedResources")` comes out
+of `app/build.gradle.kts`. Nothing else is downgraded, and nothing is disabled.
+
+### D-11 — The `-v26` mipmap qualifier stays, against Lint's advice
+
+Lint's `ObsoleteSdkInt` says `mipmap-anydpi-v26` is pointless when minSdk is 26,
+and recommends a bare `mipmap-anydpi`. Following that advice breaks the build:
+AGP's resource merger drops the renamed folder silently — the files never reach
+`packaged_res` — and the build then fails at link time with
+`AAPT: error: resource mipmap/ic_launcher not found`. Reproduced twice, and
+confirmed not to be caused by `resourceConfigurations` by removing that setting
+and rebuilding.
+
+The suppression therefore lives in `app/lint.xml`, scoped to that one folder and
+carrying the evidence, so the check keeps working on every other folder. This is
+the standing rule for that file: one issue, one path, and the reason it is a
+false positive. Anything that is a real finding gets fixed instead.
+
+### D-12 — The repository's own `.gitignore` was silently eating the app's source
+
+The root `.gitignore` carries `**/data/*` and `**/output/*`, which keep the
+tender monitor's local state out of version control. Both patterns are
+unanchored, so they also match `app/src/main/kotlin/.../leads/data/` — the data
+layer of every feature, in an app whose packages are organised as a `ui`/`data`
+split per feature.
+
+Left alone this fails in the worst way available: `git add` skips those files
+without saying so, the branch builds perfectly on the machine that wrote it, and
+CI fails pointing at a missing class rather than at a `.gitignore`. Two
+negations in `gs3_marketing_ops/.gitignore` re-include `app/src/**` and
+`domain/src/**`. Verified with `git add --dry-run` on a real path under a
+feature `data/` directory, and verified in the other direction too — a `data/`
+directory elsewhere in the module is still ignored, so the root rule still does
+its job.
 
 ---
 

@@ -5,11 +5,11 @@ Sherman 3. Offline, local-only, Arabic-first. Built from the v1.4 build brief;
 this file is the plan for executing it, and [`DECISIONS.md`](DECISIONS.md) is
 the record of what was decided along the way.
 
-**Current status: blocked before Milestone 0 can compile.** `dl.google.com` is
-refused by this environment's egress policy, which takes away both the Android
-SDK and every Google-hosted Maven artifact. See `DECISIONS.md` → D-1 for the
-evidence and the one-line fix. Everything below is ready to run the moment that
-host is allowed.
+**Current status: Milestone 0 complete and green.** The `dl.google.com` block
+that stopped the first two attempts is lifted. The SDK is installed, `:app` is
+in `settings.gradle.kts`, and `./gradlew check assembleDebug` produces a real
+APK at targetSdk 36 with lint and `verifyStrings` clean. The version matrix in
+`DECISIONS.md` → D-2 is confirmed rather than proposed.
 
 ---
 

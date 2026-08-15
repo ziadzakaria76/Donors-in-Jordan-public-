@@ -110,8 +110,8 @@
     <!-- Settings -->
     <string name="settings_language">Language</string>
     <string name="settings_numerals">Numerals</string>
-    <string name="settings_numerals_western">Western digits (0-9)</string>
-    <string name="settings_numerals_arabic">Arabic-Indic digits (٠-٩)</string>
+    <string name="settings_numerals_western">Western digits (0–9)</string>
+    <string name="settings_numerals_arabic">Arabic-Indic digits (٠–٩)</string>
     <string name="settings_show_hijri">Show the Hijri date</string>
     <string name="settings_theme">Appearance</string>
     <string name="settings_business_hours">Working days and hours</string>
@@ -121,6 +121,14 @@
     <string name="empty_leads_title">No leads yet</string>
     <string name="empty_leads_body">Add the first enquiry and the response clock starts running.</string>
     <string name="empty_leads_action">Add a lead</string>
+    <string name="empty_dashboard_title">Nothing needs chasing today</string>
+    <string name="empty_dashboard_body">Today\'s tasks and the response deadlines coming due will appear here.</string>
+    <string name="empty_inventory_title">No apartments added yet</string>
+    <string name="empty_inventory_body">The project\'s fourteen apartments will appear here with their areas, prices and status.</string>
+    <string name="empty_campaigns_title">No campaigns yet</string>
+    <string name="empty_campaigns_body">Create a campaign to track spend and cost per lead for each track.</string>
+    <string name="empty_more_title">More tools</string>
+    <string name="empty_more_body">Calculators, the content plan, reports and settings.</string>
 
     <!-- Performance diagnosis -->
     <string name="diagnosis_pricing_or_imagery">Plenty of impressions and few enquiries: the problem is price or imagery, not demand.</string>

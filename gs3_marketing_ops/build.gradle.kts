@@ -1,5 +1,10 @@
 plugins {
     alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.kotlin.android) apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.ksp) apply false
+    alias(libs.plugins.hilt) apply false
 }
 
 /**
@@ -44,9 +49,6 @@ val hardcodedStringPattern = Regex(
     """(?:\bText\s*\(\s*|\b(?:text|label|contentDescription|placeholder|title|hint)\s*=\s*)"[^"]*[A-Za-z؀-ۿ][^"]*"""
 )
 
-fun parseStringKeys(xml: File): Set<String> =
-    Regex("""<string\s+name="([^"]+)"""").findAll(xml.readText()).map { it.groupValues[1] }.toSet()
-
 tasks.register("verifyStrings") {
     group = "verification"
     description = "Fails on hardcoded UI strings, on locale key drift, and on forbidden phrases."
@@ -56,11 +58,27 @@ tasks.register("verifyStrings") {
     val ar = stringsAr.asFile
     val allowlist = allowlistFile.asFile
 
+    // Everything the action needs is captured here, at configuration time, as
+    // plain serialisable values. Nothing inside `doLast` may reach back to
+    // `project` — the configuration cache cannot serialise a Project or a
+    // reference to this build script, and doing so fails the build rather than
+    // silently going slow. `projectDir` in particular used to be read inside
+    // the action, which is exactly the pattern that breaks.
+    val projectDirectory = projectDir
+    val phrases = forbiddenPhrases
+    val literalPattern = hardcodedStringPattern
+    val keyPattern = Regex("""<string\s+name="([^"]+)"""")
+
     inputs.files(files(sourceDirs).asFileTree.matching { include("**/*.kt") })
     inputs.files(files(en, ar, allowlist))
     outputs.upToDateWhen { false }
 
     doLast {
+        // Local, so it captures nothing but `keyPattern`.
+        val parseStringKeys: (File) -> Set<String> = { xml ->
+            keyPattern.findAll(xml.readText()).map { it.groupValues[1] }.toSet()
+        }
+
         val failures = mutableListOf<String>()
 
         // 1 — hardcoded user-visible literals in Kotlin sources.
@@ -74,8 +92,8 @@ tasks.register("verifyStrings") {
         sourceDirs.filter { it.exists() }.forEach { dir ->
             dir.walkTopDown().filter { it.extension == "kt" }.forEach { source ->
                 source.readLines().forEachIndexed { index, line ->
-                    if (hardcodedStringPattern.containsMatchIn(line)) {
-                        val relative = source.relativeTo(projectDir).path
+                    if (literalPattern.containsMatchIn(line)) {
+                        val relative = source.relativeTo(projectDirectory).path
                         val reference = "$relative:${index + 1}"
                         if (reference !in allowed) {
                             failures += "  hardcoded string  $reference\n      ${line.trim()}"
@@ -87,8 +105,8 @@ tasks.register("verifyStrings") {
 
         // 2 — key parity. Arabic is authored, not translated, so a key can go
         // missing on either side; both directions are reported.
-        if (!en.exists()) failures += "  missing ${en.relativeTo(projectDir)}"
-        if (!ar.exists()) failures += "  missing ${ar.relativeTo(projectDir)}"
+        if (!en.exists()) failures += "  missing ${en.relativeTo(projectDirectory)}"
+        if (!ar.exists()) failures += "  missing ${ar.relativeTo(projectDirectory)}"
 
         if (en.exists() && ar.exists()) {
             val enKeys = parseStringKeys(en)
@@ -99,9 +117,9 @@ tasks.register("verifyStrings") {
             // 3 — forbidden phrases, in either locale.
             listOf(en, ar).forEach { resource ->
                 val text = resource.readText()
-                forbiddenPhrases.forEach { (phrase, why) ->
+                phrases.forEach { (phrase, why) ->
                     if (text.contains(phrase, ignoreCase = true)) {
-                        failures += "  forbidden phrase \"$phrase\" in ${resource.relativeTo(projectDir)}\n      $why"
+                        failures += "  forbidden phrase \"$phrase\" in ${resource.relativeTo(projectDirectory)}\n      $why"
                     }
                 }
             }

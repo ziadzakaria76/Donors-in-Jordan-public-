@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The brand palette, taken verbatim from the company's own stylesheet
+    (website/assets/css/main.css) rather than re-picked by eye, so the app and
+    the site are the same brand rather than two near-misses.
+
+    These are the only colours defined in XML — the window background before
+    Compose draws, and the launcher icon. Everything else is in
+    ui/theme/Color.kt, where light and dark are declared together.
+-->
+<resources>
+    <color name="window_background">#FAF7F1</color>
+    <color name="ic_launcher_background">#0F1518</color>
+</resources>
