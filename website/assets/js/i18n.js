@@ -92,6 +92,34 @@ const T = {
   "cta.downloadPlan": { ar: "تحميل المخطط", en: "Download plan" },
 
   /* unit + project vocabulary */
+  /* Scarcity. Every one of these is computed from the schedule and stated only
+     when it is literally true — "last one at this size" appears when exactly
+     one available unit of that area remains, and not otherwise. Manufactured
+     urgency on a 90,000-dinar purchase is the fastest way to lose a buyer who
+     checks. */
+  "scarcity.lastSize": { ar: "آخر وحدة بهذه المساحة", en: "Last one at this size" },
+  "scarcity.lastInProject": { ar: "آخر وحدة متاحة في المشروع", en: "The last available unit in this project" },
+  "scarcity.fewLeft": { ar: "متبقّي {n} من {total} في هذا المشروع", en: "{n} of {total} left in this project" },
+
+  /* Comparison */
+  "compare.add": { ar: "أضف للمقارنة", en: "Add to compare" },
+  "compare.remove": { ar: "إزالة من المقارنة", en: "Remove from compare" },
+  "compare.added": { ar: "في المقارنة", en: "In compare" },
+  "compare.title": { ar: "مقارنة الوحدات", en: "Compare units" },
+  "compare.open": { ar: "قارن {n}", en: "Compare {n}" },
+  "compare.clear": { ar: "مسح", en: "Clear" },
+  "compare.full": { ar: "يمكنك مقارنة ثلاث وحدات في المرة الواحدة.", en: "You can compare three units at a time." },
+  "compare.tray": { ar: "وحدات للمقارنة", en: "Units to compare" },
+  "compare.perSqm": { ar: "سعر المتر", en: "Price per m²" },
+  "compare.total": { ar: "المساحة الإجمالية", en: "Total area" },
+  "compare.aspect": { ar: "الاتجاه", en: "Aspect" },
+  "compare.project": { ar: "المشروع", en: "Project" },
+  "compare.cheapest": { ar: "الأقل سعراً", en: "Lowest price" },
+  "compare.largest": { ar: "الأكبر مساحةً", en: "Largest" },
+  "compare.bestValue": { ar: "الأفضل سعراً للمتر", en: "Best price per m²" },
+
+  "filter.orientation": { ar: "الاتجاه", en: "Aspect" },
+
   "unit.unit": { ar: "الوحدة", en: "Unit" },
   "unit.beds": { ar: "غرف نوم", en: "Bedrooms" },
   "unit.baths": { ar: "حمّامات", en: "Bathrooms" },
@@ -370,6 +398,19 @@ const I18N = {
     const entry = typeof key === "string" ? T[key] : key;
     if (!entry) return typeof key === "string" ? key : "";
     return entry[lang] ?? entry.ar ?? "";
+  },
+
+  /**
+   * Resolve a key and substitute {placeholders}.
+   *
+   * Needed because Arabic and English put the same facts in different orders:
+   * "3 of 14 left in this project" against "متبقّي 3 من 14 في هذا المشروع".
+   * Building that by concatenating a number between two fragments works in one
+   * language and reads as nonsense in the other, so the whole sentence lives in
+   * the dictionary and the numbers are dropped into it.
+   */
+  fill(key, values) {
+    return I18N.t(key).replace(/\{(\w+)\}/g, (_, name) => values[name] ?? "");
   },
 
   /** Format a number in Western digits, which is what Jordanian sites use. */

@@ -89,6 +89,7 @@
           <div><label for="f-beds" data-i18n="filter.beds">غرف النوم</label><select id="f-beds" data-filter="beds"></select></div>
           <div><label for="f-type" data-i18n="filter.type">نوع الوحدة</label><select id="f-type" data-filter="type"></select></div>
           <div><label for="f-floor" data-i18n="filter.floor">الطابق</label><select id="f-floor" data-filter="floor"></select></div>
+          <div><label for="f-orientation" data-i18n="filter.orientation">الاتجاه</label><select id="f-orientation" data-filter="orientation"></select></div>
           <div><label for="f-minArea" data-i18n="filter.minArea">أقل مساحة (م²)</label><input id="f-minArea" data-filter="minArea" type="number" min="0" step="10" inputmode="numeric" placeholder="140"></div>
           <div><label for="f-maxPrice" data-i18n="filter.maxPrice">أعلى سعر (دينار)</label><input id="f-maxPrice" data-filter="maxPrice" type="number" min="0" step="5000" inputmode="numeric" placeholder="250000"></div>
           <div><label for="f-status" data-i18n="filter.status">الحالة</label><select id="f-status" data-filter="status"></select></div>
@@ -151,6 +152,21 @@
   <span data-icon="whatsapp"></span><span data-i18n="cta.whatsapp">واتساب</span>
 </a>
 
+<!-- Comparison. A table, not three cards side by side: the question is how
+     these units differ, and a table is the shape that answers it. -->
+<div class="modal" id="compare-modal" role="dialog" aria-modal="true" aria-labelledby="compare-title" hidden>
+  <button class="modal__backdrop" tabindex="-1" aria-hidden="true"></button>
+  <div class="modal__panel modal__panel--wide">
+    <button class="modal__close" type="button" data-modal-close aria-label="إغلاق" data-i18n-attr="aria-label:cta.close">
+      <span data-icon="close"></span>
+    </button>
+    <p class="eyebrow" id="compare-title" data-i18n="compare.title">مقارنة الوحدات</p>
+    <div class="compare-scroll">
+      <table class="compare-table" id="compare-table"></table>
+    </div>
+  </div>
+</div>
+
 <div class="modal" id="enquiry-modal" role="dialog" aria-modal="true" aria-labelledby="enquiry-title" hidden>
   <button class="modal__backdrop" tabindex="-1" aria-hidden="true"></button>
   <div class="modal__panel">
@@ -197,5 +213,6 @@
 <script src="assets/js/app.js"></script>
 <script src="assets/js/pages.js"></script>
 <script src="assets/js/units.js"></script>
+<script src="assets/js/compare.js"></script>
 </body>
 </html>
