@@ -291,8 +291,50 @@ Two details in `submitForm` matter if you edit it:
 
 ## Editing the content
 
-`assets/js/data.js` is the only file you need for content changes. Every piece
-of text is a `{ ar, en }` pair.
+`content.json` is the file you edit. Every piece of text in it is a
+`{ ar, en }` pair.
+
+```bash
+npm run data     # content.json → assets/js/data.js
+npm run check
+```
+
+Then commit both files.
+
+### Why there are two files
+
+`assets/js/data.js` is what the browser loads, and it is also the site's
+documentation: its comments record why the founding year is `null`, why the
+testimonials array is empty, why a sold unit carries no price, and why the
+commercial registration is absent rather than invented. Those comments are the
+reason nobody has quietly re-added the content that was removed.
+
+An admin panel writing to that file directly would delete every one of them —
+rewriting a commented source file from a web form is how comments die. So the
+two jobs are split:
+
+| | |
+|---|---|
+| `content.json` | what a person or the panel edits — projects, units, prices, FAQs, testimonials, captions, the company's own details |
+| `tools/build-data.mjs` | the prose, the enumerations, and the code around them |
+| `assets/js/data.js` | generated from both, never edited by hand |
+
+The enumerations stay in the generator on purpose. Districts, amenities,
+orientations, unit types and project statuses are not content — they are the
+vocabulary the content is checked *against*, and a panel able to invent a new
+orientation would defeat the check that catches a mistyped one.
+
+Project provenance notes live in `content.json` alongside the project they
+describe, under `notes`, keyed by field name. "The brochure marks none as sold"
+and "no status, because the brochure does not say" are the record of why the
+data looks the way it does; losing them is how a gap in a brochure turns into a
+guess on a page.
+
+`npm run check` renders `content.json` and compares the result to the committed
+`data.js`, so an edit made in the wrong file fails while it is still a diff.
+The deploy deliberately does *not* regenerate `data.js` — if it did, a
+correction typed into the generated file would ship once and then vanish, which
+is the worst kind of failure, because the price was right when you checked it.
 
 ### Checking an edit
 
@@ -300,7 +342,8 @@ of text is a `{ ar, en }` pair.
 npm run check
 ```
 
-Reads `data.js` and asserts what the rest of the site assumes about it: that
+Reads `data.js` and asserts what the rest of the site assumes about it: that it
+matches `content.json`, that
 every image and floor plan it names exists at the widths the manifest promises,
 that unit ids are unique, that every orientation, type, district, amenity and
 status resolves to a label, that an available unit carries a price, that a plan
@@ -553,6 +596,7 @@ website/
 ├── about.html               Commitments and process
 ├── contact.html             Contact form, direct channels, map, FAQ
 ├── 404.html
+├── content.json           ← all content lives here; assets/js/data.js is built from it
 ├── assets/
 │   ├── css/main.css         Design system; CSS logical properties throughout, so
 │   │                        one stylesheet serves both RTL and LTR
@@ -561,13 +605,14 @@ website/
 │   ├── img/                 Photographs (.webp at several widths) and floor plans
 │   └── js/
 │       ├── img-manifest.js   Generated — which widths exist per image
-│       ├── data.js          ← all content lives here
+│       ├── data.js          Generated from ../../content.json — do not edit
 │       ├── i18n.js          ← all interface strings live here
 │       ├── app.js           Header, language switch, modals, lightbox, forms, cards
 │       ├── pages.js         Home, project index, gallery, contact page modules
 │       ├── units.js         Inventory filtering, sorting, URL state
 │       ├── project.js       Project detail page
-├── tools/                   Optional generators (images, page scaffolding)
+├── tools/                   build-data.mjs (content.json → data.js), check-content.mjs,
+│                           and optional generators for images and page scaffolding
 ├── netlify.toml, vercel.json, robots.txt, sitemap.xml
 ```
 
