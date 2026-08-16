@@ -7,18 +7,27 @@ import java.math.BigDecimal
 /**
  * Cost-per-lead targets for the external track.
  *
- * On the two numbers here — see DECISIONS.md → D-3. The brief calls 45 JOD the
- * target cost per *qualified* lead, but 45 is exactly 7,200 ÷ 160 raw leads,
- * to the fils. The same budget over the 48 qualified leads it plans for gives
- * 150 JOD. Taken as written the app would judge the track against a target
- * 3.3× harder than its own budget allows, and the stop-rule alarm would come on
- * in the first week and never go off — which trains a team to ignore alarms.
+ * **There is one target, and it is per qualified lead.** D-3 is answered
+ * (2026-08-16): the owner removed the 45 JOD figure, so the raw-lead target is
+ * gone rather than reinterpreted.
  *
- * So both bases are held here, both are editable in Settings, and the defaults
- * are internally consistent with the plan. Awaiting the owner's confirmation.
+ * That leaves the track judged on the basis its own budget plans for — 7,200
+ * JOD over the 48 qualified leads it expects is 150 each, with a recorded
+ * decision forced above 200. Carrying a second target of 45 as well would have
+ * meant two numbers that can disagree about whether the same month went well.
+ *
+ * Worth keeping the history, because the figure will come up again: what the
+ * brief called a target per *qualified* lead was 7,200 ÷ 160 **raw** leads to
+ * the fils. Taken literally it would have scored the track against a target
+ * 3.3× harder than the budget allows, so the alarm would have come on in week
+ * one and never gone off — which teaches a team to ignore alarms.
+ *
+ * Cost per raw lead is still *measured* — see [ChannelSpend.costPerRawLead].
+ * What no longer exists is a target to score it against.
+ *
+ * Both remaining figures are editable in Settings.
  */
 data class CplTargets(
-    val perRawLead: Jod = Jod.ofDinars(45),
     val perQualifiedLead: Jod = Jod.ofDinars(150),
     /** Sustained cost above this on the external track forces a recorded decision. */
     val qualifiedStopThreshold: Jod = Jod.ofDinars(200),

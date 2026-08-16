@@ -197,6 +197,29 @@ against 150 JOD, with the 60 JOD stop-rule threshold scaled to the same basis
 (200 JOD per qualified lead). Both thresholds are editable in Settings, so a
 correction costs nothing. Flagged to the owner — see the open question below.
 
+#### Answered 2026-08-16 — the 45 JOD figure is removed entirely
+
+The owner's instruction was "remove the 45 JOD". So it is gone rather than
+reinterpreted: `CplTargets.perRawLead` no longer exists, and there is now
+exactly **one** target for the external track — 150 JOD per qualified lead,
+with a recorded decision forced above 200. Both are still editable in Settings.
+
+This is the cleaner answer, and better than either branch of the original
+question. The tension in D-3 came from holding two targets that could disagree
+about whether the same month went well; with one basis there is nothing to
+reconcile, and the basis kept is the one the budget actually plans for.
+
+Cost per raw lead is still **measured** — `ChannelSpend.costPerRawLead` is
+untouched, and the arithmetic that made 45 suspicious in the first place
+(7,200 ÷ 160 = 45.00 to the fils) is still asserted by a test. What no longer
+exists is a target to score it against.
+
+Two tests hold the line: one asserts the qualified-lead target still matches the
+budget's own arithmetic, and one asserts structurally that no `perRawLead` field
+has reappeared — so a future reintroduction fails the build and sends whoever
+did it back to this entry, instead of a second contradictory target creeping in
+unnoticed.
+
 ### D-4 — Monthly budget is derived, never stored
 
 The brief's monthly column is the annual figure ÷ 12, rounded. Those roundings
@@ -492,5 +515,10 @@ depends on it (noted in the last column).
 
 | Ref | Question | Status |
 | --- | --- | --- |
-| D-3 | Is 45 JOD the target per **raw** lead (as the budget arithmetic implies) or per **qualified** lead (as the brief's wording says)? Implemented as 45 raw / 150 qualified / 200 stop threshold, all editable in Settings | Awaiting confirmation — no rework either way |
 | B-1, B-2 | The two blocking questions in section 0 | Awaiting a written answer. Not defaultable |
+
+### Closed
+
+| Ref | Question | Answer |
+| --- | --- | --- |
+| D-3 | Is 45 JOD the target per **raw** lead or per **qualified** lead? | **Answered 2026-08-16.** Neither — the owner removed the 45 JOD figure. One target remains: 150 JOD per qualified lead, 200 stop threshold, both editable in Settings. See D-3 above |

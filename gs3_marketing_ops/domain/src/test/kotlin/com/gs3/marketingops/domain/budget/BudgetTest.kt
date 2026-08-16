@@ -147,16 +147,26 @@ class StopRulesTest {
     }
 
     @Test
-    fun `the budget's own arithmetic gives 45 dinars per raw lead and 150 per qualified`() {
-        // DECISIONS.md D-3: 45 is exactly 7,200 / 160 raw leads, which is why it
-        // cannot also be the target per qualified lead.
+    fun `the only target is per qualified lead, and the budget's arithmetic meets it`() {
+        // D-3, answered 2026-08-16: the owner removed the 45 JOD figure, so the
+        // raw-lead target is gone. Cost per raw lead is still measured — and
+        // 7,200 / 160 is 45 to the fils, which is exactly why that number was
+        // never a qualified-lead target — but nothing scores against it now.
         val track = channel("external", 7_200, 160, 48)
         assertEquals(Jod.ofDinars(45), track.costPerRawLead)
         assertEquals(Jod.ofDinars(150), track.costPerQualifiedLead)
 
         val targets = CplTargets()
-        assertEquals(track.costPerRawLead, targets.perRawLead)
         assertEquals(track.costPerQualifiedLead, targets.perQualifiedLead)
+    }
+
+    @Test
+    fun `no raw-lead target survives to be scored against`() {
+        // Structural rather than a value assertion. If a `perRawLead` target is
+        // ever reintroduced this fails, sending whoever did it back to D-3
+        // instead of letting a second, contradictory target reappear quietly.
+        val fields = CplTargets::class.java.declaredFields.map { it.name }
+        assertFalse(fields.contains("perRawLead"), "a raw-lead target has come back: $fields")
     }
 
     @Test
