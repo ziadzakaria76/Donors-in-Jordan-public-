@@ -24,6 +24,7 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { render } from "./build-data.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const img = (name) => existsSync(resolve(ROOT, "assets/img", name));
@@ -35,6 +36,19 @@ const { COMPANY, PROJECTS, DISTRICTS, AMENITIES, ORIENTATIONS, UNIT_TYPES, PROJE
 const errors = [];
 const notes = [];
 const check = (ok, message) => { if (!ok) errors.push(message); };
+
+/* ----------------------------------------------------- data.js is generated
+   content.json is the edited file; data.js is rendered from it, and the deploy
+   renders it again. So a change made directly in data.js works locally, ships
+   once, and then disappears the next time anything triggers a build — the
+   worst kind of failure, because the price was right when you checked it.
+
+   Rendering content.json here and comparing catches that while it is still a
+   diff. If this fails after an intentional edit to the generator, run
+   `npm run data` and commit the result. */
+
+check(read("assets/js/data.js") === render(JSON.parse(read("content.json"))),
+  "assets/js/data.js does not match content.json — it is generated, so edit content.json and run `npm run data`");
 
 /* --------------------------------------------------------------- images
    picture() offers the browser only the widths the manifest lists, and
