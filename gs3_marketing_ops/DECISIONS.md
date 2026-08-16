@@ -423,6 +423,25 @@ other lint error present today as well, which is the opposite of what this gate
 is for. `abortOnError = true` and `warningsAsErrors = true` stay exactly as they
 are; this removes one named check and nothing else.
 
+**Confirmed by reproduction, not by reasoning alone (2026-08-16).** The
+environment-dependence above was a hypothesis until it was made to happen on
+purpose: installing `platforms;android-37.1` into the build container made the
+identical commit fail locally with the identical message, and the fix made it
+pass again with that platform still installed.
+
+That platform is now **kept installed** in the build environment. The local
+build therefore runs under the stricter of the two conditions, so this class of
+"green here, red in CI" cannot recur silently for any check that grades against
+the newest installed SDK.
+
+A second thing made this expensive, and it is fixed separately in
+`.github/workflows/tests.yml`: the failure was unreadable. GitHub serves raw job
+logs *and* uploaded artifacts from a storage host that a restricted egress
+allowlist does not cover, so four red runs arrived with no stated reason. The
+job now writes its failure to the step summary **and** emits it as an
+`::error::` annotation — annotations being the only one of the two that comes
+back through the REST API.
+
 ---
 
 ## 3. Milestone 0.5 — the discovery interview
