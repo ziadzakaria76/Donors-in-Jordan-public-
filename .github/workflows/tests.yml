@@ -96,25 +96,25 @@ jobs:
       # storage host, which an agent behind a restricted egress allowlist cannot
       # reach -- so a red build would be a red build with no stated reason. The
       # job summary comes back through the API itself.
-      - name: Put the failure in the job summary
+      - name: Put the failure where it can be read
         if: failure()
         run: |
+          # Two places, because they have different readers. The job summary is
+          # for a person looking at the run in a browser; the ::error::
+          # annotation is the only one of the two that comes back through the
+          # REST API, which is what an agent behind an egress allowlist has.
           {
             echo '## `./gradlew check` failed'
-            echo
-            echo '```'
-            grep -E "^e: |FAILURE|What went wrong|Execution failed|Caused by|: Error:|error:|FAILED" \
-              /tmp/marketing-ops-check.log | head -n 60 || true
-            echo '```'
-            echo
-            echo '<details><summary>Last 200 lines</summary>'
-            echo
             echo '```'
             tail -n 200 /tmp/marketing-ops-check.log
             echo '```'
-            echo
-            echo '</details>'
           } >> "$GITHUB_STEP_SUMMARY"
+
+          # Newlines have to be percent-encoded to survive a workflow command.
+          DETAIL=$(grep -E "^e: |FAILURE|What went wrong|Execution failed|Caused by|: Error:|FAILED" \
+                     /tmp/marketing-ops-check.log | head -n 25 | sed 's/%/%25/g; s/\r/%0D/g' \
+                   | awk '{printf "%s%%0A", $0}')
+          echo "::error title=marketing-ops check failed::${DETAIL}"
 
       - name: Report the actual coverage figure
         run: ./gradlew coverage --no-daemon
