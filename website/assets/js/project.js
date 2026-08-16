@@ -219,6 +219,38 @@
       </article>`).join("");
   }
 
+  /**
+   * The construction log, newest first.
+   *
+   * Dates are rendered in the reading language's own calendar formatting but
+   * always with Western digits, as every other number on this site is — a
+   * price in Western digits beside a date in Eastern-Arabic ones reads as two
+   * different documents. The percentage is optional: "we poured the third
+   * floor slab" is a fact, "41% complete" is an estimate, and a log is more
+   * credible when it can state the first without inventing the second.
+   */
+  function renderProgress() {
+    if (!$("#p-progress")) return;
+    const log = (project.progress || []).filter((e) => e && e.date);
+    if (!log.length) { $("#p-progress-section")?.remove(); return; }
+
+    const entries = [...log].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const locale = document.documentElement.lang === "ar" ? "ar-JO-u-nu-latn" : "en-GB";
+    const fmt = (iso) => {
+      const d = new Date(`${iso}T00:00:00`);
+      return Number.isNaN(d.getTime()) ? iso
+        : d.toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" });
+    };
+
+    $("#p-progress").innerHTML = entries.map((e) => `
+      <li class="timeline__item reveal">
+        <p class="timeline__date"><time class="num" datetime="${esc(e.date)}">${esc(fmt(e.date))}</time>${
+          Number.isFinite(e.percent) ? ` <span class="timeline__pct num">${e.percent}%</span>` : ""}</p>
+        ${e.title ? `<h3 class="timeline__title">${tx(e.title)}</h3>` : ""}
+        ${e.body ? `<p>${tx(e.body)}</p>` : ""}
+      </li>`).join("");
+  }
+
   function renderMap() {
     if (!$("#p-map")) return;
     if (!project.mapQuery) { dropSection("#p-map"); return; }
@@ -260,7 +292,7 @@
 
   function renderAll() {
     setCanonical(); renderHero(); renderAbout(); renderMatrix(); renderUnits(); renderPlans();
-    renderNearby(); renderMap(); renderGallery(); renderRelated();
+    renderProgress(); renderNearby(); renderMap(); renderGallery(); renderRelated();
     initReveals();
     /* After initReveals, so the card is not mid-animation when we scroll it
        into view. Deep links from the units page: ?id=…#unit-<id> */

@@ -301,6 +301,12 @@ npm run check
 
 Then commit both files.
 
+### Editing it in a browser
+
+`/admin/` edits `content.json` from a browser, so a price change does not need
+a text editor and a git client. It is described in full under
+[The admin panel](#the-admin-panel) below.
+
 ### Why there are two files
 
 `assets/js/data.js` is what the browser loads, and it is also the site's
@@ -398,6 +404,108 @@ UI strings live in `assets/js/i18n.js` as `{ ar, en }` pairs keyed by
 what search engines and no-JS visitors see — and repeated in `i18n.js` so that
 switching back from English restores it. **If you change a string in the HTML,
 change its twin in `i18n.js`.**
+
+---
+
+## The admin panel
+
+`/admin/` is a small editing tool for the content: projects, the unit schedules
+and their prices, construction progress, FAQs and testimonials. It has no
+database. It saves by committing `content.json` and the rendered `data.js` to
+this repository as one commit, which means every edit is a diff with an author
+and a date, CI runs on it, the deploy is the ordinary deploy, and undoing a
+mistake is `git revert` rather than a support request.
+
+```
+browser  ->  /api/content (PUT)  ->  validate  ->  render data.js
+                                        |
+                           one commit on main, both files
+                                        |
+                      CI: npm run check -> wrangler pages deploy
+```
+
+### One definition of what is valid
+
+`tools/validate-content.mjs` holds the rules that need nothing but the content
+-- unit ids unique, every orientation and amenity resolving to a label, an
+available unit carrying a price, both languages filled in together. It runs in
+four places from one file:
+
+| where | when |
+|---|---|
+| the panel, in your browser | as you type |
+| the Pages Function | before it commits anything |
+| `npm run check` | before you push |
+| CI | before anything deploys |
+
+`tools/render-data.mjs` also holds the five enumerations -- districts,
+amenities, unit types, orientations, project statuses -- and this is the whole
+point of the split. They are the vocabulary the content is checked *against*. A
+panel that could add an orientation would be a panel where a typo passes
+validation, so the panel offers them as a closed list and adding a real one is
+a code change, reviewed as a diff.
+
+Both files import nothing at all. They have to run in a Workers runtime and in
+a browser as well as in Node, so a single `import ... from "node:fs"` in either
+would break the deploy and the panel at once. `npm run check` asserts they stay
+clean.
+
+### What it cannot do
+
+- **Add an image.** Photographs are re-cut to several widths by
+  `npm run assets`, which needs the original file. The panel edits captions and
+  the order images appear in; adding one is still a commit.
+- **Invent vocabulary.** See above.
+- **Show leads.** Enquiries go to WhatsApp and to Web3Forms. Reading them back
+  needs the Web3Forms Submissions API, which is a paid feature; on the free
+  plan there is no endpoint to read. The alternative is storing buyers' names
+  and phone numbers ourselves, which this site deliberately does not do. The
+  panel says so rather than showing an empty table.
+
+### Setting it up
+
+The panel needs Cloudflare Access in front of it and a GitHub token to commit
+with. Neither lives in this repository.
+
+**1. Put Access in front of it.** Cloudflare Zero Trust -> Access ->
+Applications -> Add an application -> Self-hosted. Free for up to 50 users.
+
+- Cover **both** paths: `your-domain.com/admin` *and* `your-domain.com/api`.
+  An Access policy on `/admin` alone would leave the write API facing the
+  internet. The panel refuses to work in that case rather than trusting it, but
+  the point is not to be in that position.
+- Policy: *Emails* -> your address. Session duration is up to you; a week is
+  reasonable for one person.
+- Copy the **Application Audience (AUD) tag** from the application overview.
+
+**2. Set the variables.** Cloudflare dashboard -> Workers & Pages -> the
+project -> Settings -> Variables and Secrets:
+
+| name | kind | value |
+|---|---|---|
+| `ACCESS_TEAM_DOMAIN` | plaintext | `yourteam.cloudflareaccess.com` |
+| `ACCESS_AUD` | plaintext | the AUD tag from step 1 |
+| `GITHUB_REPO` | plaintext | `owner/repository` |
+| `GITHUB_BRANCH` | plaintext | `main` (optional) |
+| `GITHUB_TOKEN` | **encrypted** | see below |
+
+`GITHUB_TOKEN` is a fine-grained personal access token (GitHub -> Settings ->
+Developer settings -> Personal access tokens -> Fine-grained tokens) scoped to
+**this repository only**, with **Contents: read and write**. Nothing else. It
+must be stored **encrypted** -- a plaintext variable is readable by anyone who
+can open the dashboard.
+
+If any of these is missing, the panel names the missing one at load rather than
+failing at the end of a long edit.
+
+### Why the assertion is verified rather than trusted
+
+The Function verifies the Access JWT signature itself instead of trusting the
+`Cf-Access-Authenticated-User-Email` header. "Access is in front of it" is a
+claim about a setting in someone's dashboard -- the same class of claim as the
+Git connection that was silently absent while `main` stopped reaching the site
+for twelve hours. If the policy is ever removed or scoped to the wrong path,
+verifying turns that into a 401 instead of a stranger with commit access.
 
 ---
 
@@ -597,6 +705,8 @@ website/
 ├── contact.html             Contact form, direct channels, map, FAQ
 ├── 404.html
 ├── content.json           ← all content lives here; assets/js/data.js is built from it
+├── admin/                   The editing panel (behind Cloudflare Access)
+├── functions/api/           Pages Functions: the panel's read and write API
 ├── assets/
 │   ├── css/main.css         Design system; CSS logical properties throughout, so
 │   │                        one stylesheet serves both RTL and LTR
@@ -611,8 +721,11 @@ website/
 │       ├── pages.js         Home, project index, gallery, contact page modules
 │       ├── units.js         Inventory filtering, sorting, URL state
 │       ├── project.js       Project detail page
-├── tools/                   build-data.mjs (content.json → data.js), check-content.mjs,
-│                           and optional generators for images and page scaffolding
+├── tools/                   render-data.mjs (pure: content.json → data.js) and
+│                           validate-content.mjs (pure: the publishable rules) — both
+│                           also run in the Worker and in the panel, so neither may
+│                           import node:*. Plus build-data.mjs, check-content.mjs and
+│                           the optional image and page-scaffolding generators.
 ├── netlify.toml, vercel.json, robots.txt, sitemap.xml
 ```
 
