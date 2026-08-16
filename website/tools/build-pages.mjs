@@ -44,6 +44,21 @@ const LIGHTBOX = `<div class="modal modal--lightbox" id="lightbox" role="dialog"
   </div>
 </div>`;
 
+const COMPARE = `<!-- Comparison. A table, not three cards side by side: the question is how
+     these units differ, and a table is the shape that answers it. -->
+<div class="modal" id="compare-modal" role="dialog" aria-modal="true" aria-labelledby="compare-title" hidden>
+  <button class="modal__backdrop" tabindex="-1" aria-hidden="true"></button>
+  <div class="modal__panel modal__panel--wide">
+    <button class="modal__close" type="button" data-modal-close aria-label="إغلاق" data-i18n-attr="aria-label:cta.close">
+      <span data-icon="close"></span>
+    </button>
+    <p class="eyebrow" id="compare-title" data-i18n="compare.title">مقارنة الوحدات</p>
+    <div class="compare-scroll">
+      <table class="compare-table" id="compare-table"></table>
+    </div>
+  </div>
+</div>`;
+
 const SITE = "https://general-sherman-housing.com";
 
 function head({ file, title, desc, keywords = "", noindex = false }) {
@@ -76,12 +91,36 @@ ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" hr
 }
 
 /** A dark page hero used by every inner page. */
+/**
+ * Which widths actually exist for an image.
+ *
+ * The hero used to name 800, 1280 and 1920 for every image regardless. Most of
+ * these photographs come out of a sales brochure and top out at 1600 — this
+ * page's own hero does — so a hard-coded 1920 is a 404 on the `src` and again
+ * in the srcset, on the largest, most visible image on the page. app.js has
+ * read the manifest since the gallery hit the same wall; the scaffolder never
+ * did.
+ */
+const MANIFEST = Object.fromEntries(
+  [...(await readFile(resolve(ROOT, "assets/js/img-manifest.js"), "utf8"))
+    .matchAll(/"([^"]+)": \[([\d, ]+)\]/g)]
+    .map((m) => [m[1], m[2].split(",").map((n) => Number(n.trim()))]),
+);
+
+function heroImage(image) {
+  const widths = (MANIFEST[image] || [800, 1280, 1920]).filter((w) => w >= 800);
+  if (!widths.length) throw new Error(`pageHero: no width >= 800 for "${image}" — it is too small to be a hero`);
+  const largest = widths[widths.length - 1];
+  const srcset = widths.map((w) => `assets/img/${image}-${w}.webp ${w}w`).join(", ");
+  return `<img src="assets/img/${image}-${largest}.webp"
+           srcset="${srcset}"
+           sizes="100vw" alt="" fetchpriority="high" width="${largest}" height="${Math.round(largest * 9 / 16)}">`;
+}
+
 function pageHero({ image, eyebrow, title, lead, crumb, extra = "" }) {
   return `  <section class="page-hero">
     <div class="page-hero__media">
-      <img src="assets/img/${image}-1920.webp"
-           srcset="assets/img/${image}-800.webp 800w, assets/img/${image}-1280.webp 1280w, assets/img/${image}-1920.webp 1920w"
-           sizes="100vw" alt="" fetchpriority="high" width="1920" height="1080">
+      ${heroImage(image)}
     </div>
     <div class="wrap">
       <ul class="crumbs">
@@ -226,6 +265,20 @@ PAGES.push({
     </div>
   </section>
 
+  <!-- Construction progress. Removed entirely unless the project has a log:
+       a buyer shown no progress report is better served than one shown a
+       stale one, and an empty timeline reads as a stalled site. -->
+  <section class="section" id="p-progress-section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow" data-i18n="project.progressEyebrow">سير العمل</p>
+        <h2 data-i18n="project.progressTitle">مراحل الإنجاز</h2>
+        <p class="lead" data-i18n="project.progressLead">تقرير مؤرّخ بما تمّ تنفيذه على أرض الواقع.</p>
+      </div>
+      <ol class="timeline" id="p-progress"></ol>
+    </div>
+  </section>
+
   <section class="section section--paper" id="p-nearby-section">
     <div class="wrap">
       <div class="section-head">
@@ -280,8 +333,8 @@ PAGES.push({
   title: "الوحدات المتاحة — شقق للبيع في عمّان بالمساحة والسعر | جنرال شيرمان",
   desc: "الوحدات المتاحة للبيع في مشاريع شركة جنرال شيرمان للإسكان في مرج الحمام، بمساحاتها وأسعارها وطوابقها.",
   keywords: "شقق للبيع في عمان, أسعار الشقق في عمان, شقق 3 غرف عمان, شقق بحديقة عمان",
-  scripts: ["pages.js", "units.js"],
-  modals: [ENQUIRY],
+  scripts: ["pages.js", "units.js", "compare.js"],
+  modals: [COMPARE, ENQUIRY],
   main: `
 ${pageHero({
     image: "sherman1-3",
@@ -300,6 +353,7 @@ ${pageHero({
           <div><label for="f-beds" data-i18n="filter.beds">غرف النوم</label><select id="f-beds" data-filter="beds"></select></div>
           <div><label for="f-type" data-i18n="filter.type">نوع الوحدة</label><select id="f-type" data-filter="type"></select></div>
           <div><label for="f-floor" data-i18n="filter.floor">الطابق</label><select id="f-floor" data-filter="floor"></select></div>
+          <div><label for="f-orientation" data-i18n="filter.orientation">الاتجاه</label><select id="f-orientation" data-filter="orientation"></select></div>
           <div><label for="f-minArea" data-i18n="filter.minArea">أقل مساحة (م²)</label><input id="f-minArea" data-filter="minArea" type="number" min="0" step="10" inputmode="numeric" placeholder="140"></div>
           <div><label for="f-maxPrice" data-i18n="filter.maxPrice">أعلى سعر (دينار)</label><input id="f-maxPrice" data-filter="maxPrice" type="number" min="0" step="5000" inputmode="numeric" placeholder="250000"></div>
           <div><label for="f-status" data-i18n="filter.status">الحالة</label><select id="f-status" data-filter="status"></select></div>
@@ -504,24 +558,15 @@ ${pageHero({
         <p class="eyebrow" data-i18n="contact.faqEyebrow">أسئلة شائعة</p>
         <h2 data-i18n="contact.faqTitle">قبل أن تسأل</h2>
       </div>
-      <div class="accordion">
-        <details>
-          <summary data-i18n="contact.q1">هل يمكن لغير الأردنيين تملّك شقة؟</summary>
-          <div class="accordion__body" data-i18n="contact.a1">نعم. يستطيع مواطنو الدول العربية والأجانب التملّك في الأردن بموافقة من مجلس الوزراء، ونتولى نحن تجهيز المعاملة ومتابعتها. المدة المعتادة بين شهرين وأربعة أشهر.</div>
-        </details>
-        <details>
-          <summary data-i18n="contact.q2">ما الذي يشمله السعر المعلن؟</summary>
-          <div class="accordion__body" data-i18n="contact.a2">السعر يشمل الوحدة بمساحتها الصافية وحصتها من المساحات المشتركة، والتشطيبات المذكورة في العقد، وموقف السيارة والمستودع. لا يشمل رسوم التسجيل الحكومية إلا إذا نُصّ على ذلك في خطة الدفع.</div>
-        </details>
-        <details>
-          <summary data-i18n="contact.q3">هل يمكن تعديل التشطيبات أو التوزيع الداخلي؟</summary>
-          <div class="accordion__body" data-i18n="contact.a3">يمكن تعديل التشطيبات ومواد الأرضيات والمطبخ قبل مرحلة معينة من التنفيذ. تعديل الجدران الداخلية غير الإنشائية ممكن أيضاً بموافقة المهندس المشرف وبفارق تكلفة يُحتسب مسبقاً.</div>
-        </details>
-        <details>
-          <summary data-i18n="contact.q4">ما هي الضمانات بعد التسليم؟</summary>
-          <div class="accordion__body" data-i18n="contact.a4">سنتان على التشطيبات والأعمال الكهربائية والميكانيكية، وعشر سنوات على الهيكل الإنشائي، إضافةً إلى فريق صيانة يستجيب خلال ٤٨ ساعة في السنة الأولى.</div>
-        </details>
-      </div>
+      <!-- Rendered from DATA.FAQS by pages.js. These four used to be written
+           out here by hand while content.json held five that no page read — so
+           the admin panel's FAQ editor changed nothing, and a fifth question
+           about buying to let was invisible on the site entirely. -->
+      <div class="accordion" id="faq-list" data-faq-limit="4"></div>
+      <p style="margin-block-start:1.75rem">
+        <a class="link-arrow" href="faq.html"><span data-i18n="faq.all">كل الأسئلة الشائعة</span>
+          <span data-icon="arrow" class="icon icon--dir"></span></a>
+      </p>
     </div>
   </section>`,
 });
@@ -549,7 +594,45 @@ PAGES.push({
   </section>`,
 });
 
+/* -------------------------------------------------------------------- FAQ */
+
+PAGES.push({
+  file: "faq.html",
+  title: "أسئلة شائعة — شراء شقة من شركة جنرال شيرمان للإسكان",
+  desc: "التملّك لغير الأردنيين، وما يشمله السعر، وتعديل التشطيبات، والضمانات بعد التسليم، والشراء بغرض التأجير.",
+  keywords: "تملك الأجانب في الأردن, ضمانات التسليم, شراء شقة في عمّان",
+  scripts: ["pages.js"],
+  modals: [],
+  main: `
+${pageHero({
+    image: "sherman3-lobby-1",
+    crumb: '<span data-i18n="nav.faq">أسئلة شائعة</span>',
+    eyebrow: '<span data-i18n="faq.eyebrow">قبل أن تسأل</span>',
+    title: '<span data-i18n="faq.title">أسئلة شائعة</span>',
+    lead: '<span data-i18n="faq.lead">الأسئلة التي تتكرّر في كل زيارة، بإجابات مكتوبة. إن لم تجد سؤالك، اسألنا مباشرةً.</span>',
+  })}
+
+  <section class="section">
+    <div class="wrap wrap--narrow">
+      <!-- Rendered from DATA.FAQS, which is what the admin panel edits.
+           pages.js also emits FAQPage structured data from the same array, so
+           the answers Google shows and the answers on the page cannot drift. -->
+      <div class="accordion" id="faq-list"></div>
+
+      <div style="margin-block-start:3.5rem;text-align:center">
+        <p class="lead" data-i18n="faq.ctaBody">سؤالك ليس هنا؟ اسأل فريق المبيعات مباشرةً — كلّهم مهندسون.</p>
+        <p style="margin-block-start:1.5rem;display:flex;gap:.75rem;justify-content:center;flex-wrap:wrap">
+          <a class="btn btn--brass" href="contact.html" data-i18n="cta.contactUs">تواصل معنا</a>
+          <a class="btn btn--ghost" data-wa href="#" data-i18n="cta.whatsapp">واتساب</a>
+        </p>
+      </div>
+    </div>
+  </section>`,
+});
+
 /* ------------------------------------------------------------------ write */
+
+const rendered = new Map();
 
 for (const page of PAGES) {
   const scripts = ["img-manifest.js", "data.js", "i18n.js", "app.js", ...page.scripts]
@@ -578,7 +661,28 @@ ${scripts}
 </body>
 </html>
 `;
-  await writeFile(resolve(ROOT, page.file), html);
-  console.log("  ✓", page.file);
+  rendered.set(page.file, html);
 }
-console.log("Done.");
+
+/**
+ * What every generated page should contain, as { file -> html }.
+ *
+ * Exported so check-content.mjs can compare it against what is committed. The
+ * pages in this repository are finished files you can open and edit — and that
+ * is exactly the trap: an edit made in the page, not here, survives until
+ * somebody runs `npm run pages` and then vanishes without a word.
+ *
+ * It has happened. A construction-progress section added straight to
+ * project.html would have been deleted by the next scaffold run, and nothing
+ * anywhere would have said so.
+ */
+export { rendered };
+
+/* Writing only happens when this file is run, not when it is imported. */
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  for (const [file, html] of rendered) {
+    await writeFile(resolve(ROOT, file), html);
+    console.log("  ✓", file);
+  }
+  console.log("Done.");
+}

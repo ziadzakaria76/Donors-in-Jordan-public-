@@ -70,6 +70,7 @@ const T = {
   "nav.projects": { ar: "مشاريعنا", en: "Projects" },
   "nav.units": { ar: "الوحدات المتاحة", en: "Available units" },
   "nav.gallery": { ar: "معرض الصور", en: "Gallery" },
+  "nav.faq": { ar: "أسئلة شائعة", en: "FAQ" },
   "nav.contact": { ar: "اتصل بنا", en: "Contact" },
   "nav.menu": { ar: "القائمة", en: "Menu" },
   "nav.skip": { ar: "تخطَّ إلى المحتوى", en: "Skip to content" },
@@ -90,6 +91,19 @@ const T = {
   "cta.next": { ar: "التالي", en: "Next" },
   "cta.reset": { ar: "مسح الفلاتر", en: "Clear filters" },
   "cta.downloadPlan": { ar: "تحميل المخطط", en: "Download plan" },
+
+  /* FAQ page */
+  "faq.eyebrow": { ar: "قبل أن تسأل", en: "Before you ask" },
+  "faq.title": { ar: "أسئلة شائعة", en: "Frequently asked questions" },
+  "faq.lead": {
+    ar: "الأسئلة التي تتكرّر في كل زيارة، بإجابات مكتوبة. إن لم تجد سؤالك، اسألنا مباشرةً.",
+    en: "The questions that come up on every visit, answered in writing. If yours is not here, ask us directly.",
+  },
+  "faq.all": { ar: "كل الأسئلة الشائعة", en: "All frequently asked questions" },
+  "faq.ctaBody": {
+    ar: "سؤالك ليس هنا؟ اسأل فريق المبيعات مباشرةً — كلّهم مهندسون.",
+    en: "Not the question you had? Ask the sales team directly — they are all engineers.",
+  },
 
   /* unit + project vocabulary */
   /* Scarcity. Every one of these is computed from the schedule and stated only
@@ -348,26 +362,6 @@ const T = {
   "contact.hours": { ar: "ساعات العمل", en: "Opening hours" },
   "contact.faqEyebrow": { ar: "أسئلة شائعة", en: "Common questions" },
   "contact.faqTitle": { ar: "قبل أن تسأل", en: "Before you ask" },
-  "contact.q1": { ar: "هل يمكن لغير الأردنيين تملّك شقة؟", en: "Can non-Jordanians buy an apartment?" },
-  "contact.a1": {
-    ar: "نعم. يستطيع مواطنو الدول العربية والأجانب التملّك في الأردن بموافقة من مجلس الوزراء، ونتولى نحن تجهيز المعاملة ومتابعتها. المدة المعتادة بين شهرين وأربعة أشهر.",
-    en: "Yes. Arab and foreign nationals may own property in Jordan subject to Cabinet approval, and we prepare and follow up the application for you. It usually takes two to four months.",
-  },
-  "contact.q2": { ar: "ما الذي يشمله السعر المعلن؟", en: "What does the quoted price include?" },
-  "contact.a2": {
-    ar: "السعر يشمل الوحدة بمساحتها الصافية وحصتها من المساحات المشتركة، والتشطيبات المذكورة في العقد، وموقف السيارة والمستودع. لا يشمل رسوم التسجيل الحكومية إلا إذا نُصّ على ذلك في خطة الدفع.",
-    en: "The price covers the unit's net area and its share of common areas, the finishes listed in the contract, the parking bay and the store. Government registration fees are excluded unless your payment plan states otherwise.",
-  },
-  "contact.q3": { ar: "هل يمكن تعديل التشطيبات أو التوزيع الداخلي؟", en: "Can finishes or the internal layout be changed?" },
-  "contact.a3": {
-    ar: "يمكن تعديل التشطيبات ومواد الأرضيات والمطبخ قبل مرحلة معينة من التنفيذ. تعديل الجدران الداخلية غير الإنشائية ممكن أيضاً بموافقة المهندس المشرف وبفارق تكلفة يُحتسب مسبقاً.",
-    en: "Finishes, flooring and the kitchen can be changed up to a defined construction stage. Non-structural internal walls can also be adjusted with the supervising engineer's approval, at a cost difference agreed in advance.",
-  },
-  "contact.q4": { ar: "ما هي الضمانات بعد التسليم؟", en: "What warranties apply after handover?" },
-  "contact.a4": {
-    ar: "سنتان على التشطيبات والأعمال الكهربائية والميكانيكية، وعشر سنوات على الهيكل الإنشائي، إضافةً إلى فريق صيانة يستجيب خلال ٤٨ ساعة في السنة الأولى.",
-    en: "Two years on finishes and on electrical and mechanical works, ten years on the structure, plus a maintenance team that responds within 48 hours during the first year.",
-  },
 
   /* 404 */
   "e404.title": { ar: "هذه الصفحة لم تعد موجودة", en: "This page is no longer here" },

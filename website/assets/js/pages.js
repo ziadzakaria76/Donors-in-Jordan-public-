@@ -194,11 +194,57 @@
     }
   }
 
+  /* ------------------------------------------------------------------ FAQ
+
+     One array, two places, and the structured data too.
+
+     These answers used to be written out by hand in contact.html while
+     content.json held a set that no page read — so editing them in the admin
+     panel changed nothing, and a fifth question about buying to let never
+     appeared on the site at all. Now both the contact page and faq.html render
+     DATA.FAQS, and the FAQPage JSON-LD is emitted from the same array, so what
+     Google is told and what the page says cannot drift apart. */
+
+  function faqs() {
+    const box = $("#faq-list");
+    if (!box) return;
+    const all = window.DATA.FAQS || [];
+    if (!all.length) { box.closest("section")?.remove(); return; }
+
+    const limit = Number(box.dataset.faqLimit) || all.length;
+    const shown = all.slice(0, limit);
+
+    box.innerHTML = shown.map((f) => `
+      <details>
+        <summary>${esc(tx(f.q))}</summary>
+        <div class="accordion__body">${esc(tx(f.a))}</div>
+      </details>`).join("");
+
+    /* Structured data only where the whole set is on the page. Marking up a
+       truncated list as the FAQPage would offer Google answers the page does
+       not actually carry. */
+    document.getElementById("faq-schema")?.remove();
+    if (shown.length !== all.length) return;
+    const script = document.createElement("script");
+    script.type = "application/ld+json";
+    script.id = "faq-schema";
+    script.textContent = JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: all.map((f) => ({
+        "@type": "Question",
+        name: tx(f.q),
+        acceptedAnswer: { "@type": "Answer", text: tx(f.a) },
+      })),
+    });
+    document.head.append(script);
+  }
+
   /* --------------------------------------------------------------- run all */
 
   function run() {
     homeStats(); featuredProjects(); featuredUnits(); testimonials(); process();
-    projectIndex(); contactBits();
+    projectIndex(); contactBits(); faqs();
     initReveals();
   }
 
