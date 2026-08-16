@@ -107,12 +107,22 @@
     <!-- الإعدادات -->
     <string name="settings_language">اللغة</string>
     <string name="settings_numerals">الأرقام</string>
-    <string name="settings_numerals_western">أرقام غربية (0–9)</string>
-    <string name="settings_numerals_arabic">أرقام عربية (٠–٩)</string>
+    <string name="settings_numerals_western">أرقام غربية — 1234</string>
+    <string name="settings_numerals_arabic">أرقام عربية — ١٢٣٤</string>
     <string name="settings_show_hijri">إظهار التاريخ الهجري</string>
     <string name="settings_theme">المظهر</string>
     <string name="settings_business_hours">أيام وساعات العمل</string>
     <string name="settings_app_lock">قفل التطبيق</string>
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_language_arabic">العربية</string>
+    <string name="settings_language_english">الإنجليزية</string>
+    <string name="settings_theme_system">حسب إعداد الهاتف</string>
+    <string name="settings_theme_light">فاتح</string>
+    <string name="settings_theme_dark">داكن</string>
+    <string name="settings_preview_title">معاينة</string>
+    <string name="settings_preview_date">التاريخ</string>
+    <string name="settings_preview_price">سعر الشقة</string>
+    <string name="settings_show_hijri_explanation">يُعرض التاريخ الهجري إلى جانب الميلادي، لا بديلاً عنه؛ فالعقود والمواعيد الرسمية بالتاريخ الميلادي.</string>
 
     <!-- حالات فارغة -->
     <string name="empty_leads_title">لا يوجد عملاء بعد</string>

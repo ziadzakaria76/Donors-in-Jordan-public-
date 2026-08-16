@@ -10,9 +10,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.gs3.marketingops.campaigns.ui.CampaignsScreen
 import com.gs3.marketingops.dashboard.ui.DashboardScreen
+import com.gs3.marketingops.domain.money.AppLanguage
+import com.gs3.marketingops.domain.money.NumeralStyle
 import com.gs3.marketingops.inventory.ui.InventoryScreen
 import com.gs3.marketingops.leads.ui.LeadsScreen
-import com.gs3.marketingops.more.ui.MoreScreen
+import com.gs3.marketingops.settings.data.AppSettings
+import com.gs3.marketingops.settings.data.ThemeMode
+import com.gs3.marketingops.settings.ui.SettingsScreen
 
 /**
  * These are `fadeIn`/`fadeOut` rather than a slide on purpose: a slide has a
@@ -35,6 +39,11 @@ private val FadeSpec = tween<Float>(durationMillis = 180)
 @Composable
 internal fun Gs3NavHost(
     navController: NavHostController,
+    settings: AppSettings,
+    onLanguageChange: (AppLanguage) -> Unit,
+    onNumeralsChange: (NumeralStyle) -> Unit,
+    onShowHijriChange: (Boolean) -> Unit,
+    onThemeChange: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     NavHost(
@@ -50,6 +59,18 @@ internal fun Gs3NavHost(
         composable(Gs3Destination.Inventory.route) { InventoryScreen() }
         composable(Gs3Destination.Leads.route) { LeadsScreen() }
         composable(Gs3Destination.Campaigns.route) { CampaignsScreen() }
-        composable(Gs3Destination.More.route) { MoreScreen() }
+
+        // "More" is the settings screen for now. The calculators, content
+        // planner and reports join it here as their milestones land, at which
+        // point this becomes a menu and Settings moves one level down.
+        composable(Gs3Destination.More.route) {
+            SettingsScreen(
+                settings = settings,
+                onLanguageChange = onLanguageChange,
+                onNumeralsChange = onNumeralsChange,
+                onShowHijriChange = onShowHijriChange,
+                onThemeChange = onThemeChange,
+            )
+        }
     }
 }

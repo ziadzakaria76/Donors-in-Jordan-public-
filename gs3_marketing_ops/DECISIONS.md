@@ -115,7 +115,10 @@ an APK. Nothing here is marked proposed any more.
 | WorkManager / DataStore | 2.10.2 / 1.1.7 | ✅ confirmed |
 | Hilt | **2.56.2** (+ `hilt-navigation-compose` 1.2.0) | ✅ confirmed. Compiler via KSP |
 | SQLCipher | `net.zetetic:sqlcipher-android` | not yet pinned — arrives with the encrypted store at Milestone 8 |
-| Robolectric + Roborazzi | not yet pinned | arrive at Milestone 1, where the first screenshot test is written |
+| Robolectric | **4.16.1** | ✅ confirmed at Milestone 1. 4.15.1 was tried first and rejects `sdk = 36` with `UnknownSdk`; 4.16.1 is a stable release, not a candidate |
+| Roborazzi | **1.46.1** | ✅ confirmed. JVM-only; no emulator is used or needed |
+| JUnit 4 | **4.13.2** | ✅ confirmed. `:app` only, because the Robolectric runner is a JUnit 4 runner. `:domain` keeps JUnit 5 |
+| kotlinx-coroutines-test | **1.10.2** | ✅ confirmed |
 
 **Why these are not the newest of each.** The anchor is Kotlin 2.1.21, which was
 already confirmed against `:domain`. A library compiled by a *newer* Kotlin
@@ -319,6 +322,83 @@ negations in `gs3_marketing_ops/.gitignore` re-include `app/src/**` and
 feature `data/` directory, and verified in the other direction too — a `data/`
 directory elsewhere in the module is still ignored, so the root rule still does
 its job.
+
+### D-13 — The language switch overrides composition locals; it does not restart the activity
+
+The platform's per-app locales (`LocaleManager`) need API 33, or AppCompat for
+the backport — and this app has one `ComponentActivity` and no XML views, so
+AppCompat would be a library added purely to name a style. Both routes also
+**recreate the activity**: the screen blinks and anything half-typed is gone.
+
+`Gs3Localized` instead provides `LocalContext` (with localised resources),
+`LocalConfiguration` and `LocalLayoutDirection`, so the switch re-composes in
+place. A salesperson can flip to English to show a client a screen and flip back
+without losing the lead they were part-way through entering.
+
+One trap inside it is worth keeping: `createConfigurationContext` returns a
+context that is **not** wrapped around the activity. Handing that straight to
+`LocalContext` gives correct strings and quietly breaks every later piece of
+code that walks `baseContext` to find the hosting activity — intents, biometric
+prompts, permission requests. `LocalizedContextWrapper` wraps the original
+context and overrides only `getResources`/`getAssets`, so the activity chain
+survives.
+
+### D-14 — Arabic month names are written out, not taken from the JVM
+
+`Locale("ar")` gives «يناير, فبراير, مارس» — the Egyptian and Gulf names. Jordan
+writes «كانون الثاني, شباط, آذار». They are not interchangeable to a reader: a
+Jordanian client seeing «يناير» on a payment schedule is looking at a foreign
+document. Worse, the JVM's answer for a locale tag is not always Android's, so
+the date on screen and the date in an exported PDF could disagree while both
+were "correct". `DateFormat` therefore carries all three sets of names —
+Gregorian Arabic, Gregorian English, Hijri — explicitly, and a test asserts
+«كانون الثاني» and asserts the absence of «يناير».
+
+### D-15 — Two defects the screenshots caught that the tests did not
+
+Both were found by *looking at* the generated PNGs, which is the argument for
+generating them from Milestone 1 rather than Milestone 9.
+
+**A digit range reverses in Arabic-Indic.** The numerals setting read
+`Arabic-Indic digits (٠–٩)` and rendered as `(٩−٠)` — nine to zero. Arabic-Indic
+digits are bidi class *Arabic Number*, so a neutral dash between two of them
+resolves right-to-left and swaps the endpoints. Wrapping it in an LTR isolate
+does **not** fix it, which was tried first: the isolate sets the surrounding
+direction, not the resolution of neutrals between two AN runs. The fix is to
+stop expressing it as a range — the setting now shows a sample, `١٢٣٤`, which is
+a single number run, cannot reorder, and shows the reader the actual glyphs.
+The general rule stands: never put a bare dash between Arabic-Indic numerals.
+
+**The screenshots were not being taken at all.** `captureRoboImage` is a silent
+no-op unless Roborazzi is in record mode. The four tests passed, the report was
+green, and no PNG existed. Fixed in two independent places, deliberately: the
+test task sets `roborazzi.test.record`, *and* each test asserts that the file it
+just captured exists and is larger than 10 kB. The assertion is the one that
+matters — it does not depend on a line of build configuration staying put.
+
+### D-16 — Language splitting is disabled in the bundle
+
+Lint's `AppBundleLocaleChanges` caught a defect that would have shipped. An App
+Bundle is split by language by default and a device installs only the locales it
+is configured for, fetching the rest through Play. This app switches language at
+runtime, holds no INTERNET permission, and is sideloaded. On a phone set to
+English it would have installed with no Arabic resources — and Arabic is the
+language the app opens in. `bundle { language { enableSplit = false } }` is the
+fix lint asks for, not a suppression of it.
+
+### D-17 — Unit tests run on the debug variant only
+
+`ui-test-manifest` supplies the `ComponentActivity` that `createComposeRule`
+launches, and it is `debugImplementation` because that activity has no business
+in a shipping APK. Robolectric resolves the launcher intent against the
+variant's merged manifest, so the release unit-test run failed with "Unable to
+resolve activity for Intent".
+
+Making it pass would mean adding test scaffolding to the release manifest —
+shipping test code to clients so that a duplicate test run goes green. Unit
+tests are not processed by R8, so both variants execute identical bytecode; the
+release run was adding no coverage and doubling the time. Every test still runs,
+in full, on every `check`.
 
 ---
 

@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.roborazzi)
 }
 
 /**
@@ -70,6 +71,27 @@ android {
         buildConfig = true
     }
 
+    /**
+     * Both languages ship in every install.
+     *
+     * By default an Android App Bundle is split by language and a device
+     * receives only the locales it is configured for, fetching the rest later
+     * through Play's asset delivery. This app switches language *at runtime*
+     * (see `Gs3Localized`), holds no INTERNET permission, and is sideloaded
+     * long before it is ever on Play. Left at the default, a phone set to
+     * English would install without the Arabic resources — and Arabic is the
+     * language the app opens in. The switch would silently fall back to
+     * English, on the one screen built to explain itself in Arabic.
+     *
+     * Lint catches precisely this as `AppBundleLocaleChanges`. This is the fix
+     * it asks for, not a suppression of it.
+     */
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
+
     sourceSets {
         named("main") { kotlin.srcDir("src/main/kotlin") }
         named("test") { kotlin.srcDir("src/test/kotlin") }
@@ -124,6 +146,30 @@ android {
     }
 }
 
+/**
+ * Unit tests run on the debug variant only.
+ *
+ * This is not a test being switched off — every test still runs, in full, on
+ * every `check`. It is the *second, identical* execution of them being switched
+ * off, and there is a concrete reason it cannot work rather than a preference.
+ *
+ * `ui-test-manifest` contributes the `ComponentActivity` that `createComposeRule`
+ * launches, and it is a `debugImplementation` because that activity has no
+ * business in a shipping APK. Robolectric resolves the launcher intent against
+ * the variant's merged manifest, so on release it fails with "Unable to resolve
+ * activity for Intent". The only way to make it pass would be to add the test
+ * scaffolding to the release manifest — shipping test code to clients to make a
+ * duplicate test run go green, which is worse than the problem.
+ *
+ * Unit tests are not run through R8, so debug and release execute the same
+ * bytecode. The release run was adding no coverage and doubling the time.
+ */
+androidComponents {
+    beforeVariants(selector().withBuildType("release")) { variant ->
+        variant.enableUnitTest = false
+    }
+}
+
 kotlin {
     jvmToolchain(21)
     compilerOptions {
@@ -144,6 +190,7 @@ dependencies {
     // Compose, all versions from the one BOM.
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
+    testImplementation(composeBom)
     androidTestImplementation(composeBom)
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
@@ -170,6 +217,35 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
+
+    // Screenshot and unit tests, all on the JVM. Robolectric supplies the
+    // Android framework and Roborazzi renders Compose to a PNG from inside it,
+    // so the both-language screenshot set is produced by `./gradlew test` on
+    // any machine -- no emulator, no connected device, and therefore something
+    // CI actually runs rather than something a person remembers to do.
+    testImplementation(libs.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
+    testImplementation(libs.roborazzi.junit.rule)
+    testImplementation(libs.kotlinx.coroutines.test)
+    debugImplementation(libs.compose.ui.test.manifest)
+}
+
+/**
+ * Roborazzi records on every test run.
+ *
+ * Without this property `captureRoboImage` is a **silent no-op**: the tests pass,
+ * the report is green, and not a single PNG is written. That was observed here
+ * before this block existed, and it is the exact shape of failure the plan warns
+ * about -- a check that looks like it ran. The tests also assert that the file
+ * they just captured exists on disk, so the guarantee does not rest on this one
+ * line of build configuration staying put.
+ */
+tasks.withType<Test>().configureEach {
+    systemProperty("roborazzi.test.record", "true")
 }
 
 /**

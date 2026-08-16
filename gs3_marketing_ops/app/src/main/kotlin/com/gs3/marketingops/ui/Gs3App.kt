@@ -11,6 +11,10 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.gs3.marketingops.domain.money.AppLanguage
+import com.gs3.marketingops.domain.money.NumeralStyle
+import com.gs3.marketingops.settings.data.AppSettings
+import com.gs3.marketingops.settings.data.ThemeMode
 import com.gs3.marketingops.ui.navigation.Gs3Destination
 import com.gs3.marketingops.ui.navigation.Gs3NavHost
 
@@ -25,11 +29,16 @@ import com.gs3.marketingops.ui.navigation.Gs3NavHost
  * which one it got.
  *
  * It also owns the navigation bar's own insets, which is why individual screens
- * only handle what is left over. See [Gs3ScreenScaffold].
+ * only handle what is left over. See `Gs3ScreenScaffold`.
  */
 @OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class)
 @Composable
 internal fun Gs3App(
+    settings: AppSettings,
+    onLanguageChange: (AppLanguage) -> Unit,
+    onNumeralsChange: (NumeralStyle) -> Unit,
+    onShowHijriChange: (Boolean) -> Unit,
+    onThemeChange: (ThemeMode) -> Unit,
     navController: NavHostController = rememberNavController(),
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -55,7 +64,14 @@ internal fun Gs3App(
             }
         },
     ) {
-        Gs3NavHost(navController = navController)
+        Gs3NavHost(
+            navController = navController,
+            settings = settings,
+            onLanguageChange = onLanguageChange,
+            onNumeralsChange = onNumeralsChange,
+            onShowHijriChange = onShowHijriChange,
+            onThemeChange = onThemeChange,
+        )
     }
 }
 

@@ -110,12 +110,22 @@
     <!-- Settings -->
     <string name="settings_language">Language</string>
     <string name="settings_numerals">Numerals</string>
-    <string name="settings_numerals_western">Western digits (0–9)</string>
-    <string name="settings_numerals_arabic">Arabic-Indic digits (٠–٩)</string>
+    <string name="settings_numerals_western">Western digits — 1234</string>
+    <string name="settings_numerals_arabic">Arabic-Indic digits — ١٢٣٤</string>
     <string name="settings_show_hijri">Show the Hijri date</string>
     <string name="settings_theme">Appearance</string>
     <string name="settings_business_hours">Working days and hours</string>
     <string name="settings_app_lock">App lock</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_language_arabic">Arabic</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_theme_system">Follow the phone</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_preview_title">Preview</string>
+    <string name="settings_preview_date">Date</string>
+    <string name="settings_preview_price">Apartment price</string>
+    <string name="settings_show_hijri_explanation">The Hijri date is shown alongside the Gregorian one, not instead of it — contracts and official deadlines are Gregorian.</string>
 
     <!-- Empty states -->
     <string name="empty_leads_title">No leads yet</string>
