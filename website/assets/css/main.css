@@ -763,3 +763,29 @@ table.data tbody tr:hover { background: #FCFAF6; }
   font-size: .75rem;
   color: var(--brass);
 }
+
+/* --------------------------------------------------------------- hero drift
+   A very slow scale on the hero photograph. 20 seconds from 1 to 1.06, once,
+   holding at the end — not a loop. A looping pan announces itself and then
+   keeps announcing itself; this reads as depth for the few seconds anyone
+   spends above the fold and is finished before it can become a distraction.
+
+   It runs on the image inside .hero__media, which already has overflow:hidden,
+   so nothing escapes the frame. transform only — no layout, no repaint of
+   anything but the composited layer.
+
+   Nothing below the fold moves: the reveal system handles that, and adding a
+   second kind of motion to the same scroll is how a sales page starts to feel
+   like a slideshow. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero__media img {
+    animation: hero-drift 20s var(--ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+    will-change: transform;
+  }
+}
+
+@keyframes hero-drift {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
+}

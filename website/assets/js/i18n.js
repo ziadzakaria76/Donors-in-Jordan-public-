@@ -338,6 +338,12 @@ const T = {
     ar: "فريق الصيانة تابع للشركة وليس مقاولاً خارجياً، ويستجيب خلال ٤٨ ساعة في السنة الأولى.",
     en: "The maintenance team is our own staff, not an outside contractor, and responds within 48 hours during the first year.",
   },
+  "about.workEyebrow": { ar: "ما بنيناه", en: "What we have built" },
+  "about.workTitle": { ar: "ثلاثة مبانٍ في مرج الحمام", en: "Three buildings in Marj Al-Hamam" },
+  "about.workLead": {
+    ar: "مبنىً مُسلَّم يمكنك زيارته، ومشروعان قيد البيع. هذا سجلّنا كاملاً — لا أرقام مجمّعة، بل عناوين يمكنك الذهاب إليها.",
+    en: "One delivered building you can go and look at, and two selling. That is the whole record — not an aggregate figure, but addresses you can drive to.",
+  },
   "about.ctaTitle": { ar: "تعال شاهد المشاريع على الطبيعة", en: "Come and see the buildings for yourself" },
   "about.ctaBody": {
     ar: "جولة الموقع تستغرق نحو ساعة، ونرافقك فيها بأنفسنا — بما في ذلك المشاريع قيد الإنشاء.",

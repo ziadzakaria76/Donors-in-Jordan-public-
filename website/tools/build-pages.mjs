@@ -451,6 +451,28 @@ ${pageHero({
     </div>
   </section>
 
+  <!-- The track record, as evidence rather than as a number.
+
+       A stats band used to sit here — years in business, units delivered,
+       square metres built — and every figure in it was invented for the build.
+       It was removed rather than left to be published by accident, and nothing
+       replaced it, which left an About page that asserted four commitments and
+       showed nothing.
+
+       These are the buildings. One delivered that you can go and look at, two
+       selling. It is a smaller claim than the band made, and it is true, and a
+       buyer can check every word of it in an afternoon. -->
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow" data-i18n="about.workEyebrow">ما بنيناه</p>
+        <h2 data-i18n="about.workTitle">ثلاثة مبانٍ في مرج الحمام</h2>
+        <p class="lead" data-i18n="about.workLead">مبنىً مُسلَّم يمكنك زيارته، ومشروعان قيد البيع. هذا سجلّنا كاملاً — لا أرقام مجمّعة، بل عناوين يمكنك الذهاب إليها.</p>
+      </div>
+      <div class="grid grid--3" id="about-projects"></div>
+    </div>
+  </section>
+
   <section class="section section--paper">
     <div class="wrap">
       <div class="section-head">

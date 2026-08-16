@@ -274,6 +274,7 @@ const PROJECTS = [
       "sherman2-entrance",
       "sherman2-living-1",
       "sherman2-living-2",
+      "sherman2-living-3",
       "sherman2-interior-1",
       "sherman2-interior-3",
       "sherman2-interior-5",

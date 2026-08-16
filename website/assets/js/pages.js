@@ -194,6 +194,21 @@
     }
   }
 
+  /* ----------------------------------------------------------- about page
+
+     The buildings, as the track record. The stats band this replaces carried
+     invented figures and was deleted; three real addresses say less and prove
+     more. Delivered first, because a building somebody already lives in is the
+     strongest thing this company can show a buyer. */
+
+  function aboutProjects() {
+    const box = $("#about-projects");
+    if (!box) return;
+    const order = { delivered: 0, selling: 1, upcoming: 2 };
+    const list = [...PROJECTS].sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+    box.innerHTML = list.map(projectCard).join("");
+  }
+
   /* ------------------------------------------------------------------ FAQ
 
      One array, two places, and the structured data too.
@@ -244,7 +259,7 @@
 
   function run() {
     homeStats(); featuredProjects(); featuredUnits(); testimonials(); process();
-    projectIndex(); contactBits(); faqs();
+    projectIndex(); contactBits(); faqs(); aboutProjects();
     initReveals();
   }
 
