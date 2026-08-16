@@ -602,3 +602,53 @@ table.data tbody tr:hover { background: #FCFAF6; }
 /* Phone numbers are LTR runs: without isolation RTL reverses the group order
    and "+962 6 552 0176" reads back as "0176 552 6 962+". */
 [data-tel], [data-company-phone], .tel { direction: ltr; unicode-bidi: isolate; }
+
+/* ------------------------------------------------------------- timeline
+   The construction log on a project page. A vertical rule with a marker per
+   entry, drawn with logical properties like everything else here, so it
+   mirrors with the document rather than needing an RTL variant. */
+
+.timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-inline-start: 2px solid var(--line, rgba(20, 24, 29, .12));
+  padding-inline-start: clamp(1.25rem, 3vw, 2rem);
+}
+
+.timeline__item {
+  position: relative;
+  padding-block-end: clamp(1.75rem, 3.5vw, 2.75rem);
+}
+.timeline__item:last-child { padding-block-end: 0; }
+
+.timeline__item::before {
+  content: "";
+  position: absolute;
+  inset-block-start: .45rem;
+  inset-inline-start: calc(-1 * clamp(1.25rem, 3vw, 2rem) - 7px);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--brass);
+  box-shadow: 0 0 0 4px var(--paper, #fff);
+}
+
+.timeline__date {
+  display: flex;
+  align-items: baseline;
+  gap: .75rem;
+  margin: 0 0 .35rem;
+  font-size: .875rem;
+  color: var(--ink-soft, #5b6572);
+}
+
+.timeline__pct {
+  font-weight: 600;
+  color: var(--brass);
+}
+
+.timeline__title {
+  font-size: 1.15rem;
+  margin: 0 0 .5rem;
+}

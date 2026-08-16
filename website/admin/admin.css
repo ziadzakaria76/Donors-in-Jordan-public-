@@ -1,0 +1,238 @@
+/* Admin panel styling.
+   Its own stylesheet, not the site's. main.css is a design system for selling
+   apartments — large type, generous rhythm, photography. This is a dense
+   editing tool, and the two want opposite things from a line height. It shares
+   only the typeface, so Arabic renders identically to the way it will on the
+   page you are editing. */
+
+:root {
+  --ink: #14181d;
+  --ink-soft: #5b6572;
+  --line: #dfe3e8;
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --brass: #9a7b3f;
+  --brass-soft: #f3ecdd;
+  --bad: #b3261e;
+  --bad-soft: #fdeceb;
+  --good: #1c6b41;
+  --good-soft: #e8f4ed;
+  --warn-soft: #fdf4e3;
+  --radius: 8px;
+  --sans: "IBM Plex Sans Arabic", system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* ------------------------------------------------------------------- bar */
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.bar__id { display: flex; align-items: baseline; gap: 10px; }
+.bar__id strong { font-size: 15px; letter-spacing: -0.01em; }
+.bar__repo { color: var(--ink-soft); font-size: 12px; }
+.bar__save { display: flex; align-items: center; gap: 10px; }
+
+.dirty {
+  font-size: 12px;
+  color: var(--brass);
+  background: var(--brass-soft);
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  padding: 7px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+}
+.btn:disabled { opacity: 0.4; cursor: default; }
+.btn:not(:disabled):hover { background: #000; }
+.btn--ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn--ghost:not(:disabled):hover { background: var(--bg); }
+.btn--small { padding: 4px 10px; font-size: 12px; font-weight: 500; }
+.btn--danger { color: var(--bad); border-color: #f0c9c6; background: transparent; }
+.btn--danger:not(:disabled):hover { background: var(--bad-soft); }
+
+/* ---------------------------------------------------------------- banner */
+
+.banner {
+  padding: 10px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+  background: var(--warn-soft);
+}
+.banner--bad { background: var(--bad-soft); color: var(--bad); }
+.banner--good { background: var(--good-soft); color: var(--good); }
+.banner ul { margin: 6px 0 0; padding-inline-start: 18px; }
+.banner a { color: inherit; }
+
+/* ------------------------------------------------------------------ tabs */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 14px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+.tabs button {
+  font: inherit;
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button.is-on { color: var(--ink); border-bottom-color: var(--brass); font-weight: 600; }
+
+/* ------------------------------------------------------------------ main */
+
+main { max-width: 1180px; margin: 0 auto; padding: 22px 20px 120px; }
+.loading { color: var(--ink-soft); }
+
+h2 { font-size: 17px; margin: 0 0 4px; letter-spacing: -0.01em; }
+h3 { font-size: 14px; margin: 0 0 10px; }
+.sub { color: var(--ink-soft); margin: 0 0 18px; max-width: 68ch; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+.card > h3 { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+
+/* ------------------------------------------------------------------ grid */
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+.stat b { display: block; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.stat span { color: var(--ink-soft); font-size: 12px; }
+
+/* ---------------------------------------------------------------- fields */
+
+.field { display: block; margin-bottom: 14px; }
+.field > span { display: block; font-weight: 600; font-size: 12px; margin-bottom: 4px; }
+.field small { display: block; color: var(--ink-soft); font-size: 12px; margin-top: 4px; }
+
+input[type=text], input[type=number], input[type=date], select, textarea {
+  font: inherit;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: inherit;
+}
+textarea { min-height: 76px; resize: vertical; line-height: 1.55; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brass); outline-offset: -1px; border-color: var(--brass); }
+
+/* Arabic inputs read right-to-left, because the text in them does. Typing a
+   price into a field that reorders as you type is how digits end up reversed. */
+[dir=rtl] { text-align: right; }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pair > label { display: block; }
+.pair > label > span { display: block; font-size: 11px; color: var(--ink-soft); margin-bottom: 3px; }
+@media (max-width: 700px) { .pair { grid-template-columns: 1fr; } }
+
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+
+.checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.checks label { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+
+/* ----------------------------------------------------------------- lists */
+
+.list { list-style: none; margin: 0; padding: 0; }
+.item {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--panel);
+}
+.item__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.item__head strong { font-size: 13px; }
+.item__tools { display: flex; gap: 6px; }
+
+.picker { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.picker button {
+  font: inherit; font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  cursor: pointer;
+}
+.picker button.is-on { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+/* ----------------------------------------------------------------- table */
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 5px 7px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); font-weight: 600; background: var(--bg); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: 0; }
+td input, td select { padding: 4px 6px; border-radius: 4px; }
+td input[type=number] { width: 82px; }
+td .code { width: 62px; }
+td .plan { width: 96px; }
+td .label { width: 150px; }
+
+tr.is-sold { background: #fbfbfc; color: var(--ink-soft); }
+
+/* ----------------------------------------------------------------- badge */
+
+.badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+.badge--good { background: var(--good-soft); border-color: #c6e2d2; color: var(--good); }
+.badge--bad { background: var(--bad-soft); border-color: #f0c9c6; color: var(--bad); }
+.badge--warn { background: var(--warn-soft); border-color: #ecd9ac; color: #7a5b16; }
+
+/* ---------------------------------------------------------------- dialog */
+
+dialog { border: 0; border-radius: 12px; padding: 0; max-width: 460px; width: calc(100% - 32px); box-shadow: 0 18px 50px rgba(0,0,0,0.22); }
+dialog::backdrop { background: rgba(20,24,29,0.45); }
+.dialog { padding: 20px 22px 18px; }
+.dialog h2 { margin-bottom: 6px; }
+.dialog__sub { color: var(--ink-soft); margin: 0 0 16px; font-size: 13px; }
+.dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+
+/* ----------------------------------------------------------------- deploy */
+
+.deploys { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.deploys li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.deploys li:last-child { border-bottom: 0; }
+.deploys code { font-size: 12px; color: var(--ink-soft); }
+.deploys .msg { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.empty { color: var(--ink-soft); padding: 22px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
