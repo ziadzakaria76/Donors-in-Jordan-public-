@@ -400,6 +400,29 @@ tests are not processed by R8, so both variants execute identical bytecode; the
 release run was adding no coverage and doubling the time. Every test still runs,
 in full, on every `check`.
 
+### D-18 — `OldTargetApi` is disabled, because it contradicts the pinned targetSdk
+
+Lint's `OldTargetApi` wants `targetSdk` raised to the newest platform it can
+find. Following that here would break a rule the project rests on: 36 is pinned
+deliberately (brief §2.1), it already clears the Play floor for 31 August 2026,
+and anything above it today is a **preview** API — precisely the "step down on
+conflict, never forward into a release candidate" case the version matrix exists
+to prevent. The check is not wrong in general; it is wrong about this project.
+
+What made it expensive to diagnose is that it is **environment-dependent**. The
+check compares `targetSdk` against the newest platform *installed on the
+machine*, so it stays silent in a container holding only `android-36` and fails
+on a CI runner whose image ships a newer one. `./gradlew check` was genuinely
+clean locally while the identical commit failed in CI four times running — the
+same code, the same lint version, two different verdicts. A check whose result
+depends on which machine ran it cannot be a gate, so it is disabled outright
+rather than left to chance.
+
+Deliberately **not** fixed with a lint baseline. A baseline would suppress every
+other lint error present today as well, which is the opposite of what this gate
+is for. `abortOnError = true` and `warningsAsErrors = true` stay exactly as they
+are; this removes one named check and nothing else.
+
 ---
 
 ## 3. Milestone 0.5 — the discovery interview

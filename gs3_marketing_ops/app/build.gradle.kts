@@ -131,6 +131,21 @@ android {
         // duplicates that failure and says less about it.
         disable += setOf("MissingTranslation", "ExtraTranslation")
 
+        // OldTargetApi asks for targetSdk to be raised to the highest platform
+        // it can see installed. Here that instruction is wrong, and following it
+        // would break a rule the project is built on: 36 is pinned deliberately
+        // (brief §2.1), it already clears the Play floor, and anything above it
+        // today is a preview API — the exact "never step forward into a release
+        // candidate" case the version matrix exists to prevent.
+        //
+        // It is environment-dependent, which is what made it confusing: the
+        // check compares against the newest platform *installed*, so it stays
+        // quiet in a container holding only android-36 and fires on a CI runner
+        // whose image ships a newer one. Same commit, same lint, different
+        // verdict — so this is disabled rather than left to depend on which
+        // machine happened to run the build. See DECISIONS.md → D-18.
+        disable += "OldTargetApi"
+
         // UnusedResources reports, but does not fail the build. See
         // DECISIONS.md → D-10 for the full reasoning; in short, the Arabic
         // string file is the *specification* and is authored ahead of the
