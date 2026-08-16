@@ -86,8 +86,35 @@ jobs:
           "$SDKMANAGER" --list_installed
 
       - name: Tests, coverage floor, lint and the bilingual guard
-        run: ./gradlew check --no-daemon
+        run: |
+          set -o pipefail
+          ./gradlew check --no-daemon 2>&1 | tee /tmp/marketing-ops-check.log
         working-directory: gs3_marketing_ops
+
+      # A failure here has to be readable from the API, not only from the web
+      # UI. Raw job logs and uploaded artifacts are both served from a separate
+      # storage host, which an agent behind a restricted egress allowlist cannot
+      # reach -- so a red build would be a red build with no stated reason. The
+      # job summary comes back through the API itself.
+      - name: Put the failure in the job summary
+        if: failure()
+        run: |
+          {
+            echo '## `./gradlew check` failed'
+            echo
+            echo '```'
+            grep -E "^e: |FAILURE|What went wrong|Execution failed|Caused by|: Error:|error:|FAILED" \
+              /tmp/marketing-ops-check.log | head -n 60 || true
+            echo '```'
+            echo
+            echo '<details><summary>Last 200 lines</summary>'
+            echo
+            echo '```'
+            tail -n 200 /tmp/marketing-ops-check.log
+            echo '```'
+            echo
+            echo '</details>'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report the actual coverage figure
         run: ./gradlew coverage --no-daemon
