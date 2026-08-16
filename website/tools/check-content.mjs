@@ -190,6 +190,28 @@ for (const line of read("assets/js/data.js").match(/^.*«REPLACE».*$/gm) || [])
   notes.push(text);
 }
 
+/* ------------------------------------------------ the deploy finds the API
+   Wrangler resolves Pages Functions from `path.join(process.cwd(), "functions")`
+   — its working directory, never the directory being uploaded — and wrangler 4
+   removed the --functions-directory flag that used to make this explicit.
+
+   So the deploy step must run from website/. Run from the repository root, the
+   upload succeeds, the workflow goes green, and every /api/* route answers with
+   the static 404 page. That is exactly how the admin panel first shipped: a
+   successful deploy of a site with no API in it.
+
+   Asserted here because it is a one-line change in a file nobody edits often,
+   it produces no error anywhere, and the panel is the only thing that notices. */
+
+{
+  const workflow = resolve(ROOT, "../.github/workflows/deploy-website.yml");
+  if (existsSync(workflow)) {
+    const step = /- name: Deploy to Cloudflare Pages\n([\s\S]*?)\n        run:/.exec(readFileSync(workflow, "utf8"));
+    check(step && /working-directory:\s*website/.test(step[1]),
+      "the deploy step in .github/workflows/deploy-website.yml must set `working-directory: website`, or wrangler will not find website/functions and every /api/* route will 404");
+  }
+}
+
 /* ------------------------------------------------------------------ out */
 
 if (errors.length) {
