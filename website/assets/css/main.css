@@ -279,6 +279,7 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 /* ----------------------------------------------------------------- cards */
 
 .card {
+  position: relative;
   background: var(--paper); border: 1px solid var(--line-soft); border-radius: var(--radius);
   overflow: hidden; display: flex; flex-direction: column;
   transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), border-color 0.3s;
@@ -651,4 +652,140 @@ table.data tbody tr:hover { background: #FCFAF6; }
 .timeline__title {
   font-size: 1.15rem;
   margin: 0 0 .5rem;
+}
+
+/* ------------------------------------------------ scarcity and comparison */
+
+/* The scarcity line sits under the status badge on the card image. It is a
+   statement of fact read off the schedule, so it is styled as information —
+   brass on dark, the same weight as everything else — rather than as an alarm.
+   Red would be the site claiming urgency it has not earned. */
+.badge--scarce {
+  background: rgba(12, 16, 20, .82);
+  color: var(--brass-light, #d9bd83);
+  border: 1px solid rgba(217, 189, 131, .35);
+  backdrop-filter: blur(4px);
+  font-weight: 500;
+}
+.badge--scarce-pos {
+  inset-block-start: auto;
+  inset-block-end: .75rem;
+}
+
+/* The compare toggle overlays the card image, opposite the status badge. */
+.compare-toggle {
+  position: absolute;
+  inset-block-start: .75rem;
+  inset-inline-end: .75rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font: inherit;
+  font-size: .8125rem;
+  padding: .35rem .7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  background: rgba(12, 16, 20, .7);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity .18s ease, background .18s ease;
+}
+/* Revealed on hover, and always present on touch and for keyboard users —
+   a control that only exists on hover does not exist on a phone. */
+.card:hover .compare-toggle,
+.compare-toggle:focus-visible,
+.compare-toggle.is-on { opacity: 1; }
+@media (hover: none) { .compare-toggle { opacity: 1; } }
+
+.compare-toggle.is-on { background: var(--brass); border-color: var(--brass); }
+.compare-toggle__tick { font-weight: 700; line-height: 1; }
+.card.is-comparing { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+/* The tray. Fixed to the bottom so the selection survives scrolling back up
+   through the grid, which is exactly what you do while choosing. */
+.compare-tray {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 120;
+  background: var(--ink, #14181d);
+  color: #fff;
+  padding-block: .75rem;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, .25);
+}
+.compare-tray__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.compare-tray .chip {
+  background: rgba(255, 255, 255, .1);
+  border-color: rgba(255, 255, 255, .2);
+  color: #fff;
+}
+.compare-tray__actions { display: flex; gap: .5rem; margin-inline-start: auto; }
+
+.modal__panel--wide { inline-size: min(920px, 100%); }
+
+/* Sideways on a phone rather than stacked: stacked, the rows stop lining up
+   and a comparison table becomes three cards again. */
+.compare-scroll { overflow-x: auto; margin-block-start: 1.25rem; }
+
+.compare-table { border-collapse: collapse; inline-size: 100%; }
+.compare-table th,
+.compare-table td {
+  padding: .7rem .85rem;
+  border-block-end: 1px solid var(--stone-2, #e6e2d9);
+  text-align: start;
+  vertical-align: top;
+}
+.compare-table thead th {
+  font-size: var(--fs-sm, .9rem);
+  line-height: 1.35;
+  border-block-end-width: 2px;
+}
+.compare-table tbody th {
+  font-weight: 500;
+  color: var(--ink-soft, #5b6572);
+  font-size: var(--fs-sm, .9rem);
+  white-space: nowrap;
+}
+.compare-table tfoot td { border-block-end: 0; padding-block-start: 1.1rem; }
+
+.compare-win {
+  display: block;
+  margin-block-start: .25rem;
+  font-size: .75rem;
+  color: var(--brass);
+}
+
+/* --------------------------------------------------------------- hero drift
+   A very slow scale on the hero photograph. 20 seconds from 1 to 1.06, once,
+   holding at the end — not a loop. A looping pan announces itself and then
+   keeps announcing itself; this reads as depth for the few seconds anyone
+   spends above the fold and is finished before it can become a distraction.
+
+   It runs on the image inside .hero__media, which already has overflow:hidden,
+   so nothing escapes the frame. transform only — no layout, no repaint of
+   anything but the composited layer.
+
+   Nothing below the fold moves: the reveal system handles that, and adding a
+   second kind of motion to the same scroll is how a sales page starts to feel
+   like a slideshow. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .hero__media img {
+    animation: hero-drift 20s var(--ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+    will-change: transform;
+  }
+}
+
+@keyframes hero-drift {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
 }

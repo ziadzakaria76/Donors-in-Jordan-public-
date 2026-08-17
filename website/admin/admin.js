@@ -507,15 +507,46 @@ TABS.testimonials = (root) => {
 TABS.leads = (root) => {
   root.append(
     el("h2", { text: "Leads" }),
-    el("p", { class: "sub", text: "Not built, and I would rather say why than show an empty table." }),
+    el("p", { class: "sub", text: "There is no lead list here, and that is the arrangement rather than a gap." }),
+
     el("div", { class: "card" },
-      el("h3", { text: "Where enquiries go today" }),
-      el("p", {}, "Every form hands the enquiry to WhatsApp, which is the delivery and has always worked. A copy is also posted to Web3Forms, which emails it and keeps it for 30 days."),
-      el("h3", { text: "Why they are not listed here" }),
-      el("p", {}, "Reading past submissions back out of Web3Forms needs their Submissions API, which is a paid PRO feature. On the free plan there is no endpoint to read, so a leads table here would have nothing to fill itself from."),
-      el("p", {}, "The alternatives are a paid Web3Forms plan, or storing enquiries ourselves in a Cloudflare database — which would mean this site keeps buyers' names and phone numbers, something it deliberately does not do today. That is a decision worth making on purpose, not one to make by building it."),
-      el("p", {}, el("a", { href: "https://web3forms.com/", target: "_blank", rel: "noopener", text: "Web3Forms dashboard" }),
-        " — the submissions are visible there, and in the inbox the form points at."),
+      el("h3", { text: "Where an enquiry goes" }),
+      el("p", {}, "Every form does two things. It hands the enquiry to WhatsApp, which is the delivery and has "
+        + "always worked — that happens first, synchronously, so it survives even if the second step fails. Then "
+        + "it posts a copy to Web3Forms, which emails it to the sales inbox."),
+      el("p", {}, "WhatsApp is the channel a buyer in Amman actually replies on. The email is the record."),
+    ),
+
+    el("div", { class: "card" },
+      el("h3", { text: "Why there is no table on this page" }),
+      el("p", {}, "Reading submissions back out of Web3Forms needs their Submissions API, which is a paid "
+        + "feature. The alternative was to store enquiries ourselves in a Cloudflare database — which would mean "
+        + "this site keeps buyers' names and phone numbers, something it does not do today."),
+      el("p", {}, "That was decided rather than deferred: the site keeps no personal data of its own. A panel that "
+        + "listed leads here would be a panel that had a copy of every enquiry, and holding one is a different "
+        + "commitment from passing one along."),
+    ),
+
+    /* The operational catch, stated where somebody will read it before it
+       costs them an enquiry rather than after. */
+    el("div", { class: "card" },
+      el("h3", { text: "The one thing to know" }),
+      el("p", {}, el("strong", { text: "Web3Forms keeps submissions for 30 days on the free plan." }),
+        " After that the copy in their dashboard is gone. The email in the inbox is the durable record, so treat "
+        + "the inbox as the archive and the dashboard as a recent view — do not delete an enquiry email expecting "
+        + "to find it again later."),
+      el("p", {}, "If enquiries ever need to be searched, exported or reported on, that is the point to revisit "
+        + "this, not before."),
+    ),
+
+    el("div", { class: "card" },
+      el("h3", { text: "Where to look" }),
+      el("ul", {},
+        el("li", {}, "The sales inbox — every enquiry, kept as long as you keep the email."),
+        el("li", {}, el("a", { href: "https://web3forms.com/", target: "_blank", rel: "noopener", text: "web3forms.com" }),
+          " — the last 30 days, with the IP and timestamp of each."),
+        el("li", {}, "WhatsApp — the conversations themselves."),
+      ),
     ),
   );
 };

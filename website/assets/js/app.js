@@ -509,20 +509,46 @@ function unitImage(unit) {
   return pool[(Number(unit.code) || 0) % pool.length];
 }
 
+/**
+ * A scarcity line for a unit, or nothing.
+ *
+ * Every one of these is read off the schedule and stated only when it is
+ * literally true. "Last one at this size" appears when exactly one available
+ * unit of that area remains in the project, and not otherwise; the count is the
+ * count. Nothing here is a countdown, a fake viewer number, or a threshold
+ * tuned to fire more often.
+ *
+ * That restraint is the point rather than a limitation. This is a 90,000-dinar
+ * purchase that a buyer will check against the schedule on the same page, and
+ * an urgency claim they can disprove in one scroll costs more than it earns.
+ */
+function scarcity(unit) {
+  if (unit.status !== "available" || !unit.price) return null;
+  const available = window.DATA.UNITS.filter((u) => u.projectId === unit.projectId && u.status === "available" && u.price);
+  const total = window.DATA.UNITS.filter((u) => u.projectId === unit.projectId).length;
+
+  if (available.length === 1) return t("scarcity.lastInProject");
+  if (available.filter((u) => u.area === unit.area).length === 1) return t("scarcity.lastSize");
+  if (available.length <= 3) return window.I18N.fill("scarcity.fewLeft", { n: available.length, total });
+  return null;
+}
+
 function unitCard(unit) {
   const { PROJECTS, UNIT_TYPES, ORIENTATIONS } = window.DATA;
   const project = PROJECTS.find((p) => p.id === unit.projectId);
   const sold = unit.status !== "available" || !unit.price;
+  const scarce = scarcity(unit);
   /* The id is the other half of the `#unit-…` link below: a card on units.html
      points at the same unit's card on its project page, and without the id
      here that link arrives at the top of the page with nothing to say which
      unit was clicked. A unit is only ever rendered once per page, so the id
      stays unique. */
   return `
-  <article class="card reveal" id="unit-${unit.id}">
+  <article class="card reveal" id="unit-${unit.id}" data-unit="${unit.id}">
     <a class="card__media" href="${BASE}project.html?id=${project.id}#unit-${unit.id}" aria-label="${esc(tx(project.name))} ${unit.code}">
       ${picture(unitImage(unit), `${tx(project.name)} — ${tx(UNIT_TYPES[unit.type])}`, { sizes: "(max-width: 700px) 92vw, (max-width: 1100px) 45vw, 380px" })}
       <span class="badge badge--${unit.status} badge--on-media">${t(`status.${unit.status}`)}</span>
+      ${scarce ? `<span class="badge badge--scarce badge--on-media badge--scarce-pos">${esc(scarce)}</span>` : ""}
     </a>
     <div class="card__body">
       <p class="card__meta">${tx(project.name)} · ${tx(window.DATA.DISTRICTS[unit.district])}</p>
@@ -593,6 +619,6 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 else boot();
 
 window.APP = {
-  $, $$, esc, picture, iconSvg, hydrateIcons, projectCard, unitCard,
+  $, $$, esc, picture, iconSvg, hydrateIcons, projectCard, unitCard, scarcity,
   openModal, closeModal, openLightbox, initReveals, waLink, BASE, t, tx, dropSection,
 };

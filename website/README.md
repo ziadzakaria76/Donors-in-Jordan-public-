@@ -456,11 +456,29 @@ clean.
   `npm run assets`, which needs the original file. The panel edits captions and
   the order images appear in; adding one is still a commit.
 - **Invent vocabulary.** See above.
-- **Show leads.** Enquiries go to WhatsApp and to Web3Forms. Reading them back
-  needs the Web3Forms Submissions API, which is a paid feature; on the free
-  plan there is no endpoint to read. The alternative is storing buyers' names
-  and phone numbers ourselves, which this site deliberately does not do. The
-  panel says so rather than showing an empty table.
+- **Show leads.** Decided, not deferred — see below.
+
+### Leads: the site keeps none
+
+Every form hands the enquiry to WhatsApp first, synchronously, so delivery
+survives even if the rest fails. It then posts a copy to Web3Forms, which
+emails it to the sales inbox. WhatsApp is the channel a buyer in Amman actually
+replies on; the email is the record.
+
+The panel shows no lead list, and that is the arrangement rather than a gap.
+Reading submissions back needs the Web3Forms Submissions API, which is a paid
+feature. The alternative was a Cloudflare database of our own — which would
+mean this site holds buyers' names and phone numbers. It does not, and a panel
+that listed leads would be a panel with a copy of every enquiry in it. Holding
+one is a different commitment from passing one along.
+
+**The operational catch:** Web3Forms keeps submissions for 30 days on the free
+plan. After that the copy in their dashboard is gone, so the inbox is the
+durable archive and the dashboard is a recent view. Do not delete an enquiry
+email expecting to find it again later.
+
+Revisit this if enquiries ever need to be searched, exported or reported on.
+Not before.
 
 ### Setting it up
 
