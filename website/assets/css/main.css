@@ -690,15 +690,24 @@ table.data tbody tr:hover { background: #FCFAF6; }
   color: #fff;
   cursor: pointer;
   backdrop-filter: blur(4px);
-  opacity: 0;
-  transition: opacity .18s ease, background .18s ease;
+  transition: background .18s ease, border-color .18s ease;
 }
-/* Revealed on hover, and always present on touch and for keyboard users —
-   a control that only exists on hover does not exist on a phone. */
+
+/* Always visible, on every device.
+   It used to be revealed on hover, with `@media (hover: none)` putting it back
+   for touch. That detection is not reliable: an Android browser in desktop-site
+   mode can report `hover: hover` while having no pointer to hover with, and the
+   control then sits at opacity 0 with nothing able to reveal it. The feature was
+   invisible on a real phone while every emulator showed it correctly.
+
+   So it does not hide. Whether a control exists must not depend on a media query
+   guessing what kind of device is asking. */
+
 .card:hover .compare-toggle,
-.compare-toggle:focus-visible,
-.compare-toggle.is-on { opacity: 1; }
-@media (hover: none) { .compare-toggle { opacity: 1; } }
+.compare-toggle:focus-visible {
+  background: rgba(12, 16, 20, .88);
+  border-color: rgba(255, 255, 255, .6);
+}
 
 .compare-toggle.is-on { background: var(--brass); border-color: var(--brass); }
 .compare-toggle__tick { font-weight: 700; line-height: 1; }
