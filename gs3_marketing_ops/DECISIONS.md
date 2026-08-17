@@ -465,6 +465,85 @@ job now writes its failure to the step summary **and** emits it as an
 `::error::` annotation — annotations being the only one of the two that comes
 back through the REST API.
 
+### D-19 — The seed runs on every launch, and every insert is `IGNORE`
+
+Reference data is not seeded in `RoomDatabase.Callback.onCreate`, which is the
+obvious place for it. `onCreate` fires exactly once in a database's life, so a
+template or objection added in a later release would never reach anyone who
+already had the app — on an offline app the only way to get it would be to
+reinstall, which means losing their data to receive a corrected sentence.
+
+So the seed runs on every launch, which makes overwriting someone's work the
+risk to design against. Every insert is `OnConflictStrategy.IGNORE`: a row whose
+primary key exists is left exactly as it is. `REPLACE` would silently undo a
+reworded template or a ticked contract claim on the next launch — and only for
+the people who had customised something, which is the worst possible
+distribution for a bug.
+
+Four tests hold it: a re-seed leaves counts unchanged; a unit edited to
+Contracted with an agreed price and justification survives a re-seed; a cleared
+eligibility gate is never re-closed; a confirmed contract claim stays confirmed.
+
+### D-20 — Units and budgets are derived from `:domain`, never re-typed
+
+`Gs3Seed.units()` maps `Gs3Schedule.apartments`; `Gs3Seed.marketBudgets()` maps
+`Gs3Budget.externalTrackMarkets`. Neither re-types a figure.
+
+Fourteen prices typed a second time would be a third copy — after the brochure
+and `website/assets/js/data.js` — and the way that failure surfaces is a client
+being quoted a price the company's own website does not show. The seed test
+asserts whole-object equality against the domain rather than spot-checking
+fields, because a right price with a wrong priority class is still a defect.
+
+### D-21 — `fallbackToDestructiveMigration` is absent, and a test proves it
+
+It means "if the schema moved and nobody wrote a migration, delete the user's
+data and start again". This database is the only copy of every lead, agreed
+price and discount justification the company holds; there is no server to
+re-sync from, and the encrypted backup is a manual act someone may not have
+performed recently.
+
+An absent line is precisely what code review does not catch, so the test is
+behavioural: it stamps the database file with a version this build knows nothing
+about, opens it through `Gs3Database.build` — the same builder Hilt uses, not a
+replica — and asserts Room *refuses*, then asserts the fourteen units are still
+in the file afterwards.
+
+**The guard was proved to fail before being relied on.** Adding
+`fallbackToDestructiveMigration(dropAllTables = true)` to the builder makes the
+test fail; removing it makes it pass. A guard that has never been seen to fail
+is not yet a guard.
+
+Migrations are wired from version 1 with an intentionally empty `MIGRATIONS`
+array, so writing the first real one is filling in an established mechanism
+rather than a decision taken in a hurry next to a tempting one-line alternative.
+
+### D-22 — `verifyStrings` could not see the seeded text, so a test does
+
+`verifyStrings` polices `strings.xml`. The moment templates and objections were
+authored, client-facing text also existed in Kotlin seed data — outside
+everything that guard checks. That was a real gap, opened by this milestone.
+
+`SeedContentTest` closes it by scanning every seeded template and objection, in
+both languages, for two families of phrase:
+
+- the four **B-2 contract claims** — the finishing annex, the delay penalty, the
+  warranty, the quarterly progress report. Nobody has read the signed contract
+  and confirmed any of them, so none may be promised;
+- the standing **forbidden phrases** — a fee exemption the company cannot grant,
+  an approval belonging to the authorities, a return belonging to the market.
+
+It caught its first defect during authoring: the delivery-timing objection
+originally offered "regular photographic updates on progress", which is close
+enough to the unverified quarterly photographic progress report to be a promise
+the team might not be able to keep. It now commits to keeping the client
+informed — which the app's own ten-day external-track update rule already backs
+— and says that what follows from a delay is set by the contract text.
+
+The non-Jordanian objection is written for the world as it is while B-1 is
+unanswered: it defers to the competent authorities, states that the written
+statement and legal opinion are being sought, and promises nothing.
+
 ---
 
 ## 3. Milestone 0.5 — the discovery interview
