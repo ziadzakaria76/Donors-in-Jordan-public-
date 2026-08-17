@@ -1,11 +1,13 @@
 # Donors in Jordan
 
-Two unrelated projects share this repository. They have no code in common, and
-neither one builds, imports or deploys the other.
+Three projects share this repository. None of them builds, imports or deploys
+another. Two are for the same company and share a unit schedule and its Arabic
+wording; they share no code.
 
 | Project | What it is | Where it lives |
 | --- | --- | --- |
 | **General Sherman Housing** | A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential developer | [`website/`](website/) |
+| **GS3 Marketing Ops** | A bilingual offline Android app for the team selling the fourteen apartments the site advertises — planned, not yet building | [`gs3_marketing_ops/`](gs3_marketing_ops/) |
 | **[Jordan Tender Intelligence Monitor](#jordan-tender-intelligence-monitor)** | A Python system that watches 13 donor and IFI procurement portals for Jordan-related consulting work | [`jordan_tender_monitor/`](jordan_tender_monitor/) |
 
 ---

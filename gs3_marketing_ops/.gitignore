@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# The wrapper JAR and properties ARE committed on purpose: without them a fresh
+# clone cannot build, which defeats the point of a wrapper.
+
+# Signing material. The keystore never enters version control -- anyone with it
+# can publish an update as this company. Keep it offline; losing it means the
+# app can never be updated again, only reinstalled from scratch.
+*.jks
+*.keystore
+keystore.properties
+
+# Android Studio
+.idea/
+*.iml
+captures/
+
+# Re-include this module's sources.
+#
+# The repository root ignores `**/data/*` and `**/output/*` to keep the tender
+# monitor's local state out of version control. Those patterns are unanchored,
+# so they also match `app/src/main/kotlin/.../leads/data/` — every feature's
+# data layer, which this app is organised around (ui/data split per feature).
+#
+# Without these two lines `git add` silently skips those files, the branch
+# builds locally and fails in CI, and the error message points at a missing
+# class rather than at a .gitignore. Found by `git check-ignore`, not by
+# guessing; there is a test for it in tools/, run by CI.
+!app/src/**
+!domain/src/**

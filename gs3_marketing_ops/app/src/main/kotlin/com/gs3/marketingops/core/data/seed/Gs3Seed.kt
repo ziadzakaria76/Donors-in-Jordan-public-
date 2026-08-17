@@ -1,0 +1,278 @@
+package com.gs3.marketingops.core.data.seed
+
+import com.gs3.marketingops.campaigns.data.MarketBudgetEntity
+import com.gs3.marketingops.domain.budget.Gs3Budget
+import com.gs3.marketingops.domain.inventory.Gs3Schedule
+import com.gs3.marketingops.inventory.data.UnitEntity
+import com.gs3.marketingops.nonjordanian.data.ContractClaim
+import com.gs3.marketingops.nonjordanian.data.ContractClaimEntity
+import com.gs3.marketingops.nonjordanian.data.EligibilityGateEntity
+import com.gs3.marketingops.outreach.data.MessageTemplateEntity
+import com.gs3.marketingops.outreach.data.ObjectionEntity
+
+/**
+ * What the database contains on first launch.
+ *
+ * The two halves of this file are different in kind, and it is worth being
+ * explicit about which is which.
+ *
+ * **Units and budgets are derived, not typed.** They are read straight from
+ * `Gs3Schedule` and `Gs3Budget` in `:domain`, which are themselves
+ * cross-checked against `website/assets/js/data.js`. Re-typing fourteen prices
+ * here would create a third copy that can disagree with the other two, and the
+ * disagreement would surface as a client being quoted a price the website does
+ * not show. A test asserts the seed matches the domain exactly.
+ *
+ * **Templates and objections are authored.** Arabic first, English derived from
+ * it — and constrained by what the company is actually entitled to say.
+ */
+object Gs3Seed {
+
+    fun units(): List<UnitEntity> =
+        Gs3Schedule.apartments.map(UnitEntity.Companion::fromDomain)
+
+    fun marketBudgets(): List<MarketBudgetEntity> =
+        Gs3Budget.externalTrackMarkets.map(MarketBudgetEntity.Companion::fromDomain)
+
+    /**
+     * The gate starts closed, and the four contract claims start unverified.
+     *
+     * This is the correct state rather than a placeholder: B-1 and B-2 are
+     * unanswered, so the non-Jordanian module is locked, no `NONJO` campaign can
+     * be activated, and none of the four terms may appear in client-facing text.
+     */
+    fun eligibilityGate(): EligibilityGateEntity = EligibilityGateEntity()
+
+    fun contractClaims(): List<ContractClaimEntity> =
+        ContractClaim.entries.map(ContractClaimEntity.Companion::unverified)
+
+    /**
+     * WhatsApp templates.
+     *
+     * Every one of these is *pre-filled text for a person to send*, never a
+     * message the app sends by itself. A buyer weighing a six-figure purchase
+     * can tell an automated message from a written one, and the automated one
+     * costs more than it saves.
+     *
+     * Placeholders use the `{snake_case}` syntax `MessageTemplate` understands,
+     * and only names from `MessageTemplate.UNIT_VARIABLES`. An unfilled
+     * placeholder makes `render` return null rather than sending a client the
+     * literal text "{price}".
+     */
+    fun messageTemplates(): List<MessageTemplateEntity> = listOf(
+        MessageTemplateEntity(
+            templateKey = "first_response",
+            bodyAr = "أهلاً وسهلاً 👋\n" +
+                "شكراً لتواصلك بخصوص مشروع جنرال شيرمان ٣ في مرج الحمام.\n" +
+                "الشقة رقم {unit_number} مساحتها {area} م² وسعرها {price}.\n" +
+                "تفاصيل الشقة والصور: {link}\n" +
+                "بخدمتك لأي استفسار — {contact}",
+            bodyEn = "Hello 👋\n" +
+                "Thank you for your enquiry about General Sherman 3 in Marj Al-Hamam.\n" +
+                "Apartment {unit_number} is {area} m² at {price}.\n" +
+                "Details and photographs: {link}\n" +
+                "Happy to answer any question — {contact}",
+            trackKey = null,
+            isEditable = true,
+        ),
+        MessageTemplateEntity(
+            templateKey = "out_of_hours_acknowledgement",
+            // The only template the app may send without a person, and it
+            // promises nothing except that a human will follow. Sent outside
+            // business hours so an enquiry is never met with silence; the SLA
+            // engine still requires a human reply by 10:00 the next working day.
+            bodyAr = "وصلنا استفسارك، شكراً لك.\n" +
+                "فريق المبيعات خارج الدوام حالياً، وسيتواصل معك أول يوم عمل قبل الساعة ١٠:٠٠ صباحاً.",
+            bodyEn = "We have received your enquiry, thank you.\n" +
+                "The sales team is outside working hours; someone will contact you before 10:00 on the next working day.",
+            trackKey = null,
+            isEditable = false,
+        ),
+        MessageTemplateEntity(
+            templateKey = "viewing_confirmation",
+            bodyAr = "تم تثبيت موعد معاينة الشقة رقم {unit_number}.\n" +
+                "الموقع: مرج الحمام — بالقرب من دوار الكتاب.\n" +
+                "{link}\n" +
+                "بانتظارك — {contact}",
+            bodyEn = "Your viewing of apartment {unit_number} is confirmed.\n" +
+                "Location: Marj Al-Hamam — near Al-Kitab Circle.\n" +
+                "{link}\n" +
+                "See you there — {contact}",
+            trackKey = null,
+            isEditable = true,
+        ),
+        MessageTemplateEntity(
+            templateKey = "written_offer",
+            bodyAr = "تجد أدناه العرض الخطّي للشقة رقم {unit_number}:\n" +
+                "المساحة الداخلية {area} م² — المساحة الخارجية {external_area} م²\n" +
+                "السعر {price}\n" +
+                "{link}\n" +
+                "العرض قابل للنقاش خلال المدة المتفق عليها — {contact}",
+            bodyEn = "Here is the written offer for apartment {unit_number}:\n" +
+                "Internal area {area} m² — external area {external_area} m²\n" +
+                "Price {price}\n" +
+                "{link}\n" +
+                "The offer is open for discussion within the agreed period — {contact}",
+            trackKey = null,
+            isEditable = true,
+        ),
+        MessageTemplateEntity(
+            templateKey = "external_track_update",
+            // The ten-day update to expatriate clients. Its whole purpose is to
+            // say something when there is nothing new, because silence across a
+            // time zone reads as the project having gone quiet.
+            bodyAr = "تحديث بخصوص مشروع جنرال شيرمان ٣:\n" +
+                "الشقة رقم {unit_number} ما زالت متاحة.\n" +
+                "{link}\n" +
+                "إن أحببت ترتيب جولة مباشرة عبر الفيديو، أخبرني بالوقت المناسب لك — {contact}",
+            bodyEn = "An update on General Sherman 3:\n" +
+                "Apartment {unit_number} is still available.\n" +
+                "{link}\n" +
+                "If you would like a live video tour, tell me a time that suits you — {contact}",
+            trackKey = "EXPAT",
+            isEditable = true,
+        ),
+    )
+
+    /**
+     * The objection library.
+     *
+     * Written because the alternative is each salesperson inventing an answer
+     * under pressure, and answers invented under pressure over-promise.
+     *
+     * Two hard rules, both enforced by tests rather than by memory:
+     *
+     * 1. **No B-2 claim appears here.** Not the finishing annex, the delay
+     *    penalty, the warranty, or the quarterly progress report — none of them
+     *    may be promised until the signed contract has been read and confirmed
+     *    to contain them.
+     * 2. **Nothing guarantees an outcome that belongs to someone else.** Not a
+     *    government approval, not a market yield. `verifyStrings` blocks the
+     *    worst phrasings outright; these answers avoid the shape of the claim,
+     *    not just the words.
+     *
+     * What they *do* lean on is what the company already publishes on its own
+     * website: the two street frontages, the named finishing specifications, the
+     * schools and hospitals nearby. Those are checkable, which is what makes
+     * them persuasive.
+     */
+    fun objections(): List<ObjectionEntity> = listOf(
+        ObjectionEntity(
+            objectionKey = "price_too_high",
+            objectionAr = "السعر أعلى من مشاريع ثانية في المنطقة",
+            objectionEn = "The price is higher than other projects in the area",
+            responseAr = "المقارنة الأدقّ هي سعر المتر المربّع وليس سعر الشقة، لأن المساحات تختلف. " +
+                "احسب معي: سعر متر هذه الشقة مقابل المشروع الذي تقارن به. " +
+                "والفرق الثاني في التشطيبات المذكورة بالاسم — الحجر والبورسلان والأبواب والشبابيك — " +
+                "وهي منشورة على موقع الشركة ويمكنك التحقق منها بنفسك.",
+            responseEn = "The fairer comparison is price per square metre rather than price per apartment, " +
+                "because the areas differ. Let us work it out together for this unit against the one you are " +
+                "comparing it with. The second difference is the finishes, specified by name — the stone, the " +
+                "porcelain, the doors and the windows — all published on the company's website, so you can check them yourself.",
+            displayOrder = 1,
+        ),
+        ObjectionEntity(
+            objectionKey = "location_far",
+            objectionAr = "مرج الحمام بعيدة عليّ",
+            objectionEn = "Marj Al-Hamam is too far for me",
+            responseAr = "المشروع قريب من دوار الكتاب، وحوله مدارس وجامعات ومراكز صحية ومراكز تسوّق. " +
+                "اسألني عن المسافة من المكان الذي تنطلق منه يومياً وسأحسبها معك بدل التقدير، " +
+                "فغالباً تكون أقصر مما يبدو على الخريطة.",
+            responseEn = "The project sits near Al-Kitab Circle, with schools, universities, health facilities and " +
+                "shopping around it. Tell me where you travel from each day and we will work out the real journey " +
+                "rather than estimate it — it is usually shorter than it looks on a map.",
+            displayOrder = 2,
+        ),
+        ObjectionEntity(
+            objectionKey = "payment_terms",
+            objectionAr = "شروط الدفع لا تناسبني",
+            objectionEn = "The payment terms do not suit me",
+            responseAr = "أخبرني بالدفعة الأولى المريحة لك وبالمدة التي تفكّر بها، وسأعرضها على الإدارة. " +
+                "وإن كان التمويل عن طريق البنك، يمكنني أن أحسب لك قسطاً استرشادياً الآن — " +
+                "مع التنويه أن شروط التمويل الفعلية يحدّدها البنك وحده.",
+            responseEn = "Tell me the down payment that works for you and the period you have in mind, and I will put " +
+                "it to management. If you are financing through a bank I can calculate an indicative instalment now — " +
+                "noting that the actual financing terms are set by the bank alone.",
+            displayOrder = 3,
+        ),
+        ObjectionEntity(
+            objectionKey = "finishing_quality",
+            objectionAr = "كيف أتأكّد من جودة التشطيب؟",
+            objectionEn = "How can I be sure of the finishing quality?",
+            // Deliberately does not mention a finishing-specifications annex or
+            // any warranty: both are B-2 claims, unverified against the signed
+            // contract. It points instead at what is already published and at
+            // what the buyer can see with their own eyes.
+            responseAr = "المواصفات مذكورة بالاسم لا بالوصف العام — نوع الحجر ومقاس البورسلان ومصدر الأبواب والشبابيك — " +
+                "وهي منشورة على موقع الشركة. وأفضل من ذلك أن تراها بنفسك: صور المدخل من التنفيذ الفعلي، " +
+                "ويسعدني ترتيب زيارة للموقع لتعاين المواد على الطبيعة.",
+            responseEn = "The specifications are named rather than described in general terms — the type of stone, the " +
+                "size of the porcelain, the source of the doors and windows — and they are published on the company's " +
+                "website. Better still, see them yourself: the entrance photographs are of the building as built, and " +
+                "I would be glad to arrange a site visit so you can inspect the materials in person.",
+            displayOrder = 4,
+        ),
+        ObjectionEntity(
+            objectionKey = "delivery_timing",
+            objectionAr = "متى التسليم، وماذا لو تأخّر؟",
+            objectionEn = "When is delivery, and what if it is late?",
+            // Promises neither a delay penalty nor a scheduled photographic
+            // progress report: both are B-2 claims, unverified against the
+            // signed contract. What is offered instead is the delivery date and
+            // a commitment to keep in touch -- and the second one is already
+            // backed by the app's own ten-day update rule for external-track
+            // clients, so it is a promise the team is actually held to.
+            responseAr = "أعطيك تاريخ التسليم المعتمد للمشروع خطّياً ضمن العرض. " +
+                "وألتزم بإبقائك على اطّلاع بسير العمل أولاً بأول حتى لا تكون بعيداً عمّا يجري، " +
+                "وخصوصاً إن كنت خارج الأردن. أما ما يترتّب على التأخير فيحدّده نصّ العقد، وتُراجعه قبل التوقيع.",
+            responseEn = "I will give you the project's approved delivery date in writing as part of the offer, " +
+                "and I will keep you up to date on progress as it happens so you are not left guessing — " +
+                "particularly if you are outside Jordan. What follows from a delay is set by the text of the " +
+                "contract, which you review before signing.",
+            displayOrder = 5,
+        ),
+        ObjectionEntity(
+            objectionKey = "rental_yield",
+            objectionAr = "كم العائد الإيجاري المتوقّع؟",
+            objectionEn = "What rental yield should I expect?",
+            responseAr = "أستطيع أن أحسب لك نطاقاً تقديرياً بناءً على إيجارات مشابهة في المنطقة، " +
+                "وأوضّح لك الافتراضات التي بُني عليها حتى تحكم عليها بنفسك. " +
+                "وهو تقدير مبني على السوق، لا وعداً من الشركة.",
+            responseEn = "I can work out an estimated range from comparable rents in the area and show you the " +
+                "assumptions behind it so you can judge them yourself. It is an estimate based on the market, " +
+                "not a promise from the company.",
+            displayOrder = 6,
+        ),
+        ObjectionEntity(
+            objectionKey = "registration_fees",
+            objectionAr = "كم تبلغ رسوم التسجيل؟",
+            objectionEn = "How much are the registration fees?",
+            responseAr = "أحسبها لك الآن، مع التنويه أن الرسوم وضريبة بيع العقار تُحتسب على القيمة المقدَّرة " +
+                "من دائرة الأراضي والمساحة وليس بالضرورة على سعر البيع، وأن النسب عرضة للتغيير. " +
+                "وتساهم الشركة في جزء من الرسوم بحدّ أقصى متفق عليه — وهي مساهمة، لا إسقاط للرسوم.",
+            responseEn = "I will calculate it for you now, noting that the fee and the property sale tax are " +
+                "calculated on the value assessed by the Department of Lands and Survey, not necessarily on the sale " +
+                "price, and that the rates are subject to change. The company contributes toward the fees up to an " +
+                "agreed cap — a contribution, not a waiver.",
+            displayOrder = 7,
+        ),
+        ObjectionEntity(
+            objectionKey = "non_jordanian_eligibility",
+            objectionAr = "أنا غير أردني — هل يحقّ لي التملّك؟",
+            objectionEn = "I am not Jordanian — am I allowed to own?",
+            // The honest answer while B-1 is unanswered. It neither promises
+            // eligibility nor invents a legal position, and it does not
+            // guarantee an approval that belongs to the authorities.
+            responseAr = "هذا سؤال تجيب عنه الجهات المختصّة وحدها، ولا أعطيك فيه رأياً شخصياً. " +
+                "نحن بصدد الحصول على كتاب خطّي من دائرة الأراضي والمساحة بخصوص تصنيف وحدات المشروع، " +
+                "ورأي قانوني من محامٍ مرخّص. حالما يصلنا الجواب أبلغك به كما هو. " +
+                "وحتى ذلك الحين لن أعدك بشيء لا أملك تأكيده.",
+            responseEn = "That is a question only the competent authorities can answer, and I will not give you a " +
+                "personal opinion on it. We are in the process of obtaining a written statement from the Department " +
+                "of Lands and Survey on how this project's units are classified, together with a written opinion " +
+                "from a licensed lawyer. As soon as we have the answer I will pass it to you exactly as it comes. " +
+                "Until then I will not promise you anything I cannot confirm.",
+            displayOrder = 8,
+        ),
+    )
+}

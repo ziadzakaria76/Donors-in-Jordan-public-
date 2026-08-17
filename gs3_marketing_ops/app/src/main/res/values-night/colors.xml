@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The pre-Compose window background in dark mode: ink, not ivory, so the
+     first frame does not flash white on a dark phone. -->
+<resources>
+    <color name="window_background">#0F1518</color>
+</resources>
