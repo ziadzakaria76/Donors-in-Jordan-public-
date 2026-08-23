@@ -122,5 +122,18 @@ def self_test(cfg, today: date | None = None) -> int:
 
     assert store.record(result.tenders) == 0, "self-test must never write to a seen database"
     store.close()
+
+    # Sample outputs go to the throwaway workspace, not output/, so the report
+    # format can be reviewed without a network run and without touching
+    # anything the real run owns.
+    from .report import write_docx, write_json, write_xlsx
+    written = [
+        write_docx(result, workspace / "sample-report.docx", cfg.get("output.top_n", 10)),
+        write_xlsx(result, workspace / "sample-report.xlsx"),
+        write_json(result, workspace / "sample-report.json", cfg.profile),
+    ]
+    print("\nSample outputs (fixture data, not live):")
+    for path in written:
+        print(f"  {path}")
     print("\nSelf-test complete. Nothing written to real state; no network used.")
     return 0
