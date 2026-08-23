@@ -9,7 +9,7 @@ So: classify against the DELIVERY LOCATION, and where a notice states both, the
 delivery location wins. The verdict is carried on the record as syria_link_type
 rather than collapsed into a boolean, so a wrong call is visible in the report
 instead of silent.
-"""
+r"""
 
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ class Classifier:
 
     # -------------------------------------------------------------- classify
     def classify(self, record: dict, *texts: Optional[str]) -> tuple[str, Optional[str]]:
-        """Return (syria_link_type, delivery_country)."""
+        """Return (syria_link_type, delivery_country).r"""
         blob = " \n ".join(t for t in texts if t)
         field_countries, foreign_names = self._countries_in_fields(record)
         ours_in_field = self.iso2 in field_countries

@@ -1,4 +1,4 @@
-"""Country matching.
+r"""Country matching.
 
 Driven entirely by a profile: no country name appears in this file.
 
@@ -38,12 +38,16 @@ from typing import Any, Iterable, Optional
 # at all is the only case where text matching gets a say.
 ACCEPT, REJECT, UNKNOWN = True, False, None
 
+def _is_arabic(text: str) -> bool:
+    return any("\u0600" <= ch <= "\u06ff" for ch in text or "")
+
+
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w.-]+\.\w+")
 _URL_RE = re.compile(r"https?://\S+|www\.\S+")
 
 
 def _term_pattern(term: str) -> re.Pattern:
-    """(?<!\w)term(?!\w) — word-ish boundaries that also work for multiword terms.
+    r"""(?<!\w)term(?!\w) — word-ish boundaries that also work for multiword terms.
 
     \b would do here, but (?<!\w)/(?!\w) states the intent directly and behaves
     identically for terms that start or end with a non-word character.
@@ -74,7 +78,7 @@ class Evidence:
 
 
 class CountryMatcher:
-    """Profile-driven country matcher. Holds no country knowledge of its own."""
+    """Profile-driven country matcher. Holds no country knowledge of its own.r"""
 
     def __init__(self, profile: dict):
         self.profile = profile
@@ -91,8 +95,14 @@ class CountryMatcher:
         self._places_weak: list[tuple[str, re.Pattern]] = []
         for place in profile.get("places", []):
             canonical = place.get("canonical", "")
-            bucket = self._places_weak if place.get("ambiguous") else self._places_strong
             for variant in place.get("variants", []):
+                # Ambiguity is a property of the SPELLING, not of the place.
+                # "Damascus" is also a town in Maryland, Oregon, Virginia and
+                # Georgia, so the Latin spelling needs corroboration -- but
+                # دمشق is never a US municipality, so the Arabic spelling is
+                # strong evidence on its own.
+                ambiguous = bool(place.get("ambiguous")) and not _is_arabic(variant)
+                bucket = self._places_weak if ambiguous else self._places_strong
                 bucket.append((canonical, _term_pattern(variant)))
 
         tld = profile.get("tld")
@@ -102,7 +112,7 @@ class CountryMatcher:
 
     # ------------------------------------------------------------------ text
     def evidence(self, *texts: Optional[str]) -> Evidence:
-        """Weigh free text. Never call this on a record that has a country field."""
+        """Weigh free text. Never call this on a record that has a country field.r"""
         ev = Evidence()
         raw = " \n ".join(t for t in texts if t)
         if not raw.strip():

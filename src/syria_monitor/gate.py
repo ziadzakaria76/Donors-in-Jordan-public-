@@ -18,7 +18,7 @@ anything. Defence in depth is not depth when both layers read the same field.
 Hence: the verdict is read from the country FIELD, and text is consulted only
 where there is no country field at all -- and then only over fields a portal has
 declared safe, never over an API-matched body.
-"""
+r"""
 
 from __future__ import annotations
 
@@ -27,6 +27,14 @@ from typing import Optional
 
 from .classify import Classifier
 from .matching import ACCEPT, REJECT, CountryMatcher
+from .models import CROSS_BORDER, INSIDE, REFUGEE_HOSTING, REGIONAL
+
+# A record is RELATED to our country if the classifier can place it in any of
+# these categories. Related records are kept by the gate so the pipeline's scope
+# filter can decide what to report -- and so the categories left out of scope
+# are auditable line by line, not just as a count. Only records the classifier
+# cannot place at all are dropped here.
+RELATED = (INSIDE, CROSS_BORDER, REGIONAL, REFUGEE_HOSTING)
 
 # A record may set this to the list of field names that are safe to text-match.
 # Anything not listed is assumed to be an API-matched body and is not consulted.
@@ -65,9 +73,19 @@ class CountryGate:
 
         verdict = self.matcher.country_verdict(record)
         if verdict is REJECT:
-            stats.rejected_by_field += 1
+            # A field naming another country is not the end of the story: a
+            # Gaziantep-run Whole-of-Syria programme and a Jordan-delivered
+            # Syrian-refugee tender both state a foreign delivery country and
+            # both are genuinely related. The classifier decides which, and the
+            # scope filter downstream decides what is reported. Anything it
+            # cannot place -- a Malawi water consultancy that merely mentions
+            # Syria -- is dropped right here.
             link_type, delivery = self.classifier.classify(record, self.safe_text(record))
             stats.note(link_type)
+            if link_type in RELATED:
+                stats.accepted_by_field += 1
+                return True, link_type, delivery
+            stats.rejected_by_field += 1
             return False, link_type, delivery
 
         if verdict is ACCEPT:

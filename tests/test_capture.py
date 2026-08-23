@@ -1,0 +1,171 @@
+"""--capture must work for every HTML portal, including ones with custom fetch
+logic, and must fail honestly when a source is unreachable."""
+
+from __future__ import annotations
+
+import pytest
+
+from syria_monitor.fetch import Fetcher, TransportError
+from syria_monitor.portals import HTML_PORTALS, REGISTRY
+
+from conftest import fixture
+
+
+class StubFetcher(Fetcher):
+    """Serves a fixture for both GET and POST, so custom fetch logic is covered."""
+
+    def __init__(self, html="<html></html>", status=200):
+        super().__init__()
+        self._html, self._status = html, status
+
+    def get(self, url, **kwargs):
+        from syria_monitor.fetch import Response
+        return Response(url=url, status=self._status, text=self._html, headers={})
+
+    def post(self, url, **kwargs):
+        return self.get(url, **kwargs)
+
+
+class DeadFetcher(Fetcher):
+    def get(self, url, **kwargs):
+        raise TransportError("ConnectionError: name resolution failed")
+
+    def post(self, url, **kwargs):
+        return self.get(url, **kwargs)
+
+
+def build(name, fetcher, profile, gate, cfg=None):
+    return REGISTRY[name](cfg or {}, profile, fetcher, gate)
+
+
+@pytest.mark.parametrize("name", HTML_PORTALS)
+def test_capture_works_for_every_html_portal(name, profile, gate):
+    """Includes UNGM, whose search is a POST -- capture goes through the same
+    fetch_page() the run uses, so custom logic cannot be accidentally excluded."""
+    portal = build(name, StubFetcher(fixture("drupal_views.html")), profile, gate,
+                   cfg={"country_id": 9999} if name == "ungm" else {})
+    captured = portal.capture()
+    assert captured, f"{name} captured nothing"
+    for label, html, status, result in captured:
+        assert status == 200
+        assert html
+        assert result is not None, f"{name}/{label} produced no extraction report"
+        assert result.attempts, "per-layer diagnostics must be reported"
+
+
+@pytest.mark.parametrize("name", HTML_PORTALS)
+def test_capture_fails_honestly_when_unreachable(name, profile, gate):
+    portal = build(name, DeadFetcher(), profile, gate,
+                   cfg={"country_id": 9999} if name == "ungm" else {})
+    captured = portal.capture()
+    assert all(html == "" for _, html, _, _ in captured)
+    assert getattr(portal, "_capture_error", "").startswith("ConnectionError")
+
+
+def test_rest_portals_capture_their_payload(profile, gate, monkeypatch):
+    from syria_monitor.portals.worldbank import WorldBankPortal
+
+    class JsonFetcher(Fetcher):
+        def json(self, url, **kwargs):
+            return {"procnotices": [{"id": "OP00460737", "notice_title": "x",
+                                     "project_ctry_name": "Syrian Arab Republic"}]}
+
+    captured = WorldBankPortal({}, profile, JsonFetcher(), gate).capture()
+    assert captured and "OP00460737" in captured[0][1]
+
+
+def test_ungm_refuses_to_run_without_its_numeric_country_id(profile, gate):
+    """UNGM does not use ISO codes and the id cannot be derived. A wrong id
+    returns nothing, silently -- so the portal reports why instead of guessing."""
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": None})
+    reason = portal.unavailable_reason()
+    assert reason and "country_id" in reason and "--capture ungm" in reason
+
+    outcome = portal.collect()
+    assert outcome.skipped_reason == reason
+    assert outcome.tenders == []
+
+
+def test_ungm_search_body_carries_the_configured_country_id(profile, gate):
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": 2401})
+    body = portal.search_body()
+    assert body["Countries"] == [2401]
+    assert body["IsActive"] is True
+
+
+def test_ungm_deadline_uses_the_countdown_guard(profile, gate):
+    """The portal's own row text carries a countdown between the deadline and
+    the publication date."""
+    from datetime import date
+    from syria_monitor.extraction import Row
+
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": 2401})
+    row = Row(title="Rehabilitation works, Aleppo",
+              text="Deadline: 30-Sep-2026 Expires in 38 days Published: 20-Jul-2026")
+    record = portal.row_to_record(row, "https://www.ungm.org/Public/Notice/Search")
+    assert record["closing_date"] == date(2026, 9, 30).isoformat()
+
+
+def test_sam_gov_is_skipped_without_a_key_rather_than_failing(profile, gate):
+    outcome = REGISTRY["samgov"]({}, profile, StubFetcher(), gate).collect()
+    assert outcome.skipped_reason and "SAM_API_KEY" in outcome.skipped_reason
+    assert outcome.available is True          # skipped, not broken
+
+
+def test_sam_gov_sends_a_legal_date_range(profile, gate, monkeypatch):
+    """postedFrom/postedTo are mandatory and the API rejects ranges over a year,
+    so the window is an API constraint rather than the lookback policy."""
+    from datetime import datetime
+    monkeypatch.setenv("SAM_API_KEY", "test-key")
+    params = REGISTRY["samgov"]({}, profile, StubFetcher(), gate)._params()
+    start = datetime.strptime(params["postedFrom"], "%m/%d/%Y")
+    end = datetime.strptime(params["postedTo"], "%m/%d/%Y")
+    assert 0 < (end - start).days <= 365
+    assert params["ncode"] == "SY"
+
+
+def test_ted_page_limit_is_never_over_100(profile, gate):
+    """250 is a silent HTTP 400 on every run."""
+    body = REGISTRY["ted"]({}, profile, StubFetcher(), gate)._body()
+    assert body["limit"] <= 100
+    assert "SYR" in body["query"]
+
+
+def test_ted_reads_place_of_performance_not_buyer_country(profile, gate):
+    portal = REGISTRY["ted"]({}, profile, StubFetcher(), gate)
+    record = portal._to_record({
+        "publication-number": "123456-2026",
+        "notice-title": {"eng": ["Syria - Rehabilitation of water networks - Aleppo"]},
+        "place-of-performance-country-lot": {"eng": ["SYR"]},
+        "buyer-country": {"eng": ["DEU"]},
+    })
+    assert record["place_of_performance_country"] == "SYR"
+    assert record["buyer_country"] == "DEU"
+
+
+def test_ted_title_country_rule_is_strict(profile, gate):
+    from syria_monitor.portals.ted import TedPortal
+    assert TedPortal.country_from_title("Syria - Water works - Aleppo") == "Syria"
+    assert TedPortal.country_from_title("Syrian Arab Republic - Health - Homs") \
+        == "Syrian Arab Republic"
+    # Not a country name: too long, or carries digits.
+    assert TedPortal.country_from_title("Supply of laboratory equipment, Package 3 - Lot 2") is None
+    assert TedPortal.country_from_title("2026 framework agreement - services") is None
+
+
+def test_uk_fts_pagination_cannot_loop_forever(profile, gate):
+    """The next-link chain can loop; a seen-set is what terminates the run."""
+    from syria_monitor.portals.uk_fts import UkFindATenderPortal
+
+    class LoopingFetcher(Fetcher):
+        calls = 0
+
+        def json(self, url, **kwargs):
+            LoopingFetcher.calls += 1
+            return {"releases": [{"ocid": f"ocds-{LoopingFetcher.calls}",
+                                  "tender": {"title": "Works in Aleppo"}}],
+                    "links": {"next": "https://find-tender.example/page/1"}}
+
+    records = UkFindATenderPortal({}, profile, LoopingFetcher(), gate).fetch_tenders()
+    assert LoopingFetcher.calls <= 3
+    assert records

@@ -2,7 +2,7 @@
 
 Three traps live here. All three corrupt dates without ever raising: the run
 reports success and open tenders quietly vanish.
-"""
+r"""
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ def normalise_digits(text: str) -> str:
 
 
 def parse_date(value, dayfirst: bool = True) -> Optional[date]:
-    """Parse one date. Returns None rather than guessing."""
+    """Parse one date. Returns None rather than guessing.r"""
     if value is None:
         return None
     if isinstance(value, datetime):

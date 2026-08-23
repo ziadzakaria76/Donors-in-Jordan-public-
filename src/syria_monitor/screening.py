@@ -7,7 +7,7 @@ stale sanctions list that looks current is worse than no screening at all.
 
 Screening is advisory here by configuration: hits are flagged, never used to
 exclude a tender.
-"""
+r"""
 
 from __future__ import annotations
 
@@ -215,9 +215,12 @@ def parse_names(text: str, source: dict) -> set[str]:
                     if h in ("name", "sdn_name", "wholename", "name1", "namealias_wholename",
                              "full name", "fullname", "entity name")]
     fixed = source.get("name_column")
-    start = 1 if name_columns else 0
 
-    for row in rows[start:]:
+    # Row 0 is always treated as a header: all three published lists carry one.
+    # Falling back to "longest cell in every row" without skipping it turns a
+    # column heading into a designated name -- which both invents false
+    # positives and hides an empty download behind a plausible-looking count.
+    for row in rows[1:]:
         if not row:
             continue
         candidates = []

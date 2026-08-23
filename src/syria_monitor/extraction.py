@@ -30,7 +30,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from .dates import _DATE_SHAPED, parse_date
+from .dates import _DATE_SHAPED
 
 QUALITY_THRESHOLD = 0.45
 
@@ -245,13 +245,17 @@ def selector_layer(soup: BeautifulSoup, selectors: Optional[dict], base_url: str
 
 # --------------------------------------------------------- layer 4: header table
 HEADER_MAP = {
-    "deadline": ("deadline", "closing", "closes", "expiry", "abgabefrist", "frist", "clôture"),
-    "published": ("published", "posted", "date", "veröffentlicht", "publication"),
-    "value": ("value", "amount", "budget", "estimated", "wert"),
-    "buyer": ("buyer", "agency", "organisation", "organization", "entity", "auftraggeber", "office"),
-    "type": ("type", "notice type", "category", "art"),
-    "title": ("title", "subject", "description", "bezeichnung", "gegenstand", "objet"),
-    "reference": ("reference", "ref", "number", "no.", "nummer"),
+    "deadline": ("deadline", "closing", "closes", "expiry", "abgabefrist", "frist", "clôture",
+                 "الموعد النهائي", "آخر موعد", "تاريخ الإغلاق"),
+    "published": ("published", "posted", "date", "veröffentlicht", "publication",
+                  "تاريخ النشر"),
+    "value": ("value", "amount", "budget", "estimated", "wert", "القيمة"),
+    "buyer": ("buyer", "agency", "organisation", "organization", "entity", "auftraggeber", "office",
+              "الجهة"),
+    "type": ("type", "notice type", "category", "art", "النوع"),
+    "title": ("title", "subject", "description", "bezeichnung", "gegenstand", "objet",
+              "العنوان", "الموضوع"),
+    "reference": ("reference", "ref", "number", "no.", "nummer", "الرقم"),
 }
 
 

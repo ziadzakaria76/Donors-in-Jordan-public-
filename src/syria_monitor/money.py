@@ -2,7 +2,7 @@
 
 A wrong value is worse than no value: against a minimum-value filter it deletes
 real tenders silently. Every rule here exists because the naive version fails.
-"""
+r"""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def parse_number(token: str) -> Optional[float]:
 
     EUR 1.500.000 is 1.5 million, not 1.5 — get this wrong and most GIZ and KfW
     values are lost.
-    """
+    r"""
     t = token.strip().replace(" ", "").replace(" ", "")
     if not t:
         return None

@@ -26,7 +26,7 @@ the UI sends -- but every deadline is re-checked downstream anyway. A source's
 own filter is a hint, never a guarantee. Note also that the page size the UI
 asks for is not necessarily the one that governs paging: trust what page one
 returns.
-"""
+r"""
 
 from __future__ import annotations
 

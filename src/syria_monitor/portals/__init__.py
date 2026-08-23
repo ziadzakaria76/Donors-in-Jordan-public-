@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Type
 
-from .base import BasePortal, PortalOutcome  # noqa: F401  (re-exported)
+from .base import BasePortal, PortalOutcome
 from . import giz, gtai, isdb, samgov, srtf, ted, uk_fts, ungm, undp, worldbank
 
 # EBRD and EIB are deliberately absent.
@@ -44,3 +44,5 @@ REGISTRY: dict[str, Type[BasePortal]] = {
 }
 
 HTML_PORTALS = [name for name, cls in REGISTRY.items() if cls.is_html]
+
+__all__ = ["BasePortal", "PortalOutcome", "REGISTRY", "HTML_PORTALS"]

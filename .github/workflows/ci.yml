@@ -1,0 +1,31 @@
+name: CI
+
+# push on branches: [main] plus pull_request, NOT push: ["**"] plus
+# pull_request -- the latter runs CI twice on every PR commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Lint (pyflakes)
+        run: python -m pyflakes src/ tests/
+      - name: Tests
+        # The whole suite is offline: no network, no credentials, no real state.
+        run: python -m pytest tests/ -q

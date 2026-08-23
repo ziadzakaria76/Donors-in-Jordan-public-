@@ -1,4 +1,4 @@
-"""Run orchestration: collect, gate, dedupe, filter, screen, score."""
+"""Run orchestration: collect, gate, dedupe, filter, screen, score.r"""
 
 from __future__ import annotations
 
@@ -133,13 +133,19 @@ def run(cfg: Config, fetcher: Optional[Fetcher] = None, screener: Optional[Scree
     if screener is not None:
         try:
             screener.load()
+            result.screening_status = screener.list_status()
+            if not any(entry["names"] for entry in result.screening_status):
+                # Every list failed to load. Say so loudly: silence here reads as
+                # "screened and found nothing", which is the one outcome this
+                # module must never produce.
+                raise ScreeningUnavailable(
+                    "no sanctions list could be loaded this run -- nothing was screened")
             for tender in result.tenders:
                 hits = screener.screen([tender.contact, tender.description and None,
                                         (tender.country_fields or {}).get("buyer_name")])
                 if hits:
                     tender.screening = hits
                     tender.add_flag("sanctions_flag")
-            result.screening_status = screener.list_status()
         except ScreeningUnavailable as exc:
             result.screening_error = f"{exc} ({DISCLAIMER})"
 

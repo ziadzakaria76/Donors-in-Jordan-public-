@@ -11,7 +11,7 @@ country actually arrives under. Read it, do not send it.
 
 The Bank writes the country as "Syrian Arab Republic", not "Syria", wherever it
 appears -- which is why the matcher enumerates that spelling.
-"""
+r"""
 
 from __future__ import annotations
 

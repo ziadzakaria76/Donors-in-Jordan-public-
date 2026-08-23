@@ -1,8 +1,11 @@
-"""Offline self-test: the pipeline over committed fixtures.
+r"""Offline self-test: the whole pipeline over committed fixtures.
 
-Runs with a redirected database and output directory so it can never write
-fixture ids into real state -- with new-only style reporting, that would make
-the next real run look empty and therefore broken.
+This is what stands in for a live dry run in an environment with no network. It
+proves the wiring end to end -- extraction, the country gate, classification,
+deadline filtering, dedupe, ranking and the four-way classification split -- and
+it runs with the database and output directory redirected, so it can never write
+fixture ids into real state. With NEW-marking on, that would make the next real
+run report nothing and look exactly like a broken monitor.
 """
 
 from __future__ import annotations
@@ -11,35 +14,113 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
-from .fetch import Fetcher
+from .fetch import Fetcher, Response
+from .portals.base import HtmlPortal
+
+FIXTURES = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
 
 
-class FixturePortalMixin:
-    """Serve a committed fixture instead of the live page."""
+class _FixtureFetcher(Fetcher):
+    def __init__(self, html: str):
+        super().__init__()
+        self._html = html
 
-    fixture: Path = None
+    def get(self, url, **kwargs):
+        return Response(url=url, status=200, text=self._html, headers={})
+
+    def post(self, url, **kwargs):
+        return self.get(url, **kwargs)
+
+
+def _fixture_portal(name: str, filename: str):
+    class FixturePortal(HtmlPortal):
+        pass
+
+    FixturePortal.name = name
+    FixturePortal.label = f"fixture:{name}"
+    FixturePortal.url = f"fixture://{filename}"
+    FixturePortal.__doc__ = f"Serves tests/fixtures/{filename}."
+
+    def pages(self):
+        return [("index", FixturePortal.url)]
 
     def fetch_page(self, label, url):
-        return Path(self.fixture).read_text(encoding="utf-8"), 200
+        return (FIXTURES / filename).read_text(encoding="utf-8"), 200
+
+    def row_to_record(self, row, page_url):
+        record = HtmlPortal.row_to_record(self, row, page_url)
+        # These fixtures write the delivery country in prose ("Place of
+        # performance: X"), which stands in for the country field a real API
+        # returns -- the point being that the gate reads a FIELD, not the text.
+        import re
+        match = re.search(r"Place of performance:\s*([^.]+)\.", row.text)
+        if match:
+            record["place_of_performance_country"] = match.group(1).strip()
+        return record
+
+    FixturePortal.pages = pages
+    FixturePortal.row_to_record = row_to_record
+    FixturePortal.fetch_page = fetch_page
+    return FixturePortal
 
 
-def self_test(cfg) -> int:
-    from .classify import Classifier
-    from .gate import CountryGate
-    from .matching import CountryMatcher
-    from .pipeline import run as run_pipeline, scope_summary
+FIXTURE_PORTALS = {
+    "fx_drupal": _fixture_portal("fx_drupal", "drupal_views.html"),
+    "fx_cards": _fixture_portal("fx_cards", "bootstrap_cards.html"),
+    "fx_table": _fixture_portal("fx_table", "giz_header_table.html"),
+    "fx_nextjs": _fixture_portal("fx_nextjs", "nextjs.html"),
+    "fx_jsonld": _fixture_portal("fx_jsonld", "jsonld_site_only.html"),
+    "fx_arabic": _fixture_portal("fx_arabic", "arabic_rtl.html"),
+    "fx_navtrap": _fixture_portal("fx_navtrap", "nav_trap.html"),
+    # Covers all four classification categories plus the Blantyre false
+    # positive, so the split below demonstrates the classifier rather than
+    # just counting one category.
+    "fx_mixed": _fixture_portal("fx_mixed", "mixed_scope.html"),
+    "fx_wall": _fixture_portal("fx_wall", "cloudflare_wall.html"),      # must report unavailable
+}
+
+
+def self_test(cfg, today: date | None = None) -> int:
+    from .models import LINK_TYPES
+    from .pipeline import run as run_pipeline
+    from .portals import REGISTRY
+    from .report.common import LINK_LABELS
     from .state import SeenStore
 
-    tmp = Path(tempfile.mkdtemp(prefix="syria-selftest-"))
-    matcher = CountryMatcher(cfg.profile)
-    CountryGate(cfg.profile, matcher, Classifier(cfg.profile, matcher))
-    store = SeenStore(tmp / "selftest.db", read_only=True)   # never the real db
+    workspace = Path(tempfile.mkdtemp(prefix="syria-selftest-"))
+    print(f"Self-test workspace (real state untouched): {workspace}")
 
-    print(f"Self-test workspace: {tmp}")
-    result = run_pipeline(cfg, fetcher=Fetcher(), store=store,
-                          today=date.today(), portals=[])
-    print(scope_summary(result))
-    print("Fixture-driven portal tests live in tests/ and run under pytest;")
-    print("this command proves the pipeline wiring holds with no network and no real state.")
+    original = dict(REGISTRY)
+    REGISTRY.clear()
+    REGISTRY.update(FIXTURE_PORTALS)
+    store = SeenStore(workspace / "selftest.db", read_only=True)
+    try:
+        result = run_pipeline(cfg, fetcher=Fetcher(), store=store,
+                              today=today or date(2026, 8, 23),
+                              portals=list(FIXTURE_PORTALS))
+    finally:
+        REGISTRY.clear()
+        REGISTRY.update(original)
+
+    print("\n" + result.subject())
+    print("-" * 78)
+    for portal in result.portals:
+        print("  " + portal.status_line)
+    print("-" * 78)
+    print("Classification split (every category, including those out of scope):")
+    for key in LINK_TYPES:
+        print(f"  {LINK_LABELS.get(key, key):<32} {result.counts.get(key, 0)}")
+    print(f"  in scope: {len(result.tenders)} | excluded but logged: {len(result.excluded)} "
+          f"| duplicates collapsed: {result.duplicates_collapsed} "
+          f"| expired dropped: {result.expired_dropped}")
+    print("-" * 78)
+    for rank, tender in enumerate(result.tenders[:10], start=1):
+        closing = tender.closing_date.isoformat() if tender.closing_date else "not published"
+        print(f"{rank:>3}. [{tender.score:5.1f}] {tender.title[:58]}")
+        print(f"          {tender.portal} | closes {closing} | {tender.syria_link_type} "
+              f"| lang {tender.language}")
+
+    assert store.record(result.tenders) == 0, "self-test must never write to a seen database"
     store.close()
+    print("\nSelf-test complete. Nothing written to real state; no network used.")
     return 0

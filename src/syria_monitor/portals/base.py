@@ -186,6 +186,19 @@ class HtmlPortal(BasePortal):
             record["posted_date"] = row.cells["published"]
         if "value" in row.cells:
             record["value_text"] = row.cells["value"]
+
+        # Rows from the class-independent layers carry their dates in prose
+        # rather than in mapped cells. Anchor on a closing label -- never on the
+        # first date-shaped text in the row, which is usually the publication
+        # date -- and let the countdown guard void a match that sits behind
+        # "expires in N days".
+        if not record.get("closing_date"):
+            from ..dates import find_labelled_date
+            deadline = find_labelled_date(row.text)
+            if deadline:
+                record["closing_date"] = deadline.isoformat()
+        if not record.get("value_text"):
+            record["value_text"] = row.text
         return record
 
     def extract_page(self, html: str, url: str, status: int = 200) -> ExtractionResult:

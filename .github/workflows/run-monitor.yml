@@ -1,0 +1,69 @@
+name: Run monitor
+
+on:
+  workflow_dispatch:
+    inputs:
+      send:
+        description: "Send the report by email (needs Graph secrets)"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Dry run only -- scrape and print, write nothing"
+        type: boolean
+        default: false
+  schedule:
+    # 03:00 UTC = 06:00 Europe/Amman (UTC+3, no DST). GitHub Actions cron is
+    # always UTC; there is no local-time option.
+    - cron: "0 3 * * *"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Check portal reachability
+        continue-on-error: true
+        run: python -m syria_monitor.cli --check-portals
+        env:
+          PYTHONPATH: src
+
+      - name: Run monitor
+        env:
+          PYTHONPATH: src
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+          GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+          GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+          GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+          GRAPH_SENDER: ${{ secrets.GRAPH_SENDER }}
+          REPORT_TO: ${{ secrets.REPORT_TO }}
+          REPORT_CC: ${{ secrets.REPORT_CC }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python -m syria_monitor.cli --dry-run
+          elif [ "${{ inputs.send }}" = "true" ] && [ -n "${GRAPH_CLIENT_SECRET}" ]; then
+            python -m syria_monitor.cli --run --send
+          else
+            python -m syria_monitor.cli --run
+          fi
+
+      # Uploaded so a run triggered from a phone can be read on the run summary
+      # page without downloading anything.
+      - name: Upload report files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: syria-tender-report
+          path: |
+            output/*.docx
+            output/*.xlsx
+            output/*.json
+          if-no-files-found: warn
+          retention-days: 30

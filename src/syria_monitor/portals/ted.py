@@ -8,7 +8,7 @@ place-of-performance is the delivery country, buyer-country is metadata.
 
 Page limit is 100. Asking for 250 is a silent HTTP 400 on every run.
 Many fields come back as multilingual maps like {'eng': [...]}, not strings.
-"""
+r"""
 
 from __future__ import annotations
 

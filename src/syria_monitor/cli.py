@@ -9,7 +9,7 @@
                          structural selectors the page actually uses
     --self-test          run the pipeline over committed fixtures, never touching
                          real state
-"""
+r"""
 
 from __future__ import annotations
 
@@ -142,7 +142,8 @@ def _print_result(result, cfg) -> None:
     if result.screening_error:
         print(f"  SCREENING ERROR: {result.screening_error}")
     for entry in result.screening_status:
-        print(f"  {entry['list']}: fetched {entry['fetched']}, {entry['names']} names")
+        suffix = f" -- {entry['error']}" if entry.get("error") else ""
+        print(f"  {entry['list']}: fetched {entry['fetched']}, {entry['names']} names{suffix}")
     print("-" * 78)
     for rank, tender in enumerate(result.tenders[:cfg.get("output.top_n", 10)], start=1):
         flag = "NEW " if tender.is_new else "    "
