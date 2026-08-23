@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from dataclasses import dataclass
@@ -20,6 +21,23 @@ HOST_DELAY_SECONDS = 2.0
 
 _last_request: dict[str, float] = {}
 _lock = threading.Lock()
+
+
+# Some portals take credentials as query parameters (SAM.gov's api_key is one),
+# and requests' exception messages embed the full URL. Without this, a single
+# unreachable host prints the key to the console and writes it into the error
+# field of every JSON report -- which is then attached to an email.
+# The (?<![\w-]) guard matters: without it "code" matches inside SAM.gov's own
+# ncode= parameter and the redaction eats the country filter.
+_SECRET_PARAM_RE = re.compile(
+    r"(?<![\w-])((?:api[_-]?key|client[_-]?secret|access[_-]?token|refresh[_-]?token"
+    r"|token|secret|signature|password|passwd|pwd|auth|code)=)[^&\s\"']+",
+    re.IGNORECASE)
+
+
+def redact(text: str) -> str:
+    """Strip credential-bearing query parameters from anything we surface."""
+    return _SECRET_PARAM_RE.sub(r"\1<redacted>", str(text))
 
 
 class TransportError(RuntimeError):
@@ -71,14 +89,14 @@ class Fetcher:
         try:
             r = self._request("GET", url, **kwargs)
         except requests.RequestException as exc:
-            raise TransportError(f"{type(exc).__name__}: {exc}") from exc
+            raise TransportError(redact(f"{type(exc).__name__}: {exc}")) from exc
         return Response(url=r.url, status=r.status_code, text=r.text, headers=dict(r.headers))
 
     def post(self, url: str, **kwargs) -> Response:
         try:
             r = self._request("POST", url, **kwargs)
         except requests.RequestException as exc:
-            raise TransportError(f"{type(exc).__name__}: {exc}") from exc
+            raise TransportError(redact(f"{type(exc).__name__}: {exc}")) from exc
         return Response(url=r.url, status=r.status_code, text=r.text, headers=dict(r.headers))
 
     def json(self, url: str, **kwargs):
@@ -87,6 +105,6 @@ class Fetcher:
             r.raise_for_status()
             return r.json()
         except requests.RequestException as exc:
-            raise TransportError(f"{type(exc).__name__}: {exc}") from exc
+            raise TransportError(redact(f"{type(exc).__name__}: {exc}")) from exc
         except ValueError as exc:
-            raise TransportError(f"response was not JSON: {exc}") from exc
+            raise TransportError(redact(f"response was not JSON: {exc}")) from exc
