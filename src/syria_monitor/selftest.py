@@ -38,7 +38,12 @@ def _fixture_portal(name: str, filename: str):
 
     FixturePortal.name = name
     FixturePortal.label = f"fixture:{name}"
-    FixturePortal.url = f"fixture://{filename}"
+    # A synthetic but well-formed https base, so the relative hrefs inside the
+    # fixtures resolve the way a real portal's would. The pages still come from
+    # disk -- nothing is fetched. With a fixture:// base every notice URL came
+    # out unusable and the report showed "no link published" for all of them,
+    # which says more about the harness than about the writer.
+    FixturePortal.url = f"https://fixtures.example/{filename}"
     FixturePortal.__doc__ = f"Serves tests/fixtures/{filename}."
 
     def pages(self):
