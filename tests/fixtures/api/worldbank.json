@@ -1,0 +1,44 @@
+{
+  "rows": 3,
+  "os": 0,
+  "procnotices": [
+    {
+      "id": "OP00460737",
+      "project_id": "P175447",
+      "project_name": "Syria Public Financial Management Capacity Building",
+      "notice_title": "Consulting services - public financial management capacity building",
+      "project_ctry_name": "Syrian Arab Republic",
+      "countryshortname": "Syrian Arab Republic",
+      "notice_type": "Request for Expression of Interest",
+      "bid_reference_no": "SY-MOF-460737-CS-QCBS",
+      "notice_status": "Published",
+      "submission_date": "2026-08-01T00:00:00Z",
+      "submission_deadline_date": "2026-09-30T23:59:00Z",
+      "project_sector": "Public Administration",
+      "contact_email": "procurement@mof.gov.sy",
+      "contract_value": "US$ 2,400,000",
+      "notice_text": "The Ministry of Finance of the Syrian Arab Republic has received financing..."
+    },
+    {
+      "id": "OP00460999",
+      "project_id": "P180001",
+      "project_name": "Malawi Water Supply and Sanitation",
+      "notice_title": "Water supply and sanitation consultancy services",
+      "project_ctry_name": "Malawi",
+      "countryshortname": "Malawi",
+      "notice_type": "Request for Expression of Interest",
+      "submission_date": "2026-08-02T00:00:00Z",
+      "submission_deadline_date": "2026-10-15T23:59:00Z",
+      "notice_text": "Consultants with prior experience in Syria an advantage. Syria."
+    },
+    {
+      "id": "P175447",
+      "notice_title": "Supply of laboratory equipment, Package 3",
+      "project_ctry_name": "Syrian Arab Republic",
+      "notice_type": "Invitation for Bids",
+      "submission_date": "2026-08-03T00:00:00Z",
+      "submission_deadline_date": "2026-11-15T23:59:00Z",
+      "notice_text": "Bids are invited for laboratory equipment."
+    }
+  ]
+}

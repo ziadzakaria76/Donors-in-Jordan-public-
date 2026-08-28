@@ -34,6 +34,11 @@ class Classifier:
                       for h in profile.get("hub_locations", [])]
         self._neighbours = {iso: _compile(names)
                             for iso, names in (profile.get("neighbour_names") or {}).items()}
+        # A country field may carry ISO2 or ISO3 depending on the source: TED
+        # uses three-letter codes, SAM.gov two.
+        iso3 = profile.get("neighbour_iso3") or {}
+        self._neighbour_codes = {iso: {iso.upper(), str(iso3.get(iso, iso)).upper()}
+                                 for iso in self._neighbours}
         self._beneficiary = _compile(profile.get("beneficiary_terms", []))
         self._hosting = set(profile.get("refugee_hosting_countries", []))
 
@@ -73,7 +78,7 @@ class Classifier:
                     continue
                 matched_neighbour = False
                 for iso, pats in self._neighbours.items():
-                    if text.upper() == iso or any(p.search(text) for p in pats):
+                    if text.upper() in self._neighbour_codes[iso] or any(p.search(text) for p in pats):
                         found.add(iso)
                         matched_neighbour = True
                 if not matched_neighbour and verdict is REJECT:

@@ -152,6 +152,17 @@ neighbour_names:
   IQ: [iraq, irak, "العراق"]
   EG: [egypt, égypte, ägypten, "مصر"]
 
+# ISO3 codes, because TED reports countries as three-letter codes. Matching
+# only ISO2 leaves a Jordan-delivered TED notice unclassified rather than
+# refugee_hosting_only -- excluded either way, but invisible in the split that
+# is supposed to show how much is being excluded and why.
+neighbour_iso3:
+  JO: JOR
+  LB: LBN
+  TR: TUR
+  IQ: IRQ
+  EG: EGY
+
 # Beneficiary-nationality wording. The biggest false-positive class is not a
 # place name at all: "Syrian refugees" in a tender delivered in Jordan,
 # Lebanon, Turkiye, Iraq or Egypt. Thousands of these exist.
