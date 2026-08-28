@@ -3,10 +3,6 @@ name: Run monitor
 on:
   workflow_dispatch:
     inputs:
-      send:
-        description: "Send the report by email (needs Graph secrets)"
-        type: boolean
-        default: false
       dry_run:
         description: "Dry run only -- scrape and print, write nothing"
         type: boolean
@@ -52,23 +48,18 @@ jobs:
           # value is ignored, so this is safe either way.
           PLAYWRIGHT_CHROMIUM_PATH: ${{ vars.PLAYWRIGHT_CHROMIUM_PATH }}
           SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
-          GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
-          GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
-          GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
-          GRAPH_SENDER: ${{ secrets.GRAPH_SENDER }}
-          REPORT_TO: ${{ secrets.REPORT_TO }}
-          REPORT_CC: ${{ secrets.REPORT_CC }}
         run: |
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             python -m syria_monitor.cli --dry-run
-          elif [ "${{ inputs.send }}" = "true" ] && [ -n "${GRAPH_CLIENT_SECRET}" ]; then
-            python -m syria_monitor.cli --run --send
           else
             python -m syria_monitor.cli --run
           fi
 
       # Uploaded so a run triggered from a phone can be read on the run summary
       # page without downloading anything.
+      # This is how the report is delivered: download it from the run page.
+      # The Markdown summary is also appended to the run summary by the CLI,
+      # so portal health is visible in the run list without downloading.
       - name: Upload report files
         if: always()
         uses: actions/upload-artifact@v4
@@ -78,5 +69,6 @@ jobs:
             output/*.docx
             output/*.xlsx
             output/*.json
+            output/*-summary.md
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 90

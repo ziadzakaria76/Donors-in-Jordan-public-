@@ -138,36 +138,34 @@ wrongly. Same applies to `tests/fixtures/api/*.json` for the four REST portals.
 
 ---
 
-## Stage 6 — Email delivery  (30 min, needs an Azure tenant)
+## Stage 6 — Decide where the files land  (10 min)
 
-1. Azure portal → App registrations → New registration.
-2. API permissions → Microsoft Graph → **Application** → `Mail.Send` → grant
-   admin consent.
-3. **Scope it**, or the app can send as any mailbox in the tenant:
-   ```powershell
-   New-DistributionGroup -Name "SyriaMonitorSenders" -Type Security `
-     -Members "reports@yourfirm.com"
-   New-ApplicationAccessPolicy -AppId <client-id> `
-     -PolicyScopeGroupId "SyriaMonitorSenders@yourfirm.com" `
-     -AccessRight RestrictAccess -Description "Syria tender monitor"
-   ```
-4. Fill in `.env` (never `config.yml` — this is a public repo):
-   ```
-   GRAPH_TENANT_ID=      GRAPH_CLIENT_ID=      GRAPH_CLIENT_SECRET=
-   GRAPH_SENDER=reports@yourfirm.com
-   REPORT_TO=you@yourfirm.com,colleague@yourfirm.com
-   ```
+Nothing is emailed. A run writes four files to `output/`:
 
-**Done when:** `--run --send` delivers. Do a `--run` first and read the files.
+```
+syria-tenders-2026-08-28.docx          the bid-review pack
+syria-tenders-2026-08-28.xlsx          one row per tender
+syria-tenders-2026-08-28.json          full records, for debugging a bad run
+syria-tenders-2026-08-28-summary.md    short summary, always written
+```
 
----
+Pick how you want to reach them:
+
+- **Local runs** — they are simply in `output/`.
+- **Scheduled runs** — Actions → Run monitor → the run → **Artifacts** →
+  `syria-tender-report` (kept 90 days). The summary is also on the run page
+  itself, so you can see whether a run was healthy without downloading.
+- **Somewhere shared** — add a step after "Run monitor" that copies `output/*`
+  to wherever your team looks (a share, a bucket, a Drive folder). Nothing in
+  the code needs to change for that.
+
+No credentials are required for any of this.
 
 ## Stage 7 — First real report  (20 min)
 
 ```bash
 PYTHONPATH=src python -m syria_monitor.cli --dry-run    # read this carefully
-PYTHONPATH=src python -m syria_monitor.cli --run        # writes output/, sends nothing
-PYTHONPATH=src python -m syria_monitor.cli --run --send # only when the dry run looks right
+PYTHONPATH=src python -m syria_monitor.cli --run        # writes the files to output/
 ```
 
 What to check in the dry run, in order:
@@ -189,7 +187,7 @@ What to check in the dry run, in order:
 Already configured: `0 3 * * *` UTC = 06:00 Europe/Amman, daily.
 
 1. Repo → Settings → Secrets and variables → Actions → **Secrets**: add
-   `SAM_API_KEY`, `GRAPH_*`, `REPORT_TO`, `REPORT_CC`.
+   `SAM_API_KEY` (the only secret this system uses).
 2. Trigger **Run monitor** manually once (Actions tab → Run workflow) and read
    the run summary; the Word/Excel/JSON files upload as artifacts.
 3. Leave the schedule on. The subject line tells you whether a quiet day was

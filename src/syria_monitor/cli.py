@@ -14,6 +14,7 @@ r"""
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -23,7 +24,7 @@ from .fetch import Fetcher, TransportError
 from .models import LINK_TYPES
 from .pipeline import run as run_pipeline, scope_summary
 from .portals import HTML_PORTALS, REGISTRY
-from .report import render_email, write_docx, write_json, write_xlsx
+from .report import write_docx, write_json, write_summary, write_xlsx
 from .report.common import LINK_LABELS, fmt_date, fmt_value
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
@@ -160,8 +161,6 @@ def main(argv=None) -> int:
     parser.add_argument("--check-portals", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--run", action="store_true")
-    parser.add_argument("--send", action="store_true",
-                        help="deliver by Graph; without it a run only writes files")
     parser.add_argument("--capture", metavar="PORTAL",
                         help=f"one of: {', '.join(HTML_PORTALS)} (REST portals dump their payload)")
     parser.add_argument("--self-test", action="store_true",
@@ -201,34 +200,34 @@ def main(argv=None) -> int:
 
     out_dir = cfg.output_dir
     stamp = date.today().isoformat()
+    top_n = cfg.get("output.top_n", 10)
+    formats = cfg.get("output.formats", ["docx", "xlsx"])
     written = []
-    formats = cfg.get("output.formats", ["docx", "xlsx", "json"])
     if "docx" in formats:
-        written.append(write_docx(result, out_dir / f"syria-tenders-{stamp}.docx",
-                                  cfg.get("output.top_n", 10)))
+        written.append(write_docx(result, out_dir / f"syria-tenders-{stamp}.docx", top_n))
     if "xlsx" in formats:
         written.append(write_xlsx(result, out_dir / f"syria-tenders-{stamp}.xlsx"))
     if "json" in formats:
         written.append(write_json(result, out_dir / f"syria-tenders-{stamp}.json", cfg.profile))
-    print("\nWrote:")
-    for path in written:
-        print(f"  {path}")
+
+    # Always written, whatever the formats: it is what carries portal health to
+    # somewhere a person sees without opening a document.
+    summary = write_summary(result, out_dir / f"syria-tenders-{stamp}-summary.md", top_n)
+    written.append(summary)
 
     store.record(result.tenders)
 
-    if not args.send:
-        print("\nNot sent. Review the files above, then re-run with --send to deliver.")
-        return 0
+    print("\nFiles written to " + str(out_dir.resolve()) + ":")
+    for path in written:
+        print(f"  {path.name}  ({path.stat().st_size:,} bytes)")
 
-    from .delivery import GraphMailer, MailError, recipients_from_env
-    to, cc = recipients_from_env()
-    try:
-        notes = GraphMailer().send(result.subject(), render_email(result, cfg.get("output.top_n", 10)),
-                                   to, cc, written)
-        print(f"\nSent to {len(to)} recipient(s)." + ("" if not notes else f" {notes}"))
-    except MailError as exc:
-        print(f"\nDELIVERY FAILED: {exc}")
-        return 1
+    # In GitHub Actions the summary also goes to the run page, so a scheduled
+    # run's health is visible in the run list without downloading anything.
+    step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+    if step_summary:
+        with open(step_summary, "a", encoding="utf-8") as fh:
+            fh.write(summary.read_text(encoding="utf-8") + "\n")
+        print("  (summary also appended to the workflow run page)")
     return 0
 
 

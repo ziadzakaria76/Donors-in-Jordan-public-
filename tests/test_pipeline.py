@@ -11,7 +11,7 @@ from syria_monitor.models import Tender
 from syria_monitor.pipeline import run as run_pipeline
 from syria_monitor.portals import REGISTRY
 from syria_monitor.portals.base import BasePortal
-from syria_monitor.report import render_email, write_docx, write_json, write_xlsx
+from syria_monitor.report import render_summary, write_docx, write_json, write_summary, write_xlsx
 from syria_monitor.scoring import score_batch
 from syria_monitor.state import SeenStore
 
@@ -231,38 +231,47 @@ def test_report_states_the_screening_disclaimer(arabic_result, tmp_path):
     assert "triage aid, never legal clearance" in xml
 
 
-# -------------------------------------------------------------------- delivery
-def test_email_overflow_drops_attachments_rather_than_the_email(tmp_path):
-    from syria_monitor.delivery import GraphMailer
-    big = tmp_path / "big.xlsx"
-    big.write_bytes(b"0" * (4 * 1024 * 1024))
-    message, notes = GraphMailer.build_message("s", "<p>body</p>", ["a@b.c"], [], [big])
-    assert message["message"]["attachments"] == []
-    assert notes and "attachments omitted" in notes[0]
-    assert "Attachments omitted" in message["message"]["body"]["content"]
+# --------------------------------------------------------------------- outputs
+def test_nothing_in_the_package_can_send_mail():
+    """Email delivery was removed; no module should be able to reintroduce it
+    quietly through a stale import."""
+    import importlib
+    for name in ("syria_monitor.delivery", "syria_monitor.report.html_email"):
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(name)
 
 
-def test_delivery_without_credentials_fails_clearly(monkeypatch):
-    from syria_monitor.delivery import GraphMailer, MailError
-    mailer = GraphMailer()
-    with pytest.raises(MailError) as excinfo:
-        mailer.send("s", "<p>x</p>", ["a@b.c"])
-    assert "GRAPH_TENANT_ID" in str(excinfo.value)
+def test_summary_carries_portal_health_and_the_disclaimer(config, registry):
+    """Health used to live in the email subject. With no email it has to be
+    somewhere a person still sees, or a dead monitor goes unnoticed."""
+    registry.clear()
+    registry["good"] = make_portal("good", [syria_record()])
+    registry["bad"] = make_portal("bad", [], fails=True)
+    result = run_pipeline(config, fetcher=Fetcher(), today=TODAY, portals=["good", "bad"])
+
+    text = render_summary(result)
+    assert "WARNING: 1 portal(s) down" in text
+    assert "BAD: UNAVAILABLE" in text.upper()
+    assert "Classification split" in text
+    assert "triage aid, never legal clearance" in text
 
 
-def test_delivery_without_recipients_fails_clearly():
-    from syria_monitor.delivery import GraphMailer, MailError
-    with pytest.raises(MailError) as excinfo:
-        GraphMailer().send("s", "<p>x</p>", [])
-    assert "REPORT_TO" in str(excinfo.value)
-
-
-def test_email_body_renders_without_tenders(config, registry):
+def test_summary_renders_with_no_tenders(config, registry):
     registry.clear()
     registry["empty"] = make_portal("empty", [])
     result = run_pipeline(config, fetcher=Fetcher(), today=TODAY, portals=["empty"])
-    html = render_email(result)
-    assert "Syria tenders" in html and "triage aid" in html
+    text = render_summary(result)
+    assert "Nothing in scope this run" in text
+    assert "no new opportunities" in text
+
+
+def test_summary_links_each_tender(config, registry, tmp_path):
+    registry.clear()
+    registry["links"] = make_portal("links", [
+        syria_record(id="1", title="Water works, Aleppo", url="https://example.org/n/1")])
+    result = run_pipeline(config, fetcher=Fetcher(), today=TODAY, portals=["links"])
+    path = write_summary(result, tmp_path / "summary.md")
+    assert "[Water works, Aleppo](https://example.org/n/1)" in path.read_text(encoding="utf-8")
 
 
 # ----------------------------------------------------------------------- state

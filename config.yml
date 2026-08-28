@@ -33,15 +33,16 @@ screening:
   cache_dir: .cache/sanctions
   max_age_days: 7           # re-fetch weekly; list date is stamped into every report
 
+# Results are written to disk and downloaded; nothing is emailed.
 output:
   dir: output
-  formats: [docx, xlsx, json]     # HTML is the email body
+  # docx  - the bid-review pack, with a clickable link per tender
+  # xlsx  - one row per tender, every field as a column
+  # json  - the full structured record set; drop it if you never debug a run
+  formats: [docx, xlsx, json]
   top_n: 10
-
-email:
-  transport: graph          # graph | none
-  # Recipients live in .env (REPORT_TO / REPORT_CC), never in this file.
-  subject_prefix: ""
+  # A Markdown summary is always written alongside, and appended to the GitHub
+  # Actions run page, so portal health is visible without opening a file.
 
 # JavaScript fallback. Plain HTTP is always tried first; a browser is launched
 # only when extraction found nothing AND the page was diagnosed as a

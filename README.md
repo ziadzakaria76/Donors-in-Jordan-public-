@@ -206,23 +206,34 @@ them a useful completeness cross-check on that scraper.
 
 ---
 
-## Email delivery (Microsoft Graph)
+## Getting the results
 
-Register an application, grant `Mail.Send`, and put the credentials in `.env`.
+Nothing is emailed. Each run writes to `output/` (gitignored):
 
-> **`Mail.Send` as an application permission is tenant-wide.** The app can send
-> as any mailbox in the tenant until you scope it:
->
-> ```powershell
-> New-DistributionGroup -Name "SyriaMonitorSenders" -Type Security `
->   -Members "reports@yourfirm.com"
-> New-ApplicationAccessPolicy -AppId <client-id> `
->   -PolicyScopeGroupId "SyriaMonitorSenders@yourfirm.com" `
->   -AccessRight RestrictAccess -Description "Syria tender monitor"
-> ```
+| File | What it is |
+|---|---|
+| `syria-tenders-YYYY-MM-DD.docx` | The bid-review pack: top-10 brief, live/pipeline split, per-tender detail, diagnostics. Every tender carries a clickable notice link; one without a link says why. |
+| `syria-tenders-YYYY-MM-DD.xlsx` | One row per tender, every field as a column — sort, filter, paste into a bid tracker. |
+| `syria-tenders-YYYY-MM-DD.json` | The full structured record set. This is what makes a bad run diagnosable after the fact; drop it from `output.formats` if you never debug one. |
+| `syria-tenders-YYYY-MM-DD-summary.md` | Short Markdown summary. Always written. |
 
-Recipients live in `.env` (`REPORT_TO`, `REPORT_CC`), never in `config.yml` —
-this is a public repository.
+Locally:
+
+```bash
+PYTHONPATH=src python -m syria_monitor.cli --run
+ls output/
+```
+
+From GitHub Actions — this is the download path for scheduled runs:
+
+1. **Actions** → **Run monitor** → the run you want
+2. **Artifacts** → `syria-tender-report` (kept 90 days)
+
+The Markdown summary is also appended to the **run summary page**, so portal
+health is readable from the run itself without downloading anything. That
+matters more than it sounds: health used to live in an email subject line, and
+without somewhere visible to put it, a monitor that died in March gets noticed
+in May.
 
 ---
 

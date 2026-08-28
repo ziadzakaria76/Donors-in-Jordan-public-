@@ -90,25 +90,22 @@ def test_gitignore_covers_everything_the_run_writes():
         assert pattern in ignored, f"{pattern} is written at runtime but not ignored"
 
 
-def test_graph_mailer_never_echoes_a_response_body(monkeypatch):
-    """A failed token request must not quote the response: it can contain the
-    request payload, secret included."""
-    from syria_monitor.delivery import GraphMailer, MailError
-
-    for name in ("GRAPH_TENANT_ID", "GRAPH_CLIENT_ID", "GRAPH_CLIENT_SECRET", "GRAPH_SENDER"):
-        monkeypatch.setenv(name, SECRET if "SECRET" in name else "value")
-
-    mailer = GraphMailer()
-
-    class Response:
-        status_code = 400
-        text = f"{{\"error\":\"invalid_client\",\"client_secret\":\"{SECRET}\"}}"
-
-        def json(self):
-            return {"error": "invalid_client"}
-
-    monkeypatch.setattr(mailer.session, "post", lambda *a, **k: Response())
-    with pytest.raises(MailError) as excinfo:
-        mailer.token()
-    assert SECRET not in str(excinfo.value)
-    assert "400" in str(excinfo.value)
+def test_no_mail_credentials_are_referenced_anywhere(tmp_path):
+    """Email delivery was removed. Nothing should still ask for a client secret
+    -- a leftover reference is how a removed feature comes back as a support
+    question, or worse, as a secret someone dutifully sets."""
+    import subprocess
+    tracked = subprocess.run(["git", "ls-files"], capture_output=True, text=True,
+                             check=True).stdout.split()
+    offenders = []
+    for name in tracked:
+        if name.startswith("tests/") or name.endswith((".bundle", ".png", ".jpg")):
+            continue
+        try:
+            body = Path(name).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if any(token in body for token in ("GRAPH_CLIENT_SECRET", "GRAPH_TENANT_ID",
+                                           "REPORT_TO", "smtp", "sendMail")):
+            offenders.append(name)
+    assert not offenders, f"mail credentials still referenced in: {offenders}"
