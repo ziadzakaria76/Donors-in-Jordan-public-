@@ -293,3 +293,60 @@ def test_new_marking_flips_after_a_real_run(tmp_path):
     store.mark_new(tenders)
     assert tenders[0].is_new is False
     store.close()
+
+
+# ------------------------------------------------------------------ hyperlinks
+def _docx_xml(path):
+    import zipfile
+    with zipfile.ZipFile(path) as z:
+        return (z.read("word/document.xml").decode("utf-8"),
+                z.read("word/_rels/document.xml.rels").decode("utf-8"))
+
+
+@pytest.fixture
+def linked_result(config, registry):
+    registry.clear()
+    registry["links"] = make_portal("links", [
+        syria_record(id="with-link", title="Water network rehabilitation, Aleppo",
+                     url="https://example.org/notice/1"),
+        syria_record(id="no-link", title="PFM advisory services, Damascus and Homs", url=None),
+    ])
+    return run_pipeline(config, fetcher=Fetcher(), today=TODAY, portals=["links"])
+
+
+def test_notice_urls_are_real_hyperlinks(linked_result, tmp_path):
+    """Blue text that does nothing when clicked is not a link."""
+    document, rels = _docx_xml(write_docx(linked_result, tmp_path / "links.docx"))
+    assert "<w:hyperlink" in document
+    assert "https://example.org/notice/1" in rels
+    assert 'TargetMode="External"' in rels
+
+
+def test_a_tender_without_a_url_says_so_instead_of_linking(linked_result, tmp_path):
+    path = write_docx(linked_result, tmp_path / "links.docx")
+    document, rels = _docx_xml(path)
+    assert "No link published" in document
+    # Exactly one tender has a URL, so exactly one external relationship exists
+    # per section it appears in -- and never one pointing at a fabricated URL.
+    assert rels.count('TargetMode="External"') >= 1
+    assert "no-link" not in rels
+
+
+def test_only_http_urls_become_clickable(config, registry, tmp_path):
+    """A notice url is portal-supplied data; not every string is safe to make
+    clickable in a document that gets circulated."""
+    registry.clear()
+    registry["odd"] = make_portal("odd", [
+        syria_record(id="js", title="Water works, Aleppo", url="javascript:alert(1)"),
+        syria_record(id="file", title="Health works, Homs", url="file:///etc/passwd"),
+    ])
+    result = run_pipeline(config, fetcher=Fetcher(), today=TODAY, portals=["odd"])
+    document, rels = _docx_xml(write_docx(result, tmp_path / "odd.docx"))
+    assert "javascript:" not in rels and "file://" not in rels
+    assert "No link published" in document
+
+
+def test_the_full_list_table_carries_a_link_column(linked_result, tmp_path):
+    document, _ = _docx_xml(write_docx(linked_result, tmp_path / "links.docx"))
+    assert "Link" in document
+    assert ">open<" in document      # the cell's link text

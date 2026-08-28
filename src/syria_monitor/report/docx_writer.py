@@ -12,6 +12,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor
@@ -21,6 +22,68 @@ from .common import (LINK_LABELS, SCREENING_DISCLAIMER, badges, fmt_date, fmt_va
                      split_live_pipeline)
 
 ARABIC_FONT = "Arial"
+LINK_COLOR = "1B4F72"
+
+# Only real web links become hyperlinks. A notice url is portal-supplied data,
+# and a document that turns arbitrary strings into clickable targets is a worse
+# thing to circulate than one that prints them as text.
+SAFE_SCHEMES = ("http://", "https://")
+
+
+def is_linkable(url) -> bool:
+    return bool(url) and str(url).startswith(SAFE_SCHEMES)
+
+
+def add_hyperlink(paragraph, url: str, text: str, size: float = 9.0,
+                  color: str = LINK_COLOR, bold: bool = False):
+    """A real w:hyperlink, not blue text that does nothing when clicked."""
+    rel_id = paragraph.part.relate_to(url, RT.HYPERLINK, is_external=True)
+    link = OxmlElement("w:hyperlink")
+    link.set(qn("r:id"), rel_id)
+
+    run = OxmlElement("w:r")
+    props = OxmlElement("w:rPr")
+    colour = OxmlElement("w:color")
+    colour.set(qn("w:val"), color)
+    props.append(colour)
+    underline = OxmlElement("w:u")
+    underline.set(qn("w:val"), "single")
+    props.append(underline)
+    sz = OxmlElement("w:sz")
+    sz.set(qn("w:val"), str(int(size * 2)))
+    props.append(sz)
+    if bold:
+        props.append(OxmlElement("w:b"))
+    run.append(props)
+
+    text_el = OxmlElement("w:t")
+    text_el.text = text
+    text_el.set(qn("xml:space"), "preserve")
+    run.append(text_el)
+    link.append(run)
+    paragraph._p.append(link)
+    return link
+
+
+def _link_or_note(doc, tender, size: float = 9.0, indent: int = 0):
+    """One line per tender carrying its notice URL, or why there isn't one."""
+    paragraph = doc.add_paragraph()
+    paragraph.paragraph_format.space_after = Pt(6)
+    if indent:
+        paragraph.paragraph_format.left_indent = Pt(indent)
+    if is_linkable(tender.url):
+        prefix = paragraph.add_run("Notice: ")
+        prefix.font.size = Pt(size)
+        prefix.font.color.rgb = RGBColor.from_string("6B7280")
+        add_hyperlink(paragraph, tender.url, tender.url, size=size)
+    else:
+        run = paragraph.add_run(
+            "No link published - the portal supplied no notice id matching its "
+            "detail-URL pattern, so none was fabricated")
+        run.font.size = Pt(size)
+        run.italic = True
+        run.font.color.rgb = RGBColor.from_string("6B7280")
+    return paragraph
 
 
 def _is_arabic(text: str) -> bool:
@@ -83,6 +146,7 @@ def write_docx(result, path: Path, top_n: int = 10) -> Path:
         marks = badges(tender)
         if marks:
             _para(doc, "     " + " · ".join(marks), size=9, color="7D3C00")
+        _link_or_note(doc, tender, size=8.5, indent=14)
 
     # 2 --- full list
     live, pipeline = split_live_pipeline(result.tenders)
@@ -110,8 +174,7 @@ def write_docx(result, path: Path, top_n: int = 10) -> Path:
                 for h in tender.screening), size=9, bold=True, color="B02A2A")
             _para(doc, SCREENING_DISCLAIMER, size=8.5, color="B02A2A")
         _para(doc, f"Value: {fmt_value(tender)}", size=9)
-        _para(doc, tender.url or "no link published (id did not match the notice-id pattern)",
-              size=9, color="1B4F72", space_after=10)
+        _link_or_note(doc, tender, size=9)
 
     # 4 --- diagnostics
     doc.add_heading("4. Run diagnostics", level=1)
@@ -144,9 +207,9 @@ def _section_table(doc, heading: str, tenders: list) -> None:
     if not tenders:
         _para(doc, "  none", size=9, color="6B7280")
         return
-    table = doc.add_table(rows=1, cols=5)
+    table = doc.add_table(rows=1, cols=6)
     table.style = "Light Grid Accent 1"
-    for idx, label in enumerate(("", "Title", "Portal", "Closes", "Value")):
+    for idx, label in enumerate(("", "Title", "Portal", "Closes", "Value", "Link")):
         table.rows[0].cells[idx].text = label
     for tender in tenders:
         cells = table.add_row().cells
@@ -155,6 +218,14 @@ def _section_table(doc, heading: str, tenders: list) -> None:
         if _is_arabic(tender.title):
             for paragraph in cells[1].paragraphs:
                 _apply_rtl(paragraph)
+        link_cell = cells[5].paragraphs[0]
+        if is_linkable(tender.url):
+            add_hyperlink(link_cell, tender.url, "open", size=9)
+        else:
+            run = link_cell.add_run("no link")
+            run.font.size = Pt(9)
+            run.italic = True
+            run.font.color.rgb = RGBColor.from_string("6B7280")
         cells[2].text = tender.portal
         cells[3].text = fmt_date(tender.closing_date)
         cells[4].text = fmt_value(tender)
