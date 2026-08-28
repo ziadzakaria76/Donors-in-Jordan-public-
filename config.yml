@@ -43,6 +43,12 @@ email:
   # Recipients live in .env (REPORT_TO / REPORT_CC), never in this file.
   subject_prefix: ""
 
+# JavaScript fallback. Plain HTTP is always tried first; a browser is launched
+# only when extraction found nothing AND the page was diagnosed as a
+# client-rendered shell or a bot wall -- the two failures rendering can fix.
+# Per portal: browser: auto | always | never (default auto).
+# Needs `pip install playwright && playwright install chromium`; without it the
+# portal reports what it could not do and the run continues.
 portals:
   worldbank: {enabled: true, page_size: 100, max_pages: 5}
   ted:       {enabled: true, max_pages: 5}
@@ -56,7 +62,7 @@ portals:
     # `--capture ungm` and put it here. The portal refuses to run until it is
     # set, because a wrong id returns nothing, silently.
     country_id: null
-  undp:      {enabled: true}
+  undp:      {enabled: true, browser: auto}
   srtf:      {enabled: true}
   giz:       {enabled: true}
   isdb:      {enabled: true}

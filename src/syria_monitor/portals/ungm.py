@@ -94,8 +94,12 @@ class UngmPortal(HtmlPortal):
         return response.text, response.status
 
     def fetch_tenders(self) -> list[dict]:
-        html, status = self.fetch_page("search", SEARCH_ENDPOINT)
-        result = self.extract_page(html, SEARCH_ENDPOINT, status)
+        # Only the search endpoint is fetched for a run; the dropdown page in
+        # pages() exists for --capture. page_result() applies the same browser
+        # escalation the other HTML portals get -- UNGM's UI is JavaScript-driven,
+        # so if the POST endpoint ever stops answering over plain HTTP, this is
+        # the path that keeps it working.
+        result = self.page_result("search", SEARCH_ENDPOINT)
         self._winning_layer, self._winning_quality = result.layer, result.quality
         if not result.rows:
             raise RuntimeError(result.diagnosis or "UNGM search returned no rows")

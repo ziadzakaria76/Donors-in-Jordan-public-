@@ -107,6 +107,43 @@ the real request body from the capture's network trace.
 
 ---
 
+## JavaScript-rendered portals
+
+Plain HTTP is tried first for every page. A browser is launched only when
+extraction found nothing **and** the page was diagnosed as a client-rendered
+shell or a bot wall — the two failures rendering can actually fix. A genuine
+layout change or a dead URL is not escalated: Chromium would not help, and
+launching it would hide the real cause.
+
+```bash
+pip install -r requirements-browser.txt
+playwright install chromium          # or point at an existing browser:
+export PLAYWRIGHT_CHROMIUM_PATH=/path/to/chrome
+```
+
+Per portal in `config.yml`:
+
+```yaml
+undp: {enabled: true, browser: auto}     # auto (default) | always | never
+```
+
+`browser_timeout_ms`, `browser_settle_ms` and `browser_wait_for` (a CSS
+selector to wait for) are also per-portal.
+
+Without Playwright installed nothing breaks: the portal reports what it could
+not do, with the install command, and the run continues with the other nine.
+When a browser did produce the rows, the run diagnostics say so —
+`UNDP: ok -- 12 kept of 14 fetched [rendered in a browser]` — so a portal that
+quietly became JavaScript-only is visible rather than merely slower.
+
+**This is the one scraping path that has been verified end to end here**: the
+suite serves a client-rendered listing over localhost, drives real Chromium at
+it, and asserts the extraction cascade then finds the rows and that the country
+gate still applies. That test skips itself when Playwright or Chromium is
+absent, so CI needs neither.
+
+---
+
 ## Configuration
 
 `config.yml` holds run settings; `profiles/syria.yml` holds country data.

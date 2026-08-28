@@ -404,8 +404,16 @@ def diagnose(html: str, status: int = 200) -> Optional[str]:
                                     "just a moment", "attention required", "access denied",
                                     "enable javascript and cookies")):
         return "bot_wall: use a different network or drive it with Playwright"
-    body_text = re.sub(r"<[^>]+>", " ", low)
-    if len(body_text.split()) < 60 and ("<script" in low or "__next_data__" in low or "app-root" in low):
+    # Strip script and style BODIES before counting visible words. Stripping
+    # only the tags leaves the JavaScript source itself in the count, so a page
+    # whose entire listing is built by a sizeable bootstrap script -- the exact
+    # shape this check exists to catch -- looks text-rich and is misdiagnosed as
+    # a layout change, which never escalates to a browser.
+    stripped = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", low, flags=re.S)
+    body_text = re.sub(r"<[^>]+>", " ", stripped)
+    if len(body_text.split()) < 60 and ("<script" in low or "__next_data__" in low
+                                        or "app-root" in low or "id=\"app\"" in low
+                                        or "id=\"root\"" in low):
         return "js_shell: page renders client-side -- playwright install chromium"
     if status >= 500 or status == 404:
         return f"transport: HTTP {status} -- wrong URL or blocked host"

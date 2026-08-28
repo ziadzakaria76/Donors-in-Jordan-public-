@@ -35,6 +35,8 @@ class PortalOutcome:
     layer: Optional[str] = None
     quality: Optional[float] = None
     skipped_reason: Optional[str] = None
+    rendered_with_browser: bool = False
+    browser_note: Optional[str] = None
 
     @property
     def status_line(self) -> str:
@@ -42,7 +44,9 @@ class PortalOutcome:
             return f"{self.label}: skipped -- {self.skipped_reason}"
         if not self.available:
             return f"{self.label}: UNAVAILABLE -- {self.error} ({self.url})"
-        return f"{self.label}: ok -- {len(self.tenders)} kept of {self.stats.seen} fetched"
+        suffix = " [rendered in a browser]" if self.rendered_with_browser else ""
+        return (f"{self.label}: ok -- {len(self.tenders)} kept of "
+                f"{self.stats.seen} fetched{suffix}")
 
 
 class BasePortal:
@@ -127,20 +131,28 @@ class BasePortal:
             outcome.available = False
             outcome.error = str(exc)
             outcome.diagnosis = "transport: wrong URL or blocked host"
-            return outcome
+            return self._annotate(outcome)
         except Exception as exc:                      # never abort the whole run
             outcome.available = False
             outcome.error = f"{type(exc).__name__}: {exc}"
             outcome.diagnosis = "portal module raised -- see traceback in --dry-run -v"
-            return outcome
+            return self._annotate(outcome)
 
         for record in records:
             keep, link_type, delivery = self.gate.check(record, outcome.stats)
             if not keep:
                 continue
             outcome.tenders.append(self.to_tender(record, link_type, delivery))
+        return self._annotate(outcome)
+
+    def _annotate(self, outcome: PortalOutcome) -> PortalOutcome:
+        """Carry diagnostics onto every return path, failures included -- a
+        portal that could not be read is exactly when the note explaining why
+        matters most."""
         outcome.layer = getattr(self, "_winning_layer", None)
         outcome.quality = getattr(self, "_winning_quality", None)
+        outcome.rendered_with_browser = getattr(self, "_used_browser", False)
+        outcome.browser_note = getattr(self, "_browser_note", None)
         return outcome
 
     # -- capture --------------------------------------------------------------
@@ -207,15 +219,77 @@ class HtmlPortal(BasePortal):
         return extract(html, base_url=url, selectors=self.selectors,
                        anchor_pattern=self.anchor_pattern, status=status)
 
+    # auto: escalate to a browser only when the page is diagnosed as needing one
+    # always: render every page   |   never: plain HTTP only
+    BROWSER_MODES = ("auto", "always", "never")
+
+    @property
+    def browser_mode(self) -> str:
+        mode = str(self.cfg.get("browser", "auto")).lower()
+        return mode if mode in self.BROWSER_MODES else "auto"
+
+    @staticmethod
+    def needs_browser(diagnosis: Optional[str]) -> bool:
+        """Only the two diagnoses a browser can actually fix.
+
+        A genuine layout change or a transport error is not helped by rendering
+        -- it needs a human to look at the page or fix the URL -- and launching
+        Chromium for those wastes time and hides the real cause.
+        """
+        return bool(diagnosis) and diagnosis.startswith(("js_shell", "bot_wall"))
+
+    def page_result(self, label: str, url: str) -> ExtractionResult:
+        """Fetch, extract, and escalate to a rendered browser if that is what
+        the page needs. Plain HTTP is always tried first."""
+        from .. import browser as browser_mod
+
+        if self.browser_mode == "always":
+            html, status = self._render(url, browser_mod)
+            if html is not None:
+                return self.extract_page(html, url, status)
+
+        html, status = self.fetch_page(label, url)
+        result = self.extract_page(html, url, status)
+        if result.rows or self.browser_mode == "never":
+            return result
+
+        diagnosis = result.diagnosis or diagnose(html, status)
+        if not self.needs_browser(diagnosis):
+            return result
+
+        rendered, rendered_status = self._render(url, browser_mod)
+        if rendered is None:
+            return result
+        retry = self.extract_page(rendered, url, rendered_status)
+        if retry.rows:
+            self._used_browser = True
+            return retry
+        return result
+
+    def _render(self, url: str, browser_mod) -> tuple[Optional[str], int]:
+        try:
+            html, status = browser_mod.render(
+                url,
+                timeout_ms=int(self.cfg.get("browser_timeout_ms", 30000)),
+                settle_ms=int(self.cfg.get("browser_settle_ms", 1500)),
+                wait_for=self.cfg.get("browser_wait_for"),
+            )
+            return html, status
+        except browser_mod.BrowserUnavailable as exc:
+            # Never fatal: the portal reports what it could not do and the run
+            # continues with the other nine.
+            self._browser_note = str(exc)
+            return None, 0
+
     def fetch_tenders(self) -> list[dict]:
         records: list[dict] = []
         for label, url in self.pages():
-            html, status = self.fetch_page(label, url)
-            result = self.extract_page(html, url, status)
+            result = self.page_result(label, url)
             self._winning_layer = result.layer
             self._winning_quality = result.quality
             if not result.rows:
-                raise RuntimeError(result.diagnosis or diagnose(html, status))
+                note = f" ({self._browser_note})" if getattr(self, "_browser_note", None) else ""
+                raise RuntimeError((result.diagnosis or "no rows extracted") + note)
             for row in result.rows:
                 records.append(self.row_to_record(row, url))
         return records
