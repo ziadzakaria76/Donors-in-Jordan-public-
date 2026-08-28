@@ -55,9 +55,16 @@ class Tender:
 
     @property
     def is_pipeline(self) -> bool:
-        """GPNs and advance notices: real intelligence, not yet biddable."""
-        nt = (self.notice_type or "").lower()
-        return "gpn" in nt or "general procurement" in nt or "advance" in nt
+        """GPNs and advance notices: real intelligence, not yet biddable.
+
+        The title counts as well as the type field. Scraped rows frequently
+        carry no separate type at all -- the words "General Procurement Notice"
+        are simply the headline -- and treating those as live tenders puts an
+        unbiddable pipeline entry next to an RFP closing on Friday.
+        """
+        haystack = f"{self.notice_type or ''} {self.title or ''}".lower()
+        return ("gpn" in haystack.split() or "general procurement notice" in haystack
+                or "general procurement" in haystack or "advance notice" in haystack)
 
     def to_dict(self) -> dict:
         d = asdict(self)

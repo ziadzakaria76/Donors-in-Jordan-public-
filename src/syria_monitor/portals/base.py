@@ -101,7 +101,9 @@ class BasePortal:
         if value.amount is not None and (value.currency or "USD").upper() == "USD":
             tender.estimated_value_usd = value.amount
         if value.amount is not None and (value.currency or "USD").upper() != "USD":
-            tender.add_flag(f"value_{value.currency}_{value.amount:g}")
+            # ",.0f" not "g": :g turns 1500000 into "1.5e+06", which is worse
+            # than useless in a report a human reads to judge contract size.
+            tender.add_flag(f"value_{value.currency}_{value.amount:,.0f}")
         if closing is None:
             tender.add_flag("deadline_not_published")
         for f in value.flags:

@@ -121,3 +121,25 @@ def test_delivery_location_beats_beneficiary_nationality(classifier):
     link_type, _ = classifier.classify(
         {"delivery_country": "SY"}, "Support to Syrian refugees returning to Aleppo")
     assert link_type == INSIDE
+
+
+def test_a_lone_ambiguous_place_name_is_a_known_limitation(matcher):
+    """"Damascus" on its own is not enough, by design -- and that has a cost.
+
+    A notice reading only "Consulting services for water supply rehabilitation,
+    Damascus" is NOT matched, because Damascus is also a town in Maryland,
+    Oregon, Virginia and Georgia, and SAM.gov and UK Find a Tender scan whole
+    national corpora. Any corroboration rescues it: a second place, the country
+    name, a .sy address, or a country field on the record.
+
+    This test exists so the limitation is visible rather than discovered. If
+    real captures show a portal routinely naming the city alone, the fix is a
+    per-portal corroboration default for that source -- not loosening the
+    matcher globally, which would re-admit US municipal contracts.
+    """
+    bare = "Consulting services for water supply rehabilitation, Damascus"
+    assert not matcher.matches_text(bare)
+
+    assert matcher.matches_text(bare + ", Syria")
+    assert matcher.matches_text(bare + " and Aleppo")
+    assert matcher.matches_text(bare + " - contact procurement@mopic.gov.sy")
