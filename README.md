@@ -139,8 +139,19 @@ quietly became JavaScript-only is visible rather than merely slower.
 **This is the one scraping path that has been verified end to end here**: the
 suite serves a client-rendered listing over localhost, drives real Chromium at
 it, and asserts the extraction cascade then finds the rows and that the country
-gate still applies. That test skips itself when Playwright or Chromium is
-absent, so CI needs neither.
+gate still applies.
+
+That test skips itself when Playwright or Chromium is absent, so the main test
+job needs neither. A separate CI job installs a browser and runs it with
+`REQUIRE_BROWSER=1`, which turns "browser unavailable" from a skip into a
+failure -- otherwise a broken install would quietly retire the only
+end-to-end-verified path in the repository.
+
+On a runner, `playwright install chromium` fetches its own browser and no path
+is needed. Where a machine ships its own Chromium and the download is
+unavailable, set the repository variable `PLAYWRIGHT_CHROMIUM_PATH` (Settings →
+Secrets and variables → Actions → Variables); both workflows pass it through,
+and an empty value is ignored.
 
 ---
 

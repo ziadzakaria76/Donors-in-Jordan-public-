@@ -29,6 +29,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # Optional: the JavaScript fallback. Without this the run still works --
+      # portals needing a browser report that they could not be read, and the
+      # other nine carry on.
+      - name: Install browser support
+        run: |
+          pip install -r requirements-browser.txt
+          playwright install --with-deps chromium
+
       - name: Check portal reachability
         continue-on-error: true
         run: python -m syria_monitor.cli --check-portals
@@ -38,6 +46,11 @@ jobs:
       - name: Run monitor
         env:
           PYTHONPATH: src
+          # Leave the repository variable unset on a normal runner: Playwright
+          # finds the browser it just installed. Set it only where a machine
+          # ships its own Chromium and the download is unavailable -- an empty
+          # value is ignored, so this is safe either way.
+          PLAYWRIGHT_CHROMIUM_PATH: ${{ vars.PLAYWRIGHT_CHROMIUM_PATH }}
           SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
           GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
           GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}

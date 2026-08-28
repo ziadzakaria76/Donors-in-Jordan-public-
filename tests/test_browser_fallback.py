@@ -9,6 +9,7 @@ skips itself when Playwright or a usable Chromium is absent.
 from __future__ import annotations
 
 import http.server
+import os
 import socket
 import threading
 from functools import partial
@@ -170,14 +171,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 chromium_missing = not (browser_mod.available() and browser_mod._executable_path())
 
+# CI sets REQUIRE_BROWSER=1 in the job that installs Playwright. Without it a
+# broken install would show up as a skip, and the only end-to-end-verified path
+# in this repository would quietly stop being verified.
+REQUIRE_BROWSER = os.environ.get("REQUIRE_BROWSER") == "1"
 
-@pytest.mark.skipif(chromium_missing, reason="Playwright or Chromium not installed")
+
+@pytest.mark.skipif(chromium_missing and not REQUIRE_BROWSER,
+                    reason="Playwright or Chromium not installed")
 def test_chromium_actually_renders_a_client_side_listing(profile, gate):
     """End to end against a real browser, over localhost -- no external network.
 
     Plain HTTP returns a page with no rows; Chromium runs the script and the
     same extraction cascade then finds the listing.
     """
+    assert not chromium_missing, (
+        "REQUIRE_BROWSER=1 but Playwright or Chromium is unavailable -- the "
+        "install step did not do what it claimed")
     port = _free_port()
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), partial(_Handler))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
