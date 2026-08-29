@@ -79,30 +79,38 @@ nine portals run normally. Nothing else is blocked by this.
 
 ---
 
-## Stage 4 — Unlock UNGM  (20 min, needs network — or a phone, see below)
+## Stage 4 — Unlock UNGM  (steps 1–3 done; step 4 needs a browser)
 
 UNGM is the richest single Syria source and it is deliberately disabled until
-you do this. It uses its own numeric country ids, not ISO codes; the value
-cannot be derived, and a wrong one returns nothing *silently*.
+this is done. It needs two things that cannot be derived, only observed. The
+first is now in place; the second still needs a human at a browser.
 
-1. Capture the live pages:
+1. ~~Capture the live pages.~~ **Done** — Actions run 33240256664, 2026-08-29.
+   Re-run it any time from GitHub → Actions → **Syria tender monitor** → Run
+   workflow → mode `capture`, portal `ungm`. The id appears on the run summary
+   page and the captured HTML comes back as an artifact.
    ```bash
    PYTHONPATH=src python -m syria_monitor.cli --capture ungm
    ```
-   **From a phone instead:** GitHub → Actions → **Syria tender monitor** → Run workflow →
-   mode `capture`, portal `ungm`. The id appears on the run summary page, and
-   the captured HTML comes back as an artifact. Requires Stage 1 to be done.
-2. Read the line it prints:
+2. ~~Read the line it prints.~~ **Done** — it printed:
    ```
-   >>> set portals.ungm.country_id: NNNN    (Syrian Arab Republic)
+   >>> set portals.ungm.country_id: 2490    (Syrian Arab Republic)
    ```
-3. Put that number in `config.yml` under `portals.ungm.country_id`.
-4. Open your browser's devtools on https://www.ungm.org/Public/Notice, run a
-   search, and copy the **request payload** of the POST to
-   `/Public/Notice/Search`.
+   HTTP 200, 142061 bytes, 2490 of 234 dropdown options.
+3. ~~Put that number in `config.yml`.~~ **Done** — `portals.ungm.country_id:
+   2490`. UNGM owns these ids and can renumber them, so if the portal ever
+   starts returning nothing, re-run step 1 and compare before hunting for a
+   scraper bug.
+4. **Still to do, and it needs you at a browser.** Open devtools on
+   https://www.ungm.org/Public/Notice, run a search, and copy the **request
+   payload** of the POST to `/Public/Notice/Search`.
 5. Replace `search_body()` in `src/syria_monitor/portals/ungm.py` with those
    fields, exactly as sent. Do not reconstruct it from documentation — a
    previous reconstruction is what convinced a team the endpoint was dead.
+
+The id alone does not make UNGM work: it clears the refusal to run, and step 4
+is what makes the search return anything. The capture in step 1 scored rows
+against the *dropdown* page, which says nothing about how real notices parse.
 
 **Done when:** `--capture ungm` shows rows extracted with a quality score, and
 `--dry-run --portal ungm` returns notices.

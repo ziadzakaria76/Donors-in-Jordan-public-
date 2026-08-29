@@ -62,7 +62,13 @@ portals:
     # guessed or derived -- read it out of the selNoticeCountry dropdown with
     # `--capture ungm` and put it here. The portal refuses to run until it is
     # set, because a wrong id returns nothing, silently.
-    country_id: null
+    #
+    # Read from the live dropdown by `--capture ungm` on 2026-08-29 (Actions run
+    # 33240256664): HTTP 200, 142061 bytes, 234 options, "Syrian Arab Republic"
+    # = 2490. Not a guess, but not a guarantee either -- UNGM owns these ids and
+    # can renumber them. If the portal starts returning nothing, re-run the
+    # capture and compare before assuming it is a scraper bug.
+    country_id: 2490
   undp:      {enabled: true, browser: auto}
   srtf:      {enabled: true}
   giz:       {enabled: true}
