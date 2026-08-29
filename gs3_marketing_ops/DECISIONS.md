@@ -15,20 +15,43 @@ the moment they are answered, with the date and the reference.
 
 | # | Question | Status | Answered on | Reference |
 | --- | --- | --- | --- | --- |
-| B-1 | Has a written statement been obtained from the Department of Lands and Survey confirming the classification of this project's units and that non-Jordanians may own them? | **Unanswered** | — | — |
-| B-2 | Does the signed contract actually contain (a) the named finishing-specifications annex, (b) a delay penalty in the buyer's favour, (c) the two-year finishing and ten-year structural warranty, and (d) the quarterly photographic progress report? | **Unanswered** | — | — |
+| B-1 | Has a written statement been obtained from the Department of Lands and Survey confirming the classification of this project's units and that non-Jordanians may own them? | **Answered — no** | 2026-08-29 | Owner |
+| B-2 | Does the signed contract actually contain (a) the named finishing-specifications annex, (b) a delay penalty in the buyer's favour, (c) the two-year finishing and ten-year structural warranty, and (d) the quarterly photographic progress report? | **Answered in part — (a) and (d) yes; (b) and (c) not confirmed** | 2026-08-29 | Owner |
 
-Consequences while B-1 is unanswered — enforced by the app, not by convention:
+**B-1 answered 2026-08-29: no.** The statement has not been obtained. Nothing
+the app does changes — the consequences below still hold, unchanged — but the
+state has: this is a known "no" waiting on a document, not a question nobody has
+put. The next person here should chase the Department of Lands and Survey, not
+re-ask the owner.
+
+Consequences while the statement is not held — enforced by the app, not by
+convention:
 
 - the non-Jordanian buyer module stays behind its blocking gate (brief §5.9);
 - no campaign whose track is `NONJO` can be set to Active;
 - the Dashboard carries a persistent banner.
 
-Consequence while B-2 is unanswered: any claim in the list above is **omitted**
-from WhatsApp templates, share cards and ad copy. The app must not put a promise
-in front of a client that the contract does not carry. Each of the four is a
-separate switch in seed data, so three can ship if only one turns out to be
-absent.
+**B-2 answered 2026-08-29, in part.** The owner confirms the signed contract
+carries **(a)** the finishing-specifications annex and **(d)** the quarterly
+photographic progress report. **(b)** the delay penalty and **(c)** the two-year
+and ten-year warranty are **not confirmed**.
+
+This is the case the four-rows-not-one-switch design was for, and it is now
+carrying it: (a) and (d) are seeded confirmed and dropped from the banned-phrase
+guard, so client-facing text may use them; (b) and (c) stay unverified and stay
+banned. No clause references were supplied, so `contractReference` is null on
+both confirmations — worth filling in when someone next has the contract open,
+because without it the next reader has to ask a person rather than open a file.
+
+"Not confirmed" means nobody has checked, **never** "verified absent". Both
+readings keep the claim out of a client's hands, so the app behaves identically
+either way; the distinction matters only to whoever is still chasing (b) and (c).
+
+One consequence worth stating plainly: (d) was previously flagged during
+authoring, when a delivery objection offering "regular photographic updates on
+progress" was caught as too close to an unverified promise. That promise is now
+verified, so the phrasing is permissible. The catch was still correct at the
+time — it was unverified when written.
 
 ---
 

@@ -77,15 +77,41 @@ class SeedContentTest {
     }
 
     @Test
-    fun `all four contract claims ship unverified, as four separate rows`() {
+    fun `the two confirmed contract claims ship confirmed and the other two do not`() {
         val claims = Gs3Seed.contractClaims()
 
         assertEquals(ContractClaim.entries.size, claims.size)
         assertEquals(4, claims.size)
-        assertTrue(claims.none { it.confirmedPresent })
-        assertTrue(claims.all { it.contractReference == null })
-        // Four rows rather than one switch, so three can ship if one is absent.
+        // Four rows rather than one switch. This is the case that design was
+        // for: B-2 came back answered in part, and a single switch would have
+        // forced all four to share the most cautious answer.
         assertEquals(ContractClaim.entries.map { it.name }.toSet(), claims.map { it.claim }.toSet())
+
+        val confirmed = claims.filter { it.confirmedPresent }.map { it.claimType }.toSet()
+        assertEquals(
+            setOf(
+                ContractClaim.FINISHING_SPECIFICATIONS_ANNEX,
+                ContractClaim.QUARTERLY_PHOTOGRAPHIC_PROGRESS_REPORT,
+            ),
+            confirmed,
+        )
+
+        // Not confirmed means "nobody has verified it", never "verified
+        // absent". Either way it stays out of client text.
+        val unconfirmed = claims.filterNot { it.confirmedPresent }.map { it.claimType }.toSet()
+        assertEquals(
+            setOf(
+                ContractClaim.DELAY_PENALTY_IN_BUYERS_FAVOUR,
+                ContractClaim.TWO_YEAR_AND_TEN_YEAR_WARRANTY,
+            ),
+            unconfirmed,
+        )
+
+        // A confirmation is dated, so its age is visible. No clause references
+        // were supplied, so they stay null until someone has the contract open.
+        assertTrue(claims.filter { it.confirmedPresent }.all { it.confirmedAt != null })
+        assertTrue(claims.filterNot { it.confirmedPresent }.all { it.confirmedAt == null })
+        assertTrue(claims.all { it.contractReference == null })
     }
 
     @Test
@@ -148,28 +174,34 @@ class SeedContentTest {
      * text now also lives in Kotlin seed data, which is a real gap the moment
      * templates and objections were written. This closes it.
      *
-     * Two families of phrase are banned. The first is the four **B-2 contract
-     * claims** — nobody has yet read the signed contract and confirmed it
-     * contains the finishing annex, the delay penalty, the warranty or the
-     * quarterly progress report, so none of them may be promised to a client.
-     * The second is the standing **forbidden phrases**: a fee exemption the
-     * company cannot grant, an approval that belongs to the authorities, a
-     * return that belongs to the market.
+     * Two families of phrase are banned. The first is the **B-2 contract claims
+     * that are still unconfirmed**. B-2 came back answered in part on
+     * 2026-08-29: the finishing-specifications annex and the quarterly
+     * photographic progress report are in the signed contract, so they are no
+     * longer promises the company cannot make and are no longer banned here.
+     * The delay penalty and the warranty are not confirmed, so they stay banned
+     * — and they stay banned on the same reasoning as before, not a weaker one:
+     * unconfirmed means nobody has checked, which is not the same as absent,
+     * and both keep the phrase out of a client's hands.
+     *
+     * The second family is the standing **forbidden phrases**: a fee exemption
+     * the company cannot grant, an approval that belongs to the authorities, a
+     * return that belongs to the market. Note that «ضمان» stays on the list
+     * twice over — as the unconfirmed warranty, and inside «ضمان الموافقة»,
+     * which is forbidden regardless of what any contract says.
      */
     @Test
     fun `no seeded client-facing text promises anything unverified`() {
         val banned = mapOf(
-            // --- B-2: not confirmed against the signed contract ---
-            "ملحق المواصفات" to "the finishing-specifications annex is a B-2 claim",
-            "specifications annex" to "the finishing-specifications annex is a B-2 claim",
-            "غرامة تأخير" to "a delay penalty is a B-2 claim",
-            "غرامة التأخير" to "a delay penalty is a B-2 claim",
-            "delay penalty" to "a delay penalty is a B-2 claim",
-            "ضمان" to "a warranty is a B-2 claim",
-            "كفالة" to "a warranty is a B-2 claim",
-            "warranty" to "a warranty is a B-2 claim",
-            "ربع سنوي" to "a quarterly progress report is a B-2 claim",
-            "quarterly" to "a quarterly progress report is a B-2 claim",
+            // --- B-2 claims still unconfirmed against the signed contract ---
+            // The annex and the quarterly report were confirmed on 2026-08-29
+            // and are deliberately no longer here.
+            "غرامة تأخير" to "a delay penalty is an unconfirmed B-2 claim",
+            "غرامة التأخير" to "a delay penalty is an unconfirmed B-2 claim",
+            "delay penalty" to "a delay penalty is an unconfirmed B-2 claim",
+            "ضمان" to "a warranty is an unconfirmed B-2 claim",
+            "كفالة" to "a warranty is an unconfirmed B-2 claim",
+            "warranty" to "a warranty is an unconfirmed B-2 claim",
 
             // --- Standing forbidden phrases, same list verifyStrings enforces ---
             "إعفاء من الرسوم" to "the company contributes toward fees; it cannot exempt anyone",

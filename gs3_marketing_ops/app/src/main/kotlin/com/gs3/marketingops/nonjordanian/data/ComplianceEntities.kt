@@ -95,5 +95,26 @@ data class ContractClaimEntity(
 
     internal companion object {
         fun unverified(claim: ContractClaim) = ContractClaimEntity(claim = claim.name)
+
+        /**
+         * A claim someone has read the signed contract and confirmed.
+         *
+         * [reference] is nullable because the owner can confirm a term is
+         * present without having the clause number to hand, and refusing the
+         * confirmation until they do would keep a true statement out of client
+         * text for the sake of a citation. It is still worth filling in later:
+         * without it the next reader has to ask a person rather than open the
+         * contract.
+         */
+        fun confirmed(
+            claim: ContractClaim,
+            at: Instant,
+            reference: String? = null,
+        ) = ContractClaimEntity(
+            claim = claim.name,
+            confirmedPresent = true,
+            contractReference = reference,
+            confirmedAt = at,
+        )
     }
 }

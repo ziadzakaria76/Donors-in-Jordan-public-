@@ -9,6 +9,7 @@ import com.gs3.marketingops.nonjordanian.data.ContractClaimEntity
 import com.gs3.marketingops.nonjordanian.data.EligibilityGateEntity
 import com.gs3.marketingops.outreach.data.MessageTemplateEntity
 import com.gs3.marketingops.outreach.data.ObjectionEntity
+import java.time.Instant
 
 /**
  * What the database contains on first launch.
@@ -35,16 +36,48 @@ object Gs3Seed {
         Gs3Budget.externalTrackMarkets.map(MarketBudgetEntity.Companion::fromDomain)
 
     /**
-     * The gate starts closed, and the four contract claims start unverified.
+     * The gate starts closed. Two of the four contract claims start confirmed.
      *
-     * This is the correct state rather than a placeholder: B-1 and B-2 are
-     * unanswered, so the non-Jordanian module is locked, no `NONJO` campaign can
-     * be activated, and none of the four terms may appear in client-facing text.
+     * **B-1 is answered, and the answer is no** (2026-08-29). The written
+     * statement from the Department of Lands and Survey has not been obtained.
+     * The gate therefore stays closed and no `NONJO` campaign can be activated
+     * — the same enforcement as before the question was asked, but not the same
+     * state: this is now a known "no" waiting on a document, rather than a
+     * question nobody has put. Whoever reads this next should chase the
+     * statement, not re-ask the question.
+     *
+     * **B-2 is answered in part** (2026-08-29). The owner confirms the signed
+     * contract carries the finishing-specifications annex and the quarterly
+     * photographic progress report. It does not confirm the delay penalty or
+     * the two-year and ten-year warranty — and "not confirmed" here means
+     * exactly that, not "verified absent". Both readings keep the claim out of
+     * client-facing text, so the app behaves identically; the distinction
+     * matters only to whoever is still chasing an answer.
+     *
+     * No clause references were supplied, so [ContractClaimEntity.contractReference]
+     * stays null on both. Worth filling in when someone next has the contract
+     * open.
+     *
+     * This is why the four are four rows and not one switch.
      */
     fun eligibilityGate(): EligibilityGateEntity = EligibilityGateEntity()
 
+    /** When the owner answered B-2. Fixed, so the seed is deterministic. */
+    private val b2AnsweredAt: Instant = Instant.parse("2026-08-29T00:00:00Z")
+
+    private val confirmedClaims = setOf(
+        ContractClaim.FINISHING_SPECIFICATIONS_ANNEX,
+        ContractClaim.QUARTERLY_PHOTOGRAPHIC_PROGRESS_REPORT,
+    )
+
     fun contractClaims(): List<ContractClaimEntity> =
-        ContractClaim.entries.map(ContractClaimEntity.Companion::unverified)
+        ContractClaim.entries.map { claim ->
+            if (claim in confirmedClaims) {
+                ContractClaimEntity.confirmed(claim, at = b2AnsweredAt)
+            } else {
+                ContractClaimEntity.unverified(claim)
+            }
+        }
 
     /**
      * WhatsApp templates.
