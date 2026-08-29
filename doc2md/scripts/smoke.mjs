@@ -10,9 +10,22 @@
 import { chromium } from 'playwright';
 
 const BASE = process.env.BASE ?? 'http://127.0.0.1:4173';
-const CHROME = process.env.CHROME ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
-const browser = await chromium.launch({ executablePath: CHROME });
+// No default path. Playwright launches the browser it downloaded itself, which
+// is what happens on a CI runner after `playwright install chromium` and on a
+// contributor's machine after `npx playwright install`.
+//
+// This used to default to one particular sandbox's layout
+// (/opt/pw-browsers/chromium-1194/...), and passing that unconditionally meant
+// the script could only run in the one place that path existed. Everywhere
+// else it failed before the first check -- which is indistinguishable, from
+// the outside, from having no browser tests at all.
+//
+// CHROME stays as an override for the opposite case: a machine that ships its
+// own Chromium and cannot download Playwright's pinned build.
+const CHROME = process.env.CHROME;
+
+const browser = await chromium.launch(CHROME ? { executablePath: CHROME } : {});
 const context = await browser.newContext({
   viewport: { width: 412, height: 915 },
   deviceScaleFactor: 2,
