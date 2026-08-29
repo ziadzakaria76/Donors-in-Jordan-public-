@@ -1,13 +1,18 @@
 # Donors in Jordan
 
-Three unrelated projects share this repository. They have no code in common,
-and none of them builds, imports or deploys another.
+Five projects share this repository. None of them builds, imports or deploys
+another, and no two share a line of code. They are not all unrelated, though,
+and the relations are in content rather than code: the website and the GS3
+Marketing Ops app are for the same company and share a unit schedule and its
+Arabic wording, and the two tender monitors solve the same problem twice.
 
 | Project | What it is | Where it lives |
 | --- | --- | --- |
 | **General Sherman Housing** | A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential developer | [`website/`](website/) |
+| **GS3 Marketing Ops** | A bilingual offline Android app for the team selling the fourteen apartments the site advertises | [`gs3_marketing_ops/`](gs3_marketing_ops/) |
 | **[Jordan Tender Intelligence Monitor](#jordan-tender-intelligence-monitor)** | A Python system that watches 13 donor and IFI procurement portals for Jordan-related consulting work | [`jordan_tender_monitor/`](jordan_tender_monitor/) |
 | **[Syria Tender Intelligence Monitor](#syria-tender-intelligence-monitor)** | A separate Python system, country-agnostic by design, watching 10 portals for Syria-related work | [`syria_tender_monitor/`](syria_tender_monitor/) |
+| **Doc2MD** | A standalone PWA that converts PDF, Word and Excel to token-efficient Markdown, entirely in the browser | [`doc2md/`](doc2md/README.md) |
 
 The two tender monitors are **separate codebases that solve the same problem
 twice**, not one system with two configurations. They share no module, no
@@ -65,6 +70,14 @@ Full documentation: **[`jordan_tender_monitor/README.md`](jordan_tender_monitor/
 (via Germany Trade & Invest) and IsDB (HTML); Saudi Fund, ADFD and JICA
 (announcements only).
 
+The list is data, in
+[`jordan_tender_monitor/portals.json`](jordan_tender_monitor/portals.json), so
+a portal can be added, disabled or repointed without touching code. Eight of
+the thirteen are data alone and go through the generic extraction cascade; five
+keep a module because their source is a search endpoint or an API rather than a
+page. Why each is configured as it is:
+[`PORTALS.md`](jordan_tender_monitor/PORTALS.md).
+
 A failing portal is skipped with a diagnosed reason and reported as unavailable
 with the URL to check by hand. It never aborts the run, and a broken run never
 looks like a quiet one — portal health is in the output filename, and an
@@ -88,6 +101,13 @@ at all.
 | ADFD | Reachable, no listing found — needs `--capture` |
 | JICA | HTTP 404 — the URL has moved |
 | SAM.gov | Awaiting an API key |
+
+**Two defects that first run exposed, both now fixed.** The World Bank API
+silently ignores `countryshortname=Jordan`; because that module trusted the
+parameter and skipped client-side filtering, the first report led with a
+Caribbean education project and roughly 140 of 259 entries were not Jordan at
+all. And World Bank titles were read from `project_name`, so six different
+notices rendered as six identical lines.
 
 **Still unverified:** the CSS selectors for the portals that have not yet
 returned a clean listing. Run `python run.py --capture PORTAL` against those.
@@ -133,6 +153,31 @@ with the Word and Excel files attached as artifacts.
 A total portal outage makes the run exit non-zero, so GitHub marks it failed and
 notifies you. That is the failure alert, with no mail credentials involved.
 
+### The Android app
+
+**[`android/ANDROID.md`](android/ANDROID.md)** — the same thing with fewer taps.
+The last report offline, a Run button with the workflow's real inputs, the full
+portal health table, and the Word and Excel packs downloaded and opened on the
+phone. Install it from the phone: the APK is built by CI and attached to the run.
+
+It does not scrape — it is a client to the pipeline that already runs on
+GitHub's servers. It reads the `*.json` artifact each run writes, because
+GitHub's REST API does not expose the run page's summary to any client.
+
+It also **manages the portal list**: switch a portal on or off, add one by URL,
+or remove one, each as a real commit to `portals.json`. Adding one tests the
+page first — a `--probe` run fetches it on GitHub's runner and reports what
+every extraction layer found, rows included — because committing a URL nobody
+has looked at is how a portal ends up reporting "unavailable" forever while
+looking like an honest failure.
+
+Install it from the repository's **Releases** page — a plain `.apk`, no sign-in
+needed. `git tag v0.4.0 && git push origin v0.4.0` cuts one: the workflow runs
+the tests, builds the APK and publishes it with its SHA-256.
+
+**Compiled by CI, never run on a device.** `ANDROID.md` opens with a table of
+what that leaves unverified, and the generated release notes repeat it.
+
 ## Deploying
 
 Step-by-step setup for a Windows Server, including Azure app registration and
@@ -145,7 +190,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 865 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 2,527 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`

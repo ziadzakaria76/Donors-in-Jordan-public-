@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    English, the secondary set.
+
+    For anything client-facing this is derived from values-ar/strings.xml, not
+    the other way round. Where the wording appears on the company's own website
+    it is carried across verbatim rather than re-worded, so the app and the site
+    say the same thing.
+
+    Every key here must exist in values-ar/strings.xml and vice versa —
+    `./gradlew verifyStrings` fails the build otherwise.
+-->
+<resources>
+
+    <!-- Identity and navigation -->
+    <string name="app_name">GS3 Marketing</string>
+    <string name="project_name">General Sherman 3</string>
+    <string name="company_name">General Sherman Housing</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_inventory">Inventory</string>
+    <string name="nav_leads">Leads</string>
+    <string name="nav_campaigns">Campaigns</string>
+    <string name="nav_more">More</string>
+
+    <!-- Unit status -->
+    <string name="unit_status_available">Available</string>
+    <string name="unit_status_reserved">Reserved</string>
+    <string name="unit_status_contracted">Contracted</string>
+    <string name="unit_class_a">Liquidity driver — fastest turnover</string>
+    <string name="unit_class_b">Distinctive value</string>
+    <string name="unit_class_c">Premium roof unit</string>
+    <string name="unit_class_d">Flagship — directed selling</string>
+    <string name="unit_internal_area">Internal area</string>
+    <string name="unit_external_area">External area</string>
+    <string name="unit_price_per_sqm">Price per m²</string>
+
+    <!-- Buyer tracks -->
+    <string name="track_local">In Jordan</string>
+    <string name="track_expat">Jordanian expatriates</string>
+
+    <!-- Pipeline stages -->
+    <string name="stage_new_enquiry">New enquiry</string>
+    <string name="stage_qualified">Qualified</string>
+    <string name="stage_viewing_scheduled">Viewing or live tour scheduled</string>
+    <string name="stage_viewing_done">Viewing done</string>
+    <string name="stage_offer_sent">Written offer sent</string>
+    <string name="stage_negotiation">Negotiation</string>
+    <string name="stage_contracted">Contracted</string>
+    <string name="stage_lost">Lost</string>
+
+    <!-- Loss reasons — a required field, and the most valuable report in the app -->
+    <string name="loss_reason_price">Price</string>
+    <string name="loss_reason_payment_terms">Payment terms</string>
+    <string name="loss_reason_location">Location</string>
+    <string name="loss_reason_unit_size">Unit size</string>
+    <string name="loss_reason_competitor">Chose a competitor</string>
+    <string name="loss_reason_financing_refused">Financing refused</string>
+    <string name="loss_reason_eligibility">Approval or eligibility issue</string>
+    <string name="loss_reason_timing">Timing — postponed</string>
+    <string name="loss_reason_unreachable">Unreachable</string>
+    <string name="loss_reason_other">Other</string>
+
+    <!-- Response commitments -->
+    <string name="sla_first_response">First response — within 15 minutes during business hours</string>
+    <string name="sla_out_of_hours">Out-of-hours enquiry — a human reply by 10:00 the next business morning</string>
+    <string name="sla_viewing_follow_up">Viewing follow-up — within 48 hours</string>
+    <string name="sla_written_offer">Written offer — within 24 hours of the request</string>
+    <string name="sla_external_update">A status update to external-track clients at least every 10 days</string>
+    <string name="sla_state_breached">Overdue</string>
+    <string name="sla_state_approaching">Due shortly</string>
+
+    <!-- Disclaimers — mandatory, and not removable -->
+    <string name="disclaimer_fees">Registration fee and property sale tax are calculated on the value assessed by the Department of Lands and Survey, not necessarily on the sale price. Rates are subject to legislative change. Figures shown are indicative for planning only.</string>
+    <string name="disclaimer_instalments">Indicative calculation only; actual financing terms are set by the bank.</string>
+    <string name="disclaimer_yield">An estimated range based on the stated assumptions, not a guarantee of return.</string>
+    <string name="disclaimer_company_contribution">A capped contribution by the company toward registration fees — not a waiver of them.</string>
+    <string name="disclaimer_rendered_image">A 3D design study, not a photograph of the building as built.</string>
+    <string name="disclaimer_hospital_under_construction">Al-Andalus Hospital (under construction)</string>
+
+    <!-- Discounts and pricing -->
+    <string name="discount_ceiling_warning">This discount exceeds the 3.5%% ceiling and needs a written justification before it can be saved.</string>
+    <string name="discount_class_a_blocked">Class A units carry no cash discount.</string>
+    <string name="discount_concurrent_limit">Policy allows a maximum of two discounted units at any one time.</string>
+    <string name="discount_justification_hint">Reason for the discount</string>
+    <string name="escalation_due">Three sales completed — the announced 2%% price rise is now due.</string>
+
+    <!-- Backup -->
+    <string name="backup_passphrase_warning"><![CDATA[<b>If this passphrase is lost, the backup can never be recovered.</b> Nobody can open it for you. Keep it somewhere safe and off this phone.]]></string>
+    <string name="backup_passphrase_repeat">Type the passphrase again</string>
+    <string name="backup_last_taken">Last backup</string>
+    <string name="backup_never_taken">No backup has been taken yet</string>
+
+    <!-- Reminder health check -->
+    <string name="reminder_health_title">Reminder health check</string>
+    <string name="reminder_health_explanation">This sends a test reminder one minute from now. If it does not arrive, your phone\'s battery saver is stopping reminders without telling you — and reminders are the most useful thing this app does.</string>
+    <string name="reminder_health_arrived">The test reminder arrived. Reminders are working.</string>
+    <string name="reminder_health_missing">The test reminder did not arrive. The app needs to be exempted from battery optimisation.</string>
+    <string name="reminder_health_open_settings">Open battery settings</string>
+
+    <!-- Settings -->
+    <string name="settings_language">Language</string>
+    <string name="settings_numerals">Numerals</string>
+    <string name="settings_numerals_western">Western digits — 1234</string>
+    <string name="settings_numerals_arabic">Arabic-Indic digits — ١٢٣٤</string>
+    <string name="settings_show_hijri">Show the Hijri date</string>
+    <string name="settings_theme">Appearance</string>
+    <string name="settings_business_hours">Working days and hours</string>
+    <string name="settings_app_lock">App lock</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_language_arabic">Arabic</string>
+    <string name="settings_language_english">English</string>
+    <string name="settings_theme_system">Follow the phone</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_preview_title">Preview</string>
+    <string name="settings_preview_date">Date</string>
+    <string name="settings_preview_price">Apartment price</string>
+    <string name="settings_show_hijri_explanation">The Hijri date is shown alongside the Gregorian one, not instead of it — contracts and official deadlines are Gregorian.</string>
+
+    <!-- Empty states -->
+    <string name="empty_leads_title">No leads yet</string>
+    <string name="empty_leads_body">Add the first enquiry and the response clock starts running.</string>
+    <string name="empty_leads_action">Add a lead</string>
+    <string name="empty_dashboard_title">Nothing needs chasing today</string>
+    <string name="empty_dashboard_body">Today\'s tasks and the response deadlines coming due will appear here.</string>
+    <string name="empty_inventory_title">No apartments added yet</string>
+    <string name="empty_inventory_body">The project\'s fourteen apartments will appear here with their areas, prices and status.</string>
+    <string name="empty_campaigns_title">No campaigns yet</string>
+    <string name="empty_campaigns_body">Create a campaign to track spend and cost per lead for each track.</string>
+    <string name="empty_more_title">More tools</string>
+    <string name="empty_more_body">Calculators, the content plan, reports and settings.</string>
+
+    <!-- Performance diagnosis -->
+    <string name="diagnosis_pricing_or_imagery">Plenty of impressions and few enquiries: the problem is price or imagery, not demand.</string>
+    <string name="diagnosis_response_speed">Plenty of enquiries and few viewings: the problem is response speed or the ad copy.</string>
+    <string name="diagnosis_product_terms">Plenty of viewings and few contracts: the problem is the product, the payment terms, or the competition.</string>
+    <string name="diagnosis_targeting">Few impressions: the problem is targeting or budget — cutting the price would change nothing.</string>
+
+</resources>

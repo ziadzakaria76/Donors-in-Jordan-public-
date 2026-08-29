@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Deliberately absent: INTERNET.
+
+        The app is offline and local-only (IMPLEMENTATION_PLAN.md → "Deliberately
+        not in v1"). Leaving the permission out is not a formality — it is what
+        makes "client contact details never leave this phone" checkable by
+        anyone who reads the manifest, rather than a claim in a README.
+
+        WhatsApp is reached by handing a URI to the system, which needs no
+        permission of ours.
+    -->
+
+    <application
+        android:name=".Gs3Application"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Gs3MarketingOps"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="33">
+
+        <!--
+            One activity, Compose throughout.
+
+            android:screenOrientation is deliberately NOT set. API 36 ignores an
+            orientation lock on large screens, and setting one here would be a
+            promise the platform does not keep. Layout adapts by window size
+            class instead — see Gs3NavHost.
+
+            configChanges is broad on purpose: Compose handles these itself, and
+            letting the activity be recreated on every rotation would throw away
+            transient UI state a salesperson is halfway through typing.
+        -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|layoutDirection|locale"
+            android:theme="@style/Theme.Gs3MarketingOps">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

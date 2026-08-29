@@ -17,11 +17,19 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from .. import config
+from .. import config, portal_config
 from . import base
 
-API = "https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages"
 KEY = "fcdo"
+# From portals.json -- see the note in worldbank.py.
+API = portal_config.primary_url(KEY)
+
+# The fields portals.json therefore must not set: this portal is a REST
+# API and has no HtmlSpec at all, so a selector in the file would be read,
+# accepted and then used by nothing. The loader rejects the entry instead,
+# and a test keeps this list and the file's `code_owned` in step.
+CODE_OWNED = ("selectors", "field_selectors", "anchor_hint", "currency",
+              "filter_to_jordan")
 
 
 def _party_name(parties, role: str) -> str | None:
@@ -34,6 +42,7 @@ def _party_name(parties, role: str) -> str | None:
 
 
 def fetch_tenders() -> list[dict]:
+    base.require_url(API, KEY)
     params = {
         "updatedFrom": (date.today() - timedelta(days=180)).strftime("%Y-%m-%dT00:00:00"),
         "limit": 100,

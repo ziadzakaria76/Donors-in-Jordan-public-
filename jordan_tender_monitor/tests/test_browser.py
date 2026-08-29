@@ -24,10 +24,10 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from jordan_tender_monitor import portals
-from jordan_tender_monitor.portals import base, browser, giz, harvester, ungm
+from jordan_tender_monitor.portals import base, browser, harvester, ungm
 from jordan_tender_monitor.portals.base import PortalError
 
-from .harness import check, check_eq
+from .harness import check, check_eq, yaml
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 ROOT = Path(__file__).resolve().parent.parent
@@ -246,7 +246,17 @@ def test_the_browser_dependency_stays_contained():
 
     from jordan_tender_monitor import portals as registry
 
-    users = sorted(key for key, module in registry.MODULES.items()
+    # Only a portal backed by a module can reach the browser at all: a
+    # data-only portal is a portals.json entry driving the generic cascade,
+    # and there is no field in that file which could ask for a render. The
+    # dependency is contained by construction for eight of the thirteen.
+    coded = {key: module for key, module in registry.MODULES.items()
+             if inspect.ismodule(module)}
+    check(len(coded) < len(registry.MODULES),
+          "browser: most portals are data only and cannot reach it at all",
+          f"{len(coded)} of {len(registry.MODULES)} have code")
+
+    users = sorted(key for key, module in coded.items()
                    if "browser." in inspect.getsource(module))
     check_eq(users, ["ungm"],
              "browser: only the portal that demonstrably needs it declares it")
@@ -621,6 +631,385 @@ def test_ungm_declares_its_source_and_filters_to_jordan():
 # The environment this actually runs in
 # ---------------------------------------------------------------------------
 
+def test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at():
+    """A `.gitignore` pattern that hides source is a silent failure.
+
+    `**/data/*` was written to cover jordan_tender_monitor/data/, and it also
+    matches ANY directory called data at ANY depth. It swallowed the Android
+    app's entire data package -- twelve files, every model and the API client.
+    `git add -A` said nothing, the commit looked complete, and the build failed
+    with 240 unresolved references pointing at files that were on disk the
+    whole time.
+
+    That is the same shape as a scraper returning zero: the output looked like
+    a result. So the rules that hide GENERATED state are required to name the
+    directory they mean, and any new `**/`-prefixed rule has to be added to the
+    allowlist below deliberately, with a reason.
+    """
+    ignore = (ROOT.parent / ".gitignore").read_text(encoding="utf-8")
+    lines = [line.strip() for line in ignore.splitlines()
+             if line.strip() and not line.strip().startswith("#")]
+
+    # Patterns that may legitimately match at any depth: they name a file
+    # extension or a build artefact, never a source directory.
+    allowed_globs = {"**/output/.gitkeep", "**/data/.gitkeep"}
+
+    unscoped = [line for line in lines
+                if line.lstrip("!").startswith("**/")
+                and line.lstrip("!") not in
+                {g.lstrip("!") for g in allowed_globs}]
+    check(not unscoped,
+          "gitignore: no rule hides a whole directory name at any depth",
+          f"unscoped: {unscoped}")
+
+    for directory in ("output", "data"):
+        check(f"jordan_tender_monitor/{directory}/*" in lines,
+              f"gitignore: the monitor's {directory}/ is ignored by name")
+
+    # And the concrete regression: nothing under android/ may be ignored.
+    for path in ("android/app/src/main/java/jo/tendermonitor/data/Outcome.kt",
+                 "android/app/src/main/java/jo/tendermonitor/data/db/Database.kt",
+                 "android/app/src/test/java/jo/tendermonitor/RedactTest.kt"):
+        source = ROOT.parent / path
+        check(source.exists(), f"gitignore: {path} is present on disk")
+        segments = path.split("/")
+        hidden = [line for line in lines
+                  if not line.startswith("!")
+                  and line.startswith("**/")
+                  and line[3:].split("/")[0] in segments]
+        check(not hidden,
+              f"gitignore: no rule matches a directory in {path}",
+              f"would be hidden by {hidden}")
+
+
+def test_every_workflow_file_is_structurally_valid_yaml():
+    """A workflow GitHub cannot parse does not run, and nothing says so.
+
+    There is no red cross for an unparseable workflow: it simply stops being
+    scheduled, which is the one failure mode this whole system is built to
+    make impossible. It was shipped once already -- an embedded `python -c`
+    whose continuation lines started at column 1, which ends the YAML block
+    scalar and makes the rest of the file nonsense.
+
+    The check is structural rather than a full parse: inside a block scalar
+    (`run: |`), every non-blank line must be indented further than the key that
+    opened it. That is exactly the mistake that was made.
+
+    PyYAML has since become a TEST-ONLY dependency (requirements-dev.txt) and
+    other checks now parse the workflows properly. This one stays structural
+    anyway, for two reasons. It names the offending file, line and block, which
+    a parser error does not. And it still runs when PyYAML is absent -- which
+    is precisely the situation in which someone is least likely to notice that
+    the parsing checks did not.
+    """
+    import re
+
+    workflows = sorted((ROOT.parent / ".github" / "workflows").glob("*.yml"))
+    check(len(workflows) >= 2, "workflows: the workflow directory was found",
+          f"got {[w.name for w in workflows]}")
+
+    block_re = re.compile(r"^(\s*)[\w-]+:\s*[|>][-+]?\s*$")
+    for path in workflows:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        index = 0
+        while index < len(lines):
+            match = block_re.match(lines[index])
+            if not match:
+                index += 1
+                continue
+            opener_indent = len(match.group(1))
+            index += 1
+            body = 0
+            while index < len(lines):
+                line = lines[index]
+                if not line.strip():
+                    index += 1
+                    continue
+                indent = len(line) - len(line.lstrip())
+                if indent <= opener_indent:
+                    break
+                body += 1
+                index += 1
+            check(body > 0,
+                  f"workflows: {path.name} has content under every block scalar",
+                  f"empty block ending at line {index}")
+
+    # And the specific shape that broke: a bare `from`/`import`/`print` at the
+    # start of a line anywhere in a workflow is a continuation that escaped its
+    # block. Reported once per file rather than once per line -- a check count
+    # that grows with the length of a YAML file measures nothing.
+    for path in workflows:
+        escaped = [f"line {n}: {line!r}"
+                   for n, line in enumerate(path.read_text(encoding="utf-8")
+                                            .splitlines(), 1)
+                   if re.match(r"^(from|import|print)\b", line)]
+        check(not escaped,
+              f"workflows: {path.name} has no unindented Python continuation",
+              "; ".join(escaped))
+
+
+def test_the_release_workflow_cannot_silently_skip_a_release():
+    """A release that quietly does not happen is the worst kind.
+
+    android.yml has a `paths:` filter so it does not rebuild for a Python-only
+    change, and a `paths:` filter applies to TAG pushes too. Putting the tag
+    trigger there would skip the release whenever the tagged commit touched
+    nothing under android/ -- and nothing would say so. Hence a separate file,
+    and this test, which fails if the two are ever merged.
+    """
+    import io
+
+    workflows = ROOT.parent / ".github" / "workflows"
+    build = io.open(workflows / "android.yml", encoding="utf-8").read()
+    release = io.open(workflows / "android-release.yml", encoding="utf-8").read()
+
+    def has_key(text: str, key: str) -> bool:
+        """A YAML key, not a mention of one.
+
+        Both files TALK about `paths:` in their comments -- explaining exactly
+        this trap -- so a substring search finds it in the file that must not
+        have it. The distinction is whether the line begins with it.
+        """
+        return any(line.strip().startswith(key) for line in text.splitlines())
+
+    check(has_key(build, "paths:"),
+          "release: the build workflow filters by path, as intended")
+    check(not has_key(build, "tags:"),
+          "release: and therefore must NOT carry the tag trigger")
+    check(has_key(release, "tags:"), "release: the release workflow has it")
+    check(not has_key(release, "paths:"),
+          "release: and no path filter that could suppress it")
+
+    check("testDebugUnitTest" in release,
+          "release: the tests run before anything is published")
+    check("gh release create" in release,
+          "release: it publishes a real Release, not just an artifact")
+    check("sha256sum" in release,
+          "release: with a checksum, so a download can be verified")
+    check("contents: write" in release,
+          "release: and asks for the one permission that needs")
+
+    # `gh release create` refuses when the release exists, and re-cutting a
+    # tag by hand is a documented reason to dispatch this workflow. Without a
+    # replace path that dispatch fails, leaving the previous APK published
+    # under a tag that has moved -- the wrong build, advertised as the right
+    # one, which is worse than no release at all.
+    check("gh release view" in release,
+          "release: it checks whether the release already exists")
+    check("--clobber" in release,
+          "release: and replaces the asset rather than failing on a re-cut")
+    check("gh release edit" in release,
+          "release: refreshing the notes too, so they match the new asset")
+
+    # Cutting a release from the Releases page is the only route that needs no
+    # terminal, and it is the route actually available here -- pushing a tag
+    # from this environment is refused. It arrives as a `release` event.
+    document = yaml().safe_load(release)
+    # 'on' is YAML 1.1's boolean true, which is why this is not document["on"].
+    triggers = document.get("on") or document.get(True)
+    check("release" in triggers,
+          "release: a release published from the web form builds the APK",
+          f"triggers are {sorted(triggers)}")
+    check_eq(triggers.get("release", {}).get("types"), ["published"],
+             "release: on published only -- a draft must not build an APK")
+
+    # That form can deliver both a `release` event and a tag `push` for the
+    # same tag. Two concurrent runs would race on the asset upload.
+    check("concurrency:" in release,
+          "release: only one build per tag at a time")
+
+    # And a release published from the web form may carry notes somebody
+    # wrote. Overwriting them would destroy the one part of the release the
+    # workflow did not author.
+    check("--json body" in release,
+          "release: it reads the notes already on the release")
+    check("Keeping the existing notes" in release,
+          "release: and keeps them rather than overwriting what someone wrote")
+
+    # A release can be cut from a branch, and the notes point at ANDROID.md.
+    # Pointing at main would 404 for exactly the releases that most need the
+    # instructions -- the early ones, cut before the branch merged.
+    check("blob/main/" not in release,
+          "release: the notes do not link to main, which may not have the file")
+    check("/blob/${{ steps.version.outputs.tag }}/android/ANDROID.md" in release,
+          "release: they link to the tag, which is the commit that was built")
+
+    check("debug-signed" in release,
+          "release: the notes say the APK is debug-signed")
+    # Whitespace-normalised: the notes are wrapped prose, and a sentence
+    # split across two lines is still the sentence.
+    flat = " ".join(release.split())
+    check("never been run on a device or an emulator" in flat,
+          "release: and repeat that nothing has been run on a device -- a "
+          "Releases page is where that stops being obvious")
+
+    # The version has to come from somewhere monotonic, in BOTH workflows, or
+    # Android cannot tell one build from another.
+    for name, text in (("android.yml", build), ("android-release.yml", release)):
+        check("git rev-list --count HEAD" in text,
+              f"release: {name} derives a version code from the commit count")
+        check("fetch-depth: 0" in text,
+              f"release: {name} checks out enough history for it to be right")
+
+
+def test_every_workflow_can_be_started_by_hand():
+    """An event-only workflow cannot be recovered when events are the fault.
+
+    GitHub has twice stopped turning pushes on this repository into check runs
+    -- not queued, not failed, never created. A pull request then shows green
+    ticks from an older commit and nothing anywhere says the newer ones were
+    never tested, which is the exact shape of silent failure this codebase is
+    written against.
+
+    During the second outage the Android workflows could be dispatched by hand
+    and the Python suite could not, because it declared only push and
+    pull_request. So the one suite that proves the pipeline correct was the one
+    thing with no way to be run at all.
+    """
+    import io
+
+    workflows = sorted(
+        (ROOT.parent / ".github" / "workflows").glob("*.yml"))
+    check(len(workflows) >= 4, "dispatch: the workflow directory was found",
+          f"got {[w.name for w in workflows]}")
+
+    for path in workflows:
+        document = yaml().safe_load(io.open(path, encoding="utf-8").read())
+        # 'on' is YAML 1.1's boolean true.
+        triggers = document.get("on") or document.get(True) or {}
+        check("workflow_dispatch" in triggers,
+              f"dispatch: {path.name} can be started by hand",
+              f"its triggers are {sorted(triggers)} -- during an event-system "
+              f"outage there would be no way to run it")
+
+
+def test_ci_installs_the_test_only_dependencies_the_suite_needs():
+    """The workflow checks need PyYAML, and CI has to install it.
+
+    It is deliberately not in requirements.txt -- a deployment that wants the
+    weekday report should not install a YAML parser it never loads. That split
+    only works while tests.yml installs the other file. If that line is ever
+    dropped, several checks stop being able to read the workflows at all.
+
+    They fail rather than skip, so the suite would go red rather than quietly
+    green. This test is the earlier, clearer signal.
+    """
+    import io
+
+    root = Path(__file__).resolve().parent.parent
+    dev = root / "requirements-dev.txt"
+    check(dev.exists(), "deps: the test-only requirements file exists",
+          f"missing {dev}")
+
+    listed = [line.strip() for line in io.open(dev, encoding="utf-8")
+              if line.strip() and not line.strip().startswith("#")]
+    check(any(item.lower().startswith("pyyaml") for item in listed),
+          "deps: it pins the YAML parser the workflow checks need",
+          f"got {listed}")
+
+    runtime = io.open(root / "requirements.txt", encoding="utf-8").read().lower()
+    check("pyyaml" not in runtime,
+          "deps: and requirements.txt does NOT, so a deployment skips it")
+
+    tests_yml = io.open(
+        root.parent / ".github" / "workflows" / "tests.yml", encoding="utf-8").read()
+    check("requirements-dev.txt" in tests_yml,
+          "deps: CI installs it, or the workflow checks cannot read anything")
+
+
+def test_the_emulator_workflow_covers_what_no_jvm_test_can():
+    """The instrumented suite is the only place three things are exercised.
+
+    The Keystore-backed token store, Room's generated SQL, and whether a screen
+    draws at all. None of them exist on a JVM, so the unit suite is silent
+    about all three -- and silence there reads exactly like coverage.
+
+    This checks the workflow that runs them still does the things that make it
+    meaningful, because an emulator job that boots and runs nothing is the most
+    convincing green tick in the repository.
+    """
+    import io
+
+    workflows = Path(__file__).resolve().parent.parent.parent / ".github" / "workflows"
+    emulator = io.open(workflows / "android-emulator.yml", encoding="utf-8").read()
+    document = yaml().safe_load(emulator)
+    job = document["jobs"]["instrumented"]
+
+    check("connectedDebugAndroidTest" in emulator,
+          "emulator: it actually runs the instrumented tests")
+
+    # Without the KVM permissions the emulator falls back to software
+    # rendering and the job HANGS rather than failing -- a timeout, six times
+    # over, with no explanation.
+    check("/dev/kvm" in emulator or "99-kvm4all" in emulator,
+          "emulator: KVM is enabled, or the job hangs instead of running")
+
+    levels = job["strategy"]["matrix"]["api-level"]
+    check(26 in levels,
+          "emulator: minSdk is tested -- the Keystore differs on older images",
+          f"levels are {levels}")
+    check(35 in levels,
+          "emulator: and so is the target the app is built against",
+          f"levels are {levels}")
+
+    steps = job["steps"]
+    uploads = [s for s in steps if "upload-artifact" in str(s.get("uses", ""))]
+    check(uploads, "emulator: the reports are kept")
+    check(all(str(s.get("if", "")).strip() == "always()" for s in uploads),
+          "emulator: and kept ON FAILURE, which is when they are the evidence")
+
+    # The summary script is a file for a reason -- a Python heredoc inside a
+    # block scalar terminates at column 1 and ends the scalar, which is how
+    # this repository once shipped a monitor.yml GitHub could not parse.
+    summary = workflows.parent / "scripts" / "android_test_summary.py"
+    check(summary.exists(),
+          "emulator: the summariser the workflow calls exists",
+          f"missing {summary}")
+    source = io.open(summary, encoding="utf-8").read()
+    check("UNTESTED" in source,
+          "emulator: an absent report is reported as untested, not as a pass")
+    check("altogether" in source,
+          "emulator: and a trimmed failure list says both numbers")
+
+
+def test_the_instrumented_tests_exist_and_cover_the_untestable_three():
+    """A workflow that runs an empty suite is worse than no workflow.
+
+    It produces a green tick for a thing nobody checked. So the tests the
+    emulator exists to run have to be present, and have to be the ones that
+    cannot run anywhere else.
+    """
+    root = (Path(__file__).resolve().parent.parent.parent / "android" / "app"
+            / "src" / "androidTest")
+    check(root.is_dir(), "emulator: there is an instrumented source set",
+          f"missing {root}")
+
+    sources = {path.name: path.read_text(encoding="utf-8")
+               for path in root.rglob("*.kt")}
+    check(sources, "emulator: and it contains tests", f"found {sorted(sources)}")
+
+    joined = "\n".join(sources.values())
+    for subject, needle in (
+        ("the Keystore token store", "KeystoreSettings"),
+        ("Room against real SQLite", "TenderDatabase"),
+        ("the screens rendering", "createAndroidComposeRule"),
+        ("notification channels", "CHANNEL_ATTENTION"),
+    ):
+        check(needle in joined,
+              f"emulator: {subject} is covered on the device")
+
+    # The security claim, not just the round trip. A plain unencrypted file
+    # round-trips perfectly, so a test that only stores and reads back would
+    # pass with EncryptedSharedPreferences removed entirely.
+    check("walkTopDown" in joined,
+          "emulator: the token is searched for in plaintext across app storage")
+
+    total = sum(text.count("@Test") for text in sources.values())
+    check(total >= 20,
+          "emulator: the suite is worth booting an emulator for",
+          f"only {total} tests")
+
+
 def test_the_workflow_installs_the_browser_only_for_diagnosis():
     """The scheduled run must not pay for a browser it does not use.
 
@@ -674,7 +1063,7 @@ def test_giz_dropped_the_page_that_carried_no_listing():
     main-menu__item (33): pure navigation. Kept in the list it would fail on
     every run and make a working portal look half-broken.
     """
-    urls = giz.SPEC.urls
+    urls = portals.source_urls("giz")
     check_eq(len(urls), 1, "giz: one source URL, the German portal")
     check("ausschreibungen.giz.de" in urls[0],
           "giz: and it is the ausschreibungen portal")
@@ -703,6 +1092,13 @@ TESTS = [
     test_ungm_routes_its_rendered_html_through_the_cascade,
     test_ungm_selectors_come_from_the_rendered_dom,
     test_ungm_declares_its_source_and_filters_to_jordan,
+    test_no_ignore_rule_can_swallow_source_it_was_not_aimed_at,
+    test_every_workflow_file_is_structurally_valid_yaml,
+    test_the_release_workflow_cannot_silently_skip_a_release,
+    test_every_workflow_can_be_started_by_hand,
+    test_ci_installs_the_test_only_dependencies_the_suite_needs,
+    test_the_emulator_workflow_covers_what_no_jvm_test_can,
+    test_the_instrumented_tests_exist_and_cover_the_untestable_three,
     test_the_workflow_installs_the_browser_only_for_diagnosis,
     test_the_schedule_is_weekday_mornings_and_not_on_the_hour,
     test_giz_dropped_the_page_that_carried_no_listing,

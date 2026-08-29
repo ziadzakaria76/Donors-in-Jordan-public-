@@ -1,0 +1,24 @@
+# Test-only dependencies. NOT needed to run the monitor.
+#
+# Kept out of requirements.txt deliberately, for the same reason playwright is:
+# a Windows deployment that only wants the weekday report should not install a
+# YAML parser and a linter it will never load. Nothing in
+# jordan_tender_monitor/ imports either of these at runtime.
+#
+#     pip install -r jordan_tender_monitor/requirements-dev.txt
+#
+# CI installs this file. If it stops doing so, the workflow checks below stop
+# running and the suite goes green having skipped them -- so a test asserts
+# that tests.yml installs it.
+
+# Reads the workflow files. Several checks compare what a workflow really
+# declares against what the app and the pipeline assume: which step runs the
+# monitor and with which output formats, which events trigger a release, which
+# API levels the emulator matrix covers. Those were regexes once, and a regex
+# matched the FIRST JTM_OUTPUT_FORMATS in monitor.yml -- the diagnose step,
+# which writes markdown only -- and passed while the step that matters wrote no
+# JSON at all. Parsing the file is the fix.
+PyYAML>=6.0
+
+# The linter CI runs before the suite.
+pyflakes>=3.0

@@ -1,0 +1,50 @@
+name: doc2md-pages
+
+# Manual only. Publishing a site is a deliberate act, and this repo's default
+# branch should not start deploying one as a side effect of an unrelated merge.
+# Run it from Actions → doc2md-pages → "Run workflow" once GitHub Pages is set
+# to "GitHub Actions" in the repository settings.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: doc2md/package-lock.json
+
+      - run: npm ci
+        working-directory: doc2md
+
+      # Project Pages sites are served from /<repo>/, so the asset base, the
+      # manifest scope and the share-target action all have to be prefixed.
+      - name: Build
+        run: npm run build
+        working-directory: doc2md
+        env:
+          VITE_BASE: /${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: doc2md/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4

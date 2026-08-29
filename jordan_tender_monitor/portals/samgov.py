@@ -14,11 +14,19 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from .. import config
+from .. import config, portal_config
 from . import base
 
-API = "https://api.sam.gov/prod/opportunities/v2/search"
 KEY = "samgov"
+# From portals.json -- see the note in worldbank.py.
+API = portal_config.primary_url(KEY)
+
+# The fields portals.json therefore must not set: this portal is a REST
+# API and has no HtmlSpec at all, so a selector in the file would be read,
+# accepted and then used by nothing. The loader rejects the entry instead,
+# and a test keeps this list and the file's `code_owned` in step.
+CODE_OWNED = ("selectors", "field_selectors", "anchor_hint", "currency",
+              "filter_to_jordan")
 
 
 def fetch_tenders() -> list[dict]:
@@ -40,7 +48,7 @@ def fetch_tenders() -> list[dict]:
         "ncode": "JO",           # place-of-performance country
     }
 
-    data = base.fetch_json(API, params=params)
+    data = base.fetch_json(base.require_url(API, KEY), params=params)
     items = data.get("opportunitiesData") if isinstance(data, dict) else None
     if items is None and isinstance(data, dict):
         items = data.get("results") or data.get("data") or []

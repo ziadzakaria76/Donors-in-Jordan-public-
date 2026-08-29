@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The dark counterpart of the launch theme.
+
+        Compose already switches its colours on isSystemInDarkTheme(), but the
+        Activity theme is what paints the window BEFORE the first frame is
+        composed. With only the light theme declared, a phone in dark mode
+        opened the app on a white window and then repainted it dark - a flash
+        on every cold start, and the wrong colour behind the system bars until
+        Compose caught up.
+
+        The platform's Theme.Material is the dark one; Theme.Material.Light is
+        its light sibling. No AppCompat dependency is needed for either.
+    -->
+    <style name="Theme.JordanTenderMonitor" parent="android:Theme.Material.NoActionBar" />
+</resources>

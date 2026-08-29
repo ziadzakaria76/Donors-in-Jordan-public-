@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Scoped lint exceptions.
+
+    The rule for this file: an entry here names one issue at one path, with the
+    evidence for why lint is wrong about that path. Nothing is disabled
+    globally, and nothing goes in here because it was inconvenient to fix — a
+    real finding gets fixed instead. There is no lint baseline file in this
+    project, deliberately: a baseline hides today's findings from tomorrow.
+-->
+<lint>
+
+    <!--
+        ObsoleteSdkInt is correct in general and wrong here.
+
+        It reasons that with minSdkVersion 26 a `-v26` qualifier can never
+        change which folder is chosen, which is true. But renaming the folder to
+        the bare `mipmap-anydpi` it recommends makes AGP's resource merger drop
+        it altogether: the files never reach `packaged_res`, and the build fails
+        at resource-link time with
+
+            AAPT: error: resource mipmap/ic_launcher not found
+
+        That was reproduced on this project, twice, before this entry was
+        written. Scoped to the one folder so the check keeps working everywhere
+        else — including on any density folder someone adds later.
+    -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+
+</lint>

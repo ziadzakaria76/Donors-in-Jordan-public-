@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The XML theme exists only to dress the window in the moment before Compose
+    takes over. Everything a user actually sees is themed in ui/theme/Theme.kt.
+
+    The parent is the *light* platform theme, with values-night/themes.xml
+    supplying the dark one. There is no `Theme.Material.DayNight` in the
+    platform to inherit from — the DayNight variants belong to AppCompat and
+    Material Components, and this app deliberately uses neither: it has one
+    ComponentActivity and no XML views, so pulling in AppCompat would add a
+    library purely to name a style.
+
+    No android:statusBarColor or android:navigationBarColor is set. API 35
+    deprecated them and API 36 ignores them; the app is edge-to-edge and the
+    bars are drawn through by Compose with real insets.
+-->
+<resources>
+
+    <style name="Theme.Gs3MarketingOps" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+
+</resources>

@@ -3,6 +3,15 @@
 No install, no server, no laptop. GitHub runs the monitor; you tap a button and
 read the results.
 
+**There is also an app.** Same runs, fewer taps: the last report readable
+offline, a Run button, the full portal health table, the Word and Excel packs,
+portal management, and a notification when a run finishes. Install it from the
+repository's Releases page — see
+[`android/ANDROID.md`](../android/ANDROID.md). Everything below still works
+exactly as it did, and is what to fall back on if the app misbehaves; it is
+also the only route that has actually been used, since the app has never been
+run on a device.
+
 ---
 
 ## One-time setup
