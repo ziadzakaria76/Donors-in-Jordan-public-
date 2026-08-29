@@ -10,36 +10,33 @@ same Arabic wording, and nothing else — no code, no build, no deployment.
 
 ## Status
 
-**The business rules are built, tested and green. The Android app is blocked on
-one network host.**
+**Both halves build, and both are green.**
 
 ```
-./gradlew check      ->  BUILD SUCCESSFUL
-                         209 tests passing, 98.6% line coverage (gate: 80%)
-                         verifyStrings: 88 keys, both locales in step
+./gradlew check assembleDebug
+                     ->  BUILD SUCCESSFUL
+                         238 tests passing (211 in :domain, 27 in :app)
+                         98.7% line coverage on :domain (gate: 80%)
+                         verifyStrings: 98 keys, both locales in step
+                         lint: clean, abortOnError + warningsAsErrors
 ```
 
-`:domain` is pure Kotlin with no Android dependency, so it builds here today.
-Under test: the unit schedule and its totals · price per m² · the discount
-guard and the incentive ladder · price escalation · both funnel models and the
-four diagnostic rules · budget allocation, seasonal normalisation, cost per lead
-and the stop rules · the SLA engine with its time zones · fee and instalment
-calculators · the campaign code and UTM builder · the lead pipeline with its
-mandatory loss reasons · the WhatsApp link builder · CSV export · the dashboard
-"today" list · the non-Jordanian journey and its eligibility gate · content
-pillar balance · and the weekly and monthly reports.
+`:domain` is pure Kotlin with no Android dependency. Under test: the unit
+schedule and its totals · price per m² · the discount guard and the incentive
+ladder · price escalation · both funnel models and the four diagnostic rules ·
+budget allocation, seasonal normalisation, cost per lead and the stop rules ·
+the SLA engine with its time zones · fee and instalment calculators · the
+campaign code and UTM builder · the lead pipeline with its mandatory loss
+reasons · the WhatsApp link builder · CSV export · the dashboard "today" list ·
+content pillar balance · and the weekly and monthly reports.
 
-`:app` cannot be built yet. This environment's egress policy refuses
-`dl.google.com`, the single host serving both the Android SDK and every
-Google-hosted Maven artifact — the Android Gradle Plugin, AndroidX, Compose,
-Room, WorkManager and Hilt included. `maven.google.com` resolves but only
-redirects there, and Maven Central mirrors none of it. Rather than pull build
-plugins from an unofficial mirror into an app that will hold client contact
-details, the blocked host is reported and that half waits.
+`:app` builds a real debug APK at targetSdk 36. The `dl.google.com` egress
+block that stopped the first two attempts was lifted on 2026-08-15 —
+`DECISIONS.md` → D-1 keeps the record of what was true before that.
 
-**To unblock: allow `dl.google.com` for this environment.** Nothing else in the
-plan changes, and nothing built so far is wasted — the Android milestones wire
-screens to a core that is already proven.
+**No non-Jordanian buyer track.** It was removed from v1 on 2026-08-29 rather
+than shipped behind a gate nobody could open — `DECISIONS.md` → D-23, and D-24
+to D-27 for the consequences still awaiting the owner's confirmation.
 
 ## Layout
 

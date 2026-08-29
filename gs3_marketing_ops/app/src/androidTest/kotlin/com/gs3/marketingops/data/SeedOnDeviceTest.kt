@@ -3,17 +3,15 @@ package com.gs3.marketingops.data
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.gs3.marketingops.compliance.data.ContractClaim
 import com.gs3.marketingops.core.data.db.Gs3Database
 import com.gs3.marketingops.core.data.seed.DatabaseSeeder
 import com.gs3.marketingops.core.data.seed.Gs3Seed
+import com.gs3.marketingops.domain.budget.Gs3Budget
 import com.gs3.marketingops.domain.inventory.Gs3Schedule
-import com.gs3.marketingops.nonjordanian.data.ContractClaim
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -69,24 +67,25 @@ class SeedOnDeviceTest {
             Gs3Schedule.apartments.size,
             database.unitDao().count(),
         )
-        assertTrue("market budgets seeded", database.marketBudgetDao().count() > 0)
+        assertEquals(
+            "five expatriate markets and no non-Jordanian ones -- D-23, D-24",
+            Gs3Budget.externalTrackMarkets.size,
+            database.marketBudgetDao().count(),
+        )
         assertEquals(4, database.complianceDao().getClaims().size)
         assertTrue(database.outreachDao().getTemplates().isNotEmpty())
         assertTrue(database.outreachDao().getObjections().isNotEmpty())
-        assertNotNull("the gate row exists", database.complianceDao().getGate())
     }
 
     @Test
-    fun the_eligibility_gate_ships_closed() = runTest {
+    fun no_non_jordanian_market_reaches_a_real_database() = runTest {
         seeder.seed()
 
-        val gate = requireNotNull(database.complianceDao().getGate())
-        // B-1 was answered on 2026-08-29 and the answer was no: the Department
-        // of Lands and Survey statement has not been obtained. Closed is the
-        // correct shipping state, not a placeholder.
-        assertFalse(gate.landsAndSurveyStatementObtained)
-        assertFalse(gate.lawyerOpinionObtained)
-        assertNull(gate.clearedAt)
+        // On the device, not just in the seed object. The four rows are gone
+        // from what a fresh install writes; Gs3Database.MIGRATION_1_2 is what
+        // clears them from an install that already had them.
+        val tracks = database.marketBudgetDao().getAll().map { it.track }.toSet()
+        assertEquals(setOf("EXPAT"), tracks)
     }
 
     @Test

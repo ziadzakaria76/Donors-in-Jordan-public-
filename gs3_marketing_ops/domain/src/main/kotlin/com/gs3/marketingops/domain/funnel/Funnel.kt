@@ -3,16 +3,20 @@ package com.gs3.marketingops.domain.funnel
 import java.math.BigDecimal
 import java.math.RoundingMode
 
-/** The two tracks the strategy runs, which convert at genuinely different rates. */
+/**
+ * The two tracks the strategy runs, which convert at genuinely different rates.
+ *
+ * There was a third, `NONJO`, for non-Jordanian buyers. It is gone from v1 —
+ * see DECISIONS.md → D-23. Nothing here is waiting to be switched back on: the
+ * track and everything it carried were deleted, not disabled, and adding it
+ * back is a deliberate piece of work rather than flipping a flag.
+ */
 enum class Track {
     /** Buyers already in Jordan. */
     LOCAL,
 
     /** Jordanian expatriates abroad. */
     EXPAT,
-
-    /** Non-Jordanian buyers — gated until eligibility is confirmed in writing. */
-    NONJO,
     ;
 
     /**
@@ -64,6 +68,13 @@ data class FunnelModel(
          * The external track: fewer leads, harder to qualify, but a live tour
          * converts far better because someone who books one from Dubai is
          * further through the decision than a local walk-in.
+         *
+         * **The 160 raw leads were modelled for the whole external track, when
+         * that meant expatriates *and* non-Jordanians.** With the non-Jordanian
+         * track removed (D-23) the model is unchanged and the three-unit target
+         * is unchanged, so expatriate marketing alone now has to supply all 160.
+         * Whether it can has not been re-estimated — the numbers were left
+         * alone deliberately rather than adjusted by guesswork. See D-24.
          */
         val EXTERNAL = FunnelModel(
             rawLeads = 160,

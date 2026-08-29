@@ -9,9 +9,9 @@ import com.gs3.marketingops.domain.outreach.MessageTemplate
  *
  * The body is stored per language rather than being one string with the other
  * derived: Arabic is authored, not translated (B5 — Modern Standard Arabic for
- * expatriate and non-Jordanian buyers, light Jordanian dialect for local ones),
- * and a template that reads naturally in one language rarely does so when
- * mapped word-for-word into the other.
+ * expatriate buyers, light Jordanian dialect for local ones), and a template
+ * that reads naturally in one language rarely does so when mapped
+ * word-for-word into the other.
  *
  * Placeholder syntax and rendering are `MessageTemplate`'s job in `:domain`,
  * which already refuses to render a template with an unfilled placeholder. This

@@ -37,8 +37,19 @@ class LeadTest {
     fun `nationality category decides the track, and so the whole process`() {
         assertEquals(Track.LOCAL, NationalityCategory.JORDANIAN_RESIDENT.track)
         assertEquals(Track.EXPAT, NationalityCategory.JORDANIAN_EXPATRIATE.track)
-        assertEquals(Track.NONJO, NationalityCategory.ARAB_NON_JORDANIAN.track)
-        assertEquals(Track.NONJO, NationalityCategory.NON_ARAB.track)
+    }
+
+    @Test
+    fun `the two non-Jordanian categories are gone, not remapped onto expatriate`() {
+        // D-25. The failure this guards against is not the enum coming back —
+        // it is the enum coming back pointed at EXPAT, which would file a
+        // non-Jordanian buyer as a Jordanian expatriate and look perfectly
+        // healthy on every screen. Every category must map to the track its own
+        // name describes, and only two names are left that can.
+        assertEquals(
+            listOf("JORDANIAN_RESIDENT", "JORDANIAN_EXPATRIATE"),
+            NationalityCategory.entries.map { it.name },
+        )
     }
 
     @Test

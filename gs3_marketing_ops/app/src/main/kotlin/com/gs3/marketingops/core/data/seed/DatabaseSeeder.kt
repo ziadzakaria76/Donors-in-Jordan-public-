@@ -21,9 +21,10 @@ import javax.inject.Singleton
  * seed on next launch — which is precisely what `REPLACE` would do, silently,
  * and only to the people who had customised something.
  *
- * The one exception is the eligibility gate row, which is inserted only when
- * absent for the same reason: it starts closed, and once someone has cleared it
- * with a real reference number the seed must never close it again.
+ * The price of insert-only is that this class can never *remove* anything. When
+ * the non-Jordanian track was dropped, taking four market-budget rows with it,
+ * the rows already on someone's phone had to be deleted by a schema migration
+ * instead — see `Gs3Database.MIGRATION_1_2` and DECISIONS.md → D-23.
  */
 @Singleton
 class DatabaseSeeder @Inject constructor(
@@ -39,9 +40,6 @@ class DatabaseSeeder @Inject constructor(
             insertObjectionsIfAbsent(Gs3Seed.objections())
         }
 
-        database.complianceDao().apply {
-            insertClaimsIfAbsent(Gs3Seed.contractClaims())
-            if (getGate() == null) upsertGate(Gs3Seed.eligibilityGate())
-        }
+        database.complianceDao().insertClaimsIfAbsent(Gs3Seed.contractClaims())
     }
 }
