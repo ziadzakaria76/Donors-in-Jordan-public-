@@ -50,14 +50,6 @@ data class CampaignSpec(
         get() = listOf(PREFIX, track.name, market.uppercase(), objective.name, audience, format, "v$version")
             .joinToString(SEPARATOR)
 
-    /**
-     * The non-Jordanian track cannot go live until eligibility is confirmed in
-     * writing — the app enforces it rather than trusting anyone to remember.
-     * Everything else is unaffected.
-     */
-    fun canActivate(nonJordanianEligibilityCleared: Boolean): Boolean =
-        track != Track.NONJO || nonJordanianEligibilityCleared
-
     fun utmParameters(): Map<String, String> = linkedMapOf(
         "utm_source" to platform.utmSource,
         "utm_medium" to platform.utmMedium,

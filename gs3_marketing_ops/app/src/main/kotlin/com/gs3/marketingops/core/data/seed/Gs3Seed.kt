@@ -1,12 +1,11 @@
 package com.gs3.marketingops.core.data.seed
 
 import com.gs3.marketingops.campaigns.data.MarketBudgetEntity
+import com.gs3.marketingops.compliance.data.ContractClaim
+import com.gs3.marketingops.compliance.data.ContractClaimEntity
 import com.gs3.marketingops.domain.budget.Gs3Budget
 import com.gs3.marketingops.domain.inventory.Gs3Schedule
 import com.gs3.marketingops.inventory.data.UnitEntity
-import com.gs3.marketingops.nonjordanian.data.ContractClaim
-import com.gs3.marketingops.nonjordanian.data.ContractClaimEntity
-import com.gs3.marketingops.nonjordanian.data.EligibilityGateEntity
 import com.gs3.marketingops.outreach.data.MessageTemplateEntity
 import com.gs3.marketingops.outreach.data.ObjectionEntity
 import java.time.Instant
@@ -32,19 +31,28 @@ object Gs3Seed {
     fun units(): List<UnitEntity> =
         Gs3Schedule.apartments.map(UnitEntity.Companion::fromDomain)
 
+    /**
+     * Five rows, all expatriate.
+     *
+     * There were nine. IRQ, GULF, PSE and TEST were the non-Jordanian markets
+     * and are gone with the track (DECISIONS.md → D-23, D-24). Because the seed
+     * only inserts, deleting them here is not enough on its own to clear them
+     * from a phone that already has them — `Gs3Database.MIGRATION_1_2` does
+     * that.
+     */
     fun marketBudgets(): List<MarketBudgetEntity> =
         Gs3Budget.externalTrackMarkets.map(MarketBudgetEntity.Companion::fromDomain)
 
+    /** When the owner answered B-2. Fixed, so the seed is deterministic. */
+    private val b2AnsweredAt: Instant = Instant.parse("2026-08-29T00:00:00Z")
+
+    private val confirmedClaims = setOf(
+        ContractClaim.FINISHING_SPECIFICATIONS_ANNEX,
+        ContractClaim.QUARTERLY_PHOTOGRAPHIC_PROGRESS_REPORT,
+    )
+
     /**
-     * The gate starts closed. Two of the four contract claims start confirmed.
-     *
-     * **B-1 is answered, and the answer is no** (2026-08-29). The written
-     * statement from the Department of Lands and Survey has not been obtained.
-     * The gate therefore stays closed and no `NONJO` campaign can be activated
-     * — the same enforcement as before the question was asked, but not the same
-     * state: this is now a known "no" waiting on a document, rather than a
-     * question nobody has put. Whoever reads this next should chase the
-     * statement, not re-ask the question.
+     * Two of the four contract claims start confirmed.
      *
      * **B-2 is answered in part** (2026-08-29). The owner confirms the signed
      * contract carries the finishing-specifications annex and the quarterly
@@ -58,18 +66,9 @@ object Gs3Seed {
      * stays null on both. Worth filling in when someone next has the contract
      * open.
      *
-     * This is why the four are four rows and not one switch.
+     * This is why the four are four rows and not one switch. All four apply to
+     * every buyer, so all four stayed when the non-Jordanian track went (D-23).
      */
-    fun eligibilityGate(): EligibilityGateEntity = EligibilityGateEntity()
-
-    /** When the owner answered B-2. Fixed, so the seed is deterministic. */
-    private val b2AnsweredAt: Instant = Instant.parse("2026-08-29T00:00:00Z")
-
-    private val confirmedClaims = setOf(
-        ContractClaim.FINISHING_SPECIFICATIONS_ANNEX,
-        ContractClaim.QUARTERLY_PHOTOGRAPHIC_PROGRESS_REPORT,
-    )
-
     fun contractClaims(): List<ContractClaimEntity> =
         ContractClaim.entries.map { claim ->
             if (claim in confirmedClaims) {
@@ -293,18 +292,31 @@ object Gs3Seed {
             objectionKey = "non_jordanian_eligibility",
             objectionAr = "أنا غير أردني — هل يحقّ لي التملّك؟",
             objectionEn = "I am not Jordanian — am I allowed to own?",
-            // The honest answer while B-1 is unanswered. It neither promises
-            // eligibility nor invents a legal position, and it does not
-            // guarantee an approval that belongs to the authorities.
+            // This answer stays although the non-Jordanian track has gone
+            // (D-23), and it is rewritten rather than kept as it was.
+            //
+            // It stays because removing a track the company markets does not
+            // stop the question being asked at a stand or on the phone, and the
+            // objection library exists so that nobody has to invent an answer
+            // under pressure — inventing one is exactly how an over-promise
+            // gets made to the buyer the app is most exposed on.
+            //
+            // It is rewritten because the old text said the written statement
+            // and the legal opinion "are being sought" and promised to pass on
+            // the answer. B-1 came back no on 2026-08-29 and the owner chose to
+            // drop the track rather than keep chasing it, so that sentence had
+            // become a commitment nobody is working to. What replaces it
+            // promises nothing, offers nothing, refuses nobody, and points at
+            // the only two places that can actually answer.
             responseAr = "هذا سؤال تجيب عنه الجهات المختصّة وحدها، ولا أعطيك فيه رأياً شخصياً. " +
-                "نحن بصدد الحصول على كتاب خطّي من دائرة الأراضي والمساحة بخصوص تصنيف وحدات المشروع، " +
-                "ورأي قانوني من محامٍ مرخّص. حالما يصلنا الجواب أبلغك به كما هو. " +
-                "وحتى ذلك الحين لن أعدك بشيء لا أملك تأكيده.",
+                "ولا يوجد لدينا اليوم كتاب خطّي من دائرة الأراضي والمساحة بخصوص تصنيف وحدات المشروع، " +
+                "ولذلك لا أعدك بشيء في هذا الأمر، ولا نسوّق المشروع لغير الأردنيين ما دام الحال كذلك. " +
+                "وإن أردت متابعة الموضوع، فدائرة الأراضي والمساحة ومحامٍ مرخّص هما المرجع الصحيح.",
             responseEn = "That is a question only the competent authorities can answer, and I will not give you a " +
-                "personal opinion on it. We are in the process of obtaining a written statement from the Department " +
-                "of Lands and Survey on how this project's units are classified, together with a written opinion " +
-                "from a licensed lawyer. As soon as we have the answer I will pass it to you exactly as it comes. " +
-                "Until then I will not promise you anything I cannot confirm.",
+                "personal opinion on it. We hold no written statement from the Department of Lands and Survey on " +
+                "how this project's units are classified, so I will not promise you anything on it, and we are not " +
+                "marketing the project to non-Jordanian buyers while that is the case. If you want to take it " +
+                "further, the Department of Lands and Survey and a licensed lawyer are the right places to ask.",
             displayOrder = 8,
         ),
     )

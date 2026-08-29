@@ -14,18 +14,22 @@ enum class LeadSource {
 }
 
 /**
- * Which of the two special tracks a buyer falls into, if either.
+ * Which process applies to a buyer.
  *
  * This is not the same question as nationality in the passport sense, and the
  * app does not need that. It needs to know which process applies: a Jordanian
- * abroad buys remotely, and a non-Jordanian needs government approvals the
- * company cannot promise.
+ * abroad buys remotely, and a Jordanian already here does not.
+ *
+ * `ARAB_NON_JORDANIAN` and `NON_ARAB` used to sit here, both mapping to
+ * `Track.NONJO`. They are removed rather than remapped — see DECISIONS.md →
+ * D-25. With the non-Jordanian track gone there is no honest track left for
+ * them, and pointing them at `EXPAT` would have recorded a non-Jordanian buyer
+ * as a Jordanian expatriate: a lie in the one field the whole process is
+ * chosen from.
  */
 enum class NationalityCategory(val track: Track) {
     JORDANIAN_RESIDENT(Track.LOCAL),
     JORDANIAN_EXPATRIATE(Track.EXPAT),
-    ARAB_NON_JORDANIAN(Track.NONJO),
-    NON_ARAB(Track.NONJO),
 }
 
 enum class Purpose { RESIDENCE, INVESTMENT }

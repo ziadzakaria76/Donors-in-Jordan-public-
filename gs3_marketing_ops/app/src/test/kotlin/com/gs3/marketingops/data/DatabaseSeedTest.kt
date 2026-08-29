@@ -9,7 +9,6 @@ import com.gs3.marketingops.domain.inventory.UnitStatus
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -18,7 +17,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
-import java.time.Instant
 
 /**
  * The database as it actually behaves, not as the seed object describes it.
@@ -58,11 +56,10 @@ class DatabaseSeedTest {
         seed()
 
         assertEquals(14, database.unitDao().count())
-        assertEquals(9, database.marketBudgetDao().count())
+        assertEquals(5, database.marketBudgetDao().count())
         assertEquals(Gs3Seed.messageTemplates().size, database.outreachDao().getTemplates().size)
         assertEquals(Gs3Seed.objections().size, database.outreachDao().getObjections().size)
         assertEquals(4, database.complianceDao().getClaims().size)
-        assertNotNull(database.complianceDao().getGate())
     }
 
     @Test
@@ -83,7 +80,7 @@ class DatabaseSeedTest {
         seed()
 
         assertEquals(14, database.unitDao().count())
-        assertEquals(9, database.marketBudgetDao().count())
+        assertEquals(5, database.marketBudgetDao().count())
         assertEquals(Gs3Seed.objections().size, database.outreachDao().getObjections().size)
         assertEquals(4, database.complianceDao().getClaims().size)
     }
@@ -114,25 +111,6 @@ class DatabaseSeedTest {
         assertEquals(UnitStatus.CONTRACTED.name, afterRestart.status)
         assertEquals(88_000_000L, afterRestart.agreedPriceFils)
         assertEquals("Cash, no financing", afterRestart.discountJustification)
-    }
-
-    @Test
-    fun `a gate that has been cleared is never quietly closed again by the seed`() = runTest {
-        seed()
-
-        val cleared = database.complianceDao().getGate()!!.copy(
-            landsAndSurveyStatementObtained = true,
-            lawyerOpinionObtained = true,
-            reference = "DLS/2026/0001",
-            clearedAt = Instant.parse("2026-09-01T09:00:00Z"),
-        )
-        database.complianceDao().upsertGate(cleared)
-
-        seed()
-
-        val gate = database.complianceDao().getGate()!!.toDomain()
-        assertTrue(gate.isCleared)
-        assertEquals("DLS/2026/0001", gate.reference)
     }
 
     @Test

@@ -33,11 +33,16 @@ data class MarketAllocation(
 /**
  * The approved annual media allocation.
  *
- * The splits are not guesses. The expatriate share follows the geographic
- * distribution of inbound remittances to Jordan, and the non-Jordanian share
- * follows the distribution of non-Jordanian ownership transactions by
- * nationality — which is why Iraq takes half the non-Jordanian budget and
- * Kuwait takes a twentieth of the expatriate one.
+ * The split is not a guess. The expatriate share follows the geographic
+ * distribution of inbound remittances to Jordan, which is why the Emirates take
+ * roughly four times what Kuwait does.
+ *
+ * **The external track is expatriates, and nothing else.** It used to carry a
+ * second half — 2,520 JOD across IRQ, GULF, PSE and TEST — for non-Jordanian
+ * buyers. Those four rows are deleted with the track (DECISIONS.md → D-23,
+ * D-24). [totalPaidMedia] is unchanged at the approved 18,000, so the 2,520 is
+ * not withdrawn from the plan: it falls to the local track by the existing
+ * arithmetic below, which takes local as whatever the external track does not.
  */
 object Gs3Budget {
 
@@ -51,18 +56,16 @@ object Gs3Budget {
         MarketAllocation(Track.EXPAT, "KWT", Jod.ofDinars(340)),
     )
 
-    val nonJordanianMarkets: List<MarketAllocation> = listOf(
-        MarketAllocation(Track.NONJO, "IRQ", Jod.ofDinars(1_260)),
-        MarketAllocation(Track.NONJO, "GULF", Jod.ofDinars(560)),
-        MarketAllocation(Track.NONJO, "PSE", Jod.ofDinars(420)),
-        MarketAllocation(Track.NONJO, "TEST", Jod.ofDinars(280)),
-    )
-
-    val externalTrackMarkets: List<MarketAllocation> get() = expatriateMarkets + nonJordanianMarkets
+    /**
+     * Kept as its own name even though it is now exactly [expatriateMarkets].
+     * The two are the same list today and are not the same idea: "the markets
+     * the external track buys media in" is what the seed and the reports mean,
+     * and collapsing it would hide where a second external market would go.
+     */
+    val externalTrackMarkets: List<MarketAllocation> get() = expatriateMarkets
 
     val expatriateTotal: Jod get() = expatriateMarkets.map { it.annual }.sum()
-    val nonJordanianTotal: Jod get() = nonJordanianMarkets.map { it.annual }.sum()
-    val externalTrackTotal: Jod get() = expatriateTotal + nonJordanianTotal
+    val externalTrackTotal: Jod get() = expatriateTotal
 
     /** Whatever is not committed to the external track — Meta, portals, Google, Snapchat, TikTok. */
     val localTrackTotal: Jod get() = totalPaidMedia - externalTrackTotal

@@ -27,8 +27,12 @@ business logic cheap to hold rather than a chore. Everything Android — Room,
 Compose, WorkManager, Hilt — stays in `:app`.
 
 Inside `:app`, packages by feature (`inventory`, `leads`, `campaigns`,
-`content`, `whatsapp`, `calculators`, `reports`, `nonjordanian`, `settings`),
+`content`, `whatsapp`, `calculators`, `reports`, `compliance`, `settings`),
 each with its own `ui` / `data` split. MVVM, unidirectional flow, one activity.
+
+There was a `nonjordanian` package. It is gone with the track (`DECISIONS.md` →
+D-23); `compliance` is what is left of it, and holds the four contract claims,
+which were never about non-Jordanian buyers in the first place.
 
 ## Cross-cutting work that cannot be retrofitted
 
@@ -58,7 +62,7 @@ later means reopening every screen:
 | 4 | Leads, SLA engine, notifications | Capture, qualification, pipeline, timeline, mandatory loss reasons; every SLA rule firing against the *lead's* time zone including across a DST boundary; reminder health check; no client data on a lock screen |
 | 5 | Campaigns, budget, performance | Code and UTM builder that cannot drift, allocation, seasonal normalisation, spend entry, CPL, stop-rule flags |
 | 6 | Content planner + WhatsApp toolkit | Calendar, pillar balance, asset checklist, nurture sequences, quick replies, objection library |
-| 7 | Calculators + non-Jordanian tracker + gate | All calculators with their disclaimers; eight-step tracker; the blocking gate enforced everywhere it is specified |
+| 7 | Calculators | All calculators with their disclaimers. The non-Jordanian tracker and its blocking gate were this milestone's other half and are removed from v1 — `DECISIONS.md` → D-23 |
 | 8 | Dashboard, reports, export, backup | Dashboard aggregates correct; PDF and CSV with Arabic proven, not assumed; encrypted backup and a restore tested on a clean install |
 | 9 | Polish, accessibility, adaptive, dark mode | Empty states, TalkBack, 200% font scale, dark theme, landscape and tablet two-pane, predictive back, insets under both navigation modes, full screenshot set |
 | 10 | Release | Signed AAB and debug APK, keystore documented for offline safekeeping, icons, `README.md`, `USER_GUIDE_AR.md`, `USER_GUIDE_EN.md`, `QA_CHECKLIST.md`, `DECISIONS.md` |
@@ -98,6 +102,13 @@ Neither would occur to a non-technical owner, so both are stated in bold, in
 both languages, at the point of use.
 
 ## Deliberately not in v1
+
+**No non-Jordanian buyer track.** The owner removed it on 2026-08-29 after the
+Department of Lands and Survey statement came back not obtained, rather than
+ship a module locked behind a gate nobody could open. Nothing in v1 markets to,
+processes, or promises anything to a non-Jordanian buyer. It is a rebuild, not a
+switch: see `DECISIONS.md` → D-23 for exactly what came out, and D-24 to D-27
+for the consequences that are still awaiting the owner's confirmation.
 
 No backend, accounts or cloud sync — data lives on the device, and encrypted
 backup files are how it moves between phones. No ad-platform API integration;

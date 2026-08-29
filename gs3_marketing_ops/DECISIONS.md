@@ -15,21 +15,24 @@ the moment they are answered, with the date and the reference.
 
 | # | Question | Status | Answered on | Reference |
 | --- | --- | --- | --- | --- |
-| B-1 | Has a written statement been obtained from the Department of Lands and Survey confirming the classification of this project's units and that non-Jordanians may own them? | **Answered — no** | 2026-08-29 | Owner |
+| B-1 | Has a written statement been obtained from the Department of Lands and Survey confirming the classification of this project's units and that non-Jordanians may own them? | **Answered — no.** No longer blocks v1: the track it gated was removed instead (D-23) | 2026-08-29 | Owner |
 | B-2 | Does the signed contract actually contain (a) the named finishing-specifications annex, (b) a delay penalty in the buyer's favour, (c) the two-year finishing and ten-year structural warranty, and (d) the quarterly photographic progress report? | **Answered in part — (a) and (d) yes; (b) and (c) not confirmed** | 2026-08-29 | Owner |
 
-**B-1 answered 2026-08-29: no.** The statement has not been obtained. Nothing
-the app does changes — the consequences below still hold, unchanged — but the
-state has: this is a known "no" waiting on a document, not a question nobody has
-put. The next person here should chase the Department of Lands and Survey, not
-re-ask the owner.
+**B-1 answered 2026-08-29: no.** The statement has not been obtained.
 
-Consequences while the statement is not held — enforced by the app, not by
-convention:
+**And later the same day the owner closed the question by removing the track.**
+The consequences originally recorded here — a blocking gate, `NONJO` campaigns
+that cannot be activated, a persistent Dashboard banner — are all gone, because
+the module they guarded is gone. **This is not the gate being opened.** Nothing
+in v1 markets to, processes, or promises anything to a non-Jordanian buyer, and
+there is no longer a locked door to unlock: see **D-23** below for what was
+deleted and **D-24**, **D-25** and **D-26** for the three consequences that had
+to be decided along the way.
 
-- the non-Jordanian buyer module stays behind its blocking gate (brief §5.9);
-- no campaign whose track is `NONJO` can be set to Active;
-- the Dashboard carries a persistent banner.
+B-1 therefore stops being a blocker for v1 and becomes a precondition for ever
+putting the track back. Whoever revives it needs the Department of Lands and
+Survey statement *and* the legal opinion first, and rebuilds from D-23 rather
+than re-enabling something dormant.
 
 **B-2 answered 2026-08-29, in part.** The owner confirms the signed contract
 carries **(a)** the finishing-specifications annex and **(d)** the quarterly
@@ -563,9 +566,161 @@ the team might not be able to keep. It now commits to keeping the client
 informed — which the app's own ten-day external-track update rule already backs
 — and says that what follows from a delay is set by the contract text.
 
-The non-Jordanian objection is written for the world as it is while B-1 is
-unanswered: it defers to the competent authorities, states that the written
-statement and legal opinion are being sought, and promises nothing.
+The non-Jordanian objection is written for the world as it is: it defers to the
+competent authorities and promises nothing. It was rewritten on 2026-08-29 — see
+D-23 — because its original wording said the statement and the legal opinion
+were being sought, and after the owner dropped the track nobody was seeking
+them.
+
+### D-23 — The non-Jordanian track is removed from v1 (2026-08-29)
+
+The owner's decision, taken after B-1 came back "no": rather than ship a module
+that stays permanently locked behind a gate nobody can open, drop the track.
+
+**This is a removal, not an unlocking.** The distinction is the whole point. An
+app carrying a locked non-Jordanian module is one settings toggle away from
+marketing to buyers whose eligibility nobody has confirmed in writing. An app
+with no such module is not. So the gate, the eight-step journey, the approval
+authorities, the document checklist and the `NONJO` track were **deleted** —
+not commented out, not left as unreachable enum values.
+
+Gone, in full:
+
+| Deleted | Was |
+| --- | --- |
+| `domain/nonjordanian/BuyerFile.kt` and its test | `EligibilityGate`, `NonJordanianFile`, `JourneyStep`, `StepStatus`, `DocumentItem`, `DocumentProvider`, `ApprovalAuthority` |
+| `Track.NONJO` | the third track |
+| `CampaignSpec.canActivate` | the gate seen from the campaign side. With no gated track it had nothing left to refuse |
+| `eligibility_gate` table, `EligibilityGateEntity`, the three gate DAO methods | the persisted answer |
+| Four `market_budgets` rows | IRQ, GULF, PSE, TEST — see D-24 |
+| Two `NationalityCategory` values | `ARAB_NON_JORDANIAN`, `NON_ARAB` — see D-25 |
+| Eight `strings.xml` keys, in **both** locales | every `gate_*`, plus `track_nonjo` and `disclaimer_non_jordanian`. 106 keys down to 98, both files in step |
+
+**Kept, deliberately.** The four B-2 contract claims: they are terms of the
+signed contract every buyer signs, not a non-Jordanian matter, and B-2 answered
+(a) and (d) on the same day. They only ever *lived* in a package called
+`nonjordanian` — which was wrong about them before the track went — so the file
+moved to `compliance/data/ContractClaims.kt` and nothing about it changed.
+`LossReason.ELIGIBILITY_OR_APPROVAL` is kept too: a bank refusal and a company
+approval are both eligibility problems, and deleting the reason would erase the
+history of every lead already lost for one.
+
+**The objection stays, rewritten.** `non_jordanian_eligibility` is the scripted
+answer to "I am not Jordanian — may I own?". Dropping a marketing track does not
+stop that question being asked at a stand, and the objection library exists so
+that nobody has to invent an answer under pressure — an invented answer is
+exactly how an over-promise reaches the buyer this app is most exposed on. But
+the old text said the written statement and the legal opinion "are being sought"
+and undertook to pass the answer on, and after this decision nobody is seeking
+them. A promise to report back that nobody is chasing is worse than no promise.
+The replacement states that no written statement is held, promises nothing,
+offers nothing, refuses nobody, and points at the Department and a lawyer. A
+test asserts the stale sentences have not come back.
+
+**Room: a real migration, and the destructive fallback stays absent.** Version
+1 → 2 is `Gs3Database.MIGRATION_1_2`. It drops `eligibility_gate` and — the half
+that is easy to miss — **deletes the four `NONJO` rows from `market_budgets`**.
+That table is shared, and the seed is insert-only with `OnConflictStrategy.IGNORE`
+by design (D-19), so a phone upgraded from version 1 would otherwise show 2,520
+JOD of non-Jordanian media forever, on a track the app no longer has. The
+`MIGRATIONS` array created empty at version 1 is what this filled in; the
+builder was already wired for it and did not change.
+
+`DatabaseMigrationTest` builds a real version 1 database — reading the
+`CREATE TABLE` statements out of the **committed** `schemas/…/1.json` rather
+than retyping them, because a retyped schema tests the retyping — then opens it
+through `Gs3Database.build`. **Both halves were proved to fail before being
+relied on:** removing the `DELETE` fails it, removing the `DROP TABLE` fails it,
+and restoring each makes it pass. `fallbackToDestructiveMigration` is still
+absent and the test that proves it is untouched.
+
+### D-24 — The four non-Jordanian market rows are deleted, and the local track absorbs the money
+
+**Needs the owner's confirmation.** The default applied is the conservative,
+reversible one.
+
+The external track was 7,200 JOD: expatriates 4,680 plus non-Jordanians 2,520
+(IRQ 1,260, GULF 560, PSE 420, TEST 280). Those four rows are deleted with the
+track. Total paid media stays at **18,000** — it is the approved annual figure
+and it is editable in Settings — so the external track becomes expatriates alone
+at 4,680, and `localTrackTotal` rises from 10,800 to **13,320** by the existing
+subtraction, `local = total − external`. Nothing was re-derived to produce that
+number; it falls out of arithmetic that was already there.
+
+The tests were changed to the new truth rather than kept green. The old
+`the external track takes forty per cent of paid media, split sixty-five
+thirty-five` asserted two figures that described a track which no longer exists,
+and the honest replacement is not a re-split — it is that there is nothing left
+to split. The external share is now 26% of paid media, all of it expatriate.
+**Inventing new market rows to keep a 65/35 assertion passing was available and
+was not done.**
+
+**What this does not settle.** The 2,520 lands on the local track because that
+is where the subtraction puts it, not because anyone decided local media should
+grow by a quarter. Withdrawing it from the plan instead is a one-line change to
+`totalPaidMedia`, and is the owner's call.
+
+### D-25 — `ARAB_NON_JORDANIAN` and `NON_ARAB` are removed, not remapped
+
+**Needs the owner's confirmation.**
+
+Both mapped to `Track.NONJO`. With the track gone they have no honest track left,
+and the tempting alternative — point them at `EXPAT` — would have filed a
+non-Jordanian buyer as a Jordanian expatriate in the single field the entire
+process is chosen from. It would have looked healthy on every screen and been a
+lie in the database. So `NationalityCategory` is `JORDANIAN_RESIDENT` (LOCAL)
+and `JORDANIAN_EXPATRIATE` (EXPAT), and `Track` is `LOCAL` and `EXPAT`.
+
+`Track.isExternal` stays meaningful and stays as it was: `!= LOCAL`. It still
+carries the 45-day staleness window and the 10-day update promise, which were
+never non-Jordanian-specific — an expatriate lead four time zones away needs
+both for the same reason it always did.
+
+Two tests assert the *shape* rather than a value: `Track.entries` is exactly
+`[LOCAL, EXPAT]` and `NationalityCategory.entries` is exactly the two Jordanian
+ones. Reintroducing either enum value fails the build and sends whoever did it
+here, instead of a track with no gate behind it reappearing quietly.
+
+### D-26 — The 150 JOD qualified-lead target is left alone, and no longer matches the budget
+
+**Needs the owner's confirmation.** This one is not in the brief that asked for
+the removal; it was found while doing it.
+
+D-3 settled on one target for the external track: 150 JOD per qualified lead,
+with a recorded decision forced above 200. That 150 was not a preference — it
+was 7,200 ÷ 48, the budget's own arithmetic. Removing the non-Jordanian track
+takes the external budget to 4,680, and the same division gives **97.500**. The
+target and its budget no longer agree.
+
+The target is deliberately **left at 150**. Moving it down to 97.5 would tighten
+an alarm on a funnel model nobody has re-estimated, which is D-3's failure
+repeated exactly: an alarm that fires from week one, never clears, and teaches
+the team to ignore alarms. When a threshold has to move on an unconfirmed
+assumption, loose is the safe direction. Both figures remain editable in
+Settings.
+
+The test that asserted "the budget's arithmetic meets it" now asserts the gap
+instead, with the numbers written out, so the next person to touch the default
+finds the discrepancy and this entry rather than a stale claim.
+
+### D-27 — The targets and the funnel model are left exactly as they were, and one of them is now doing more work
+
+Not a change — a statement of what was deliberately **not** changed, because the
+arithmetic underneath it moved.
+
+The 11-unit annual target, the 3-unit external-track target and the ≥27%
+external share are unchanged. None was ever non-Jordanian-specific, and the
+expatriate track carries them now.
+
+`FunnelModel.EXTERNAL` is unchanged too: 160 raw leads → 48 qualified → 17
+viewings → 3 contracts. **But those 160 were modelled for the whole external
+track, when that meant expatriates and non-Jordanians together.** Expatriate
+marketing alone now has to supply all 160 — on 4,680 JOD rather than 7,200.
+Whether it can has not been re-estimated, and the numbers were left alone rather
+than adjusted by guesswork, because a funnel model invented to make a
+spreadsheet balance is worse than one that is visibly out of date. Flagged to
+the owner; the model is a single object with five numbers in it and changing it
+costs nothing once someone has decided what it should say.
 
 ---
 
@@ -599,7 +754,7 @@ depends on it (noted in the last column).
 | B2 | The same salesperson handles both tracks | Milestone 4 |
 | B3 | Loss reasons as specified — ten, single-select, mandatory | Milestone 4 |
 | B4 | Lead sources as specified | Milestone 2 |
-| B5 | Modern Standard Arabic for expatriate and non-Jordanian templates; light Jordanian dialect for local buyers | Milestone 6 |
+| B5 | Modern Standard Arabic for expatriate templates; light Jordanian dialect for local buyers. (Non-Jordanian templates were the third case and are gone with the track — D-23) | Milestone 6 |
 | B6 | No broker module — "broker" is a lead source and nothing more | — |
 
 ### Batch C — look, feel and delivery
@@ -617,10 +772,15 @@ depends on it (noted in the last column).
 
 | Ref | Question | Status |
 | --- | --- | --- |
-| B-1, B-2 | The two blocking questions in section 0 | Awaiting a written answer. Not defaultable |
+| B-2 (b), (c) | Does the signed contract carry the delay penalty and the two-year/ten-year warranty? | Unconfirmed. Both stay out of client-facing text until someone reads the contract |
+| D-24 | Does the 2,520 JOD freed by the removed markets stay in the plan on the local track, or come out of it? | **Default applied and needs confirming.** It stays: total paid media is unchanged at 18,000, so local rises 10,800 → 13,320 |
+| D-25 | Should `ARAB_NON_JORDANIAN` and `NON_ARAB` be removed, or kept and pointed somewhere? | **Default applied and needs confirming.** Removed — there is no honest track left, and `EXPAT` would be a lie |
+| D-26 | The 150 JOD qualified-lead target no longer matches the budget (97.5). Move it or keep it? | **Default applied and needs confirming.** Kept at 150 — loose is the safe direction for an unconfirmed threshold |
+| D-27 | The external funnel's 160 raw leads were for the whole external track. Can expatriates alone supply them on 4,680 JOD? | Not re-estimated. The model and every target are unchanged, deliberately |
 
 ### Closed
 
 | Ref | Question | Answer |
 | --- | --- | --- |
-| D-3 | Is 45 JOD the target per **raw** lead or per **qualified** lead? | **Answered 2026-08-16.** Neither — the owner removed the 45 JOD figure. One target remains: 150 JOD per qualified lead, 200 stop threshold, both editable in Settings. See D-3 above |
+| D-3 | Is 45 JOD the target per **raw** lead or per **qualified** lead? | **Answered 2026-08-16.** Neither — the owner removed the 45 JOD figure. One target remains: 150 JOD per qualified lead, 200 stop threshold, both editable in Settings. See D-3 above, and D-26 for what happened to the arithmetic behind the 150 |
+| B-1 | Has the Department of Lands and Survey statement been obtained? | **Answered 2026-08-29: no**, and closed as a v1 blocker on the same day by removing the track it gated rather than shipping a permanently locked module. See D-23. It becomes a precondition again only if the track is ever revived |

@@ -1,12 +1,12 @@
 package com.gs3.marketingops.data
 
+import com.gs3.marketingops.compliance.data.ContractClaim
 import com.gs3.marketingops.core.data.seed.Gs3Seed
 import com.gs3.marketingops.domain.budget.Gs3Budget
 import com.gs3.marketingops.domain.inventory.Gs3Schedule
 import com.gs3.marketingops.domain.inventory.totals
 import com.gs3.marketingops.domain.money.Jod
 import com.gs3.marketingops.domain.outreach.MessageTemplate
-import com.gs3.marketingops.nonjordanian.data.ContractClaim
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -51,7 +51,7 @@ class SeedContentTest {
     }
 
     @Test
-    fun `the seeded budget rows sum to the track totals exactly`() {
+    fun `the seeded budget rows sum to the track total exactly`() {
         val seeded = Gs3Seed.marketBudgets().map { it.toDomain() }
 
         assertEquals(Gs3Budget.externalTrackMarkets, seeded)
@@ -59,21 +59,22 @@ class SeedContentTest {
             Gs3Budget.externalTrackTotal,
             seeded.fold(Jod.ZERO) { running, row -> running + row.annual },
         )
-        assertEquals(Jod.ofDinars(7_200), Gs3Budget.externalTrackTotal)
+        // 4,680, not 7,200 — the four non-Jordanian market rows are gone with
+        // the track (D-23, D-24).
+        assertEquals(Jod.ofDinars(4_680), Gs3Budget.externalTrackTotal)
+        assertEquals(5, seeded.size)
     }
 
     @Test
-    fun `the eligibility gate ships closed, and a closed gate blocks both things it must`() {
-        val gate = Gs3Seed.eligibilityGate().toDomain()
-
-        // B-1 is unanswered. This is the correct shipping state, not a stub.
-        assertTrue(!gate.isCleared)
-        assertTrue(!gate.allowsModuleAccess())
-        assertTrue(!gate.allowsNonJordanianCampaignActivation())
-        assertEquals(
-            listOf("lands_and_survey_statement", "lawyer_opinion", "reference"),
-            gate.missingRequirements(),
-        )
+    fun `the seed ships no non-Jordanian market row`() {
+        // The rows the seed no longer writes. Named individually rather than
+        // counted, because a count passes just as happily if one of them were
+        // swapped for something else.
+        val keys = Gs3Seed.marketBudgets().map { it.marketKey }.toSet()
+        listOf("IRQ", "GULF", "PSE", "TEST").forEach {
+            assertTrue("$it is a non-Jordanian market and must not be seeded", it !in keys)
+        }
+        assertTrue(Gs3Seed.marketBudgets().all { it.track == "EXPAT" })
     }
 
     @Test
@@ -236,15 +237,26 @@ class SeedContentTest {
     }
 
     @Test
-    fun `the non-Jordanian objection answers honestly while B-1 is unanswered`() {
+    fun `the non-Jordanian objection defers to the authorities and promises nothing`() {
         val objection = Gs3Seed.objections().single { it.objectionKey == "non_jordanian_eligibility" }
 
-        // It must defer to the authorities rather than give an opinion, and say
-        // that the written answer is being sought — the same position the gate
-        // enforces in code.
+        // The answer survives the removal of the track (D-23) because the
+        // question survives it: dropping a marketing track does not stop
+        // somebody asking at a stand, and an unscripted answer is how an
+        // over-promise gets made.
         assertTrue(objection.responseAr.contains("الجهات المختصّة"))
         assertTrue(objection.responseEn.contains("competent authorities", ignoreCase = true))
         assertTrue(objection.responseAr.contains("دائرة الأراضي والمساحة"))
         assertTrue(objection.responseEn.contains("Department of Lands and Survey", ignoreCase = true))
+
+        // What it must no longer say. The old wording had the company actively
+        // obtaining the statement and undertaking to pass the answer on; B-1
+        // came back no and the track was dropped, so that became a commitment
+        // nobody is working to. A promise to report back that nobody is
+        // chasing is worse than no promise at all.
+        listOf("in the process of obtaining", "As soon as we have the answer")
+            .forEach { assertTrue("stale promise still in the English answer: $it", !objection.responseEn.contains(it)) }
+        listOf("بصدد الحصول", "حالما يصلنا الجواب")
+            .forEach { assertTrue("stale promise still in the Arabic answer: $it", !objection.responseAr.contains(it)) }
     }
 }

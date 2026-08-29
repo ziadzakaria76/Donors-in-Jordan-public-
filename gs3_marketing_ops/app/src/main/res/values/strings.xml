@@ -37,7 +37,6 @@
     <!-- Buyer tracks -->
     <string name="track_local">In Jordan</string>
     <string name="track_expat">Jordanian expatriates</string>
-    <string name="track_nonjo">Non-Jordanian buyers</string>
 
     <!-- Pipeline stages -->
     <string name="stage_new_enquiry">New enquiry</string>
@@ -74,18 +73,9 @@
     <string name="disclaimer_fees">Registration fee and property sale tax are calculated on the value assessed by the Department of Lands and Survey, not necessarily on the sale price. Rates are subject to legislative change. Figures shown are indicative for planning only.</string>
     <string name="disclaimer_instalments">Indicative calculation only; actual financing terms are set by the bank.</string>
     <string name="disclaimer_yield">An estimated range based on the stated assumptions, not a guarantee of return.</string>
-    <string name="disclaimer_non_jordanian">Approval rests solely with the competent authorities. Neither approval nor a specific processing time is guaranteed. This is not legal advice.</string>
     <string name="disclaimer_company_contribution">A capped contribution by the company toward registration fees — not a waiver of them.</string>
     <string name="disclaimer_rendered_image">A 3D design study, not a photograph of the building as built.</string>
     <string name="disclaimer_hospital_under_construction">Al-Andalus Hospital (under construction)</string>
-
-    <!-- Non-Jordanian eligibility gate -->
-    <string name="gate_title">Non-Jordanian eligibility confirmation</string>
-    <string name="gate_explanation">This section stays locked until a written statement is obtained from the Department of Lands and Survey confirming the classification of the project\'s units and the eligibility of non-Jordanians to own them, together with a written opinion from a licensed lawyer. Until then no campaign on this track can be activated.</string>
-    <string name="gate_confirm_dls">The written statement from the Department of Lands and Survey has been obtained</string>
-    <string name="gate_confirm_lawyer">The written opinion from a licensed lawyer has been obtained</string>
-    <string name="gate_reference_hint">Reference number</string>
-    <string name="gate_banner">The non-Jordanian track is locked — eligibility has not been confirmed in writing.</string>
 
     <!-- Discounts and pricing -->
     <string name="discount_ceiling_warning">This discount exceeds the 3.5%% ceiling and needs a written justification before it can be saved.</string>

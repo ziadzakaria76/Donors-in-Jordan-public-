@@ -11,10 +11,20 @@ import java.math.BigDecimal
  * (2026-08-16): the owner removed the 45 JOD figure, so the raw-lead target is
  * gone rather than reinterpreted.
  *
- * That leaves the track judged on the basis its own budget plans for — 7,200
- * JOD over the 48 qualified leads it expects is 150 each, with a recorded
+ * That left the track judged on the basis its own budget planned for — 7,200
+ * JOD over the 48 qualified leads it expected was 150 each, with a recorded
  * decision forced above 200. Carrying a second target of 45 as well would have
  * meant two numbers that can disagree about whether the same month went well.
+ *
+ * **150 no longer comes out of the budget's arithmetic, and is kept anyway.**
+ * Removing the non-Jordanian track (D-23) took the external budget from 7,200
+ * to 4,680, so the same division over the same 48 qualified leads now gives
+ * 97.500. The target is left at 150 deliberately — see DECISIONS.md → D-26. It
+ * is an approved figure, it is editable in Settings, and moving it down without
+ * the owner would tighten an alarm on a funnel model nobody has re-estimated,
+ * which is the D-3 failure all over again: an alarm that fires from week one
+ * and teaches the team to ignore it. The safe direction for an unconfirmed
+ * change to a threshold is the loose one.
  *
  * Worth keeping the history, because the figure will come up again: what the
  * brief called a target per *qualified* lead was 7,200 ÷ 160 **raw** leads to

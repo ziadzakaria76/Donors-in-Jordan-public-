@@ -1,52 +1,8 @@
-package com.gs3.marketingops.nonjordanian.data
+package com.gs3.marketingops.compliance.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.gs3.marketingops.domain.nonjordanian.EligibilityGate
 import java.time.Instant
-
-/**
- * The non-Jordanian eligibility gate, persisted.
- *
- * Exactly one row, and [SINGLETON_ID] is what keeps it that way — a second row
- * would mean two answers to a question that has one answer, and whichever the
- * query happened to return first would decide whether a module is locked.
- *
- * The *rule* is not here. `EligibilityGate` in `:domain` decides what clears the
- * gate and what a cleared gate permits, and it is tested there. This table only
- * remembers the answer.
- *
- * Seeded unconfirmed, because B-1 is unanswered. That is not a placeholder to
- * be tidied up later: it is the correct state, and it is what keeps the module
- * locked and `NONJO` campaigns unstartable until someone has the Department's
- * statement and a lawyer's opinion in hand.
- */
-@Entity(tableName = "eligibility_gate")
-data class EligibilityGateEntity(
-    @PrimaryKey val id: Int = SINGLETON_ID,
-    val landsAndSurveyStatementObtained: Boolean = false,
-    val lawyerOpinionObtained: Boolean = false,
-    val reference: String = "",
-    val clearedAt: Instant? = null,
-) {
-    fun toDomain(): EligibilityGate = EligibilityGate(
-        landsAndSurveyStatementObtained = landsAndSurveyStatementObtained,
-        lawyerOpinionObtained = lawyerOpinionObtained,
-        reference = reference,
-        clearedAt = clearedAt,
-    )
-
-    internal companion object {
-        const val SINGLETON_ID: Int = 1
-
-        fun fromDomain(gate: EligibilityGate): EligibilityGateEntity = EligibilityGateEntity(
-            landsAndSurveyStatementObtained = gate.landsAndSurveyStatementObtained,
-            lawyerOpinionObtained = gate.lawyerOpinionObtained,
-            reference = gate.reference,
-            clearedAt = gate.clearedAt,
-        )
-    }
-}
 
 /**
  * The four contract terms the marketing material would like to promise.
@@ -60,6 +16,13 @@ data class EligibilityGateEntity(
  * to be in the contract and one does not, three can be used and only the
  * missing one stays out. A single "contract verified" switch would force the
  * team to choose between over-claiming and under-claiming.
+ *
+ * **These rows are not about non-Jordanian buyers**, which is why they survived
+ * the removal of that track (DECISIONS.md → D-23) while the eligibility gate
+ * that used to share this file did not. A finishing annex and a delay penalty
+ * are terms of the same signed contract every buyer signs. This file was called
+ * `nonjordanian/data/ComplianceEntities.kt`; the package was wrong about it
+ * even before the track went.
  */
 enum class ContractClaim {
     /** A finishing-specifications annex, named and attached. */

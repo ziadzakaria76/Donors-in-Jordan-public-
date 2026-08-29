@@ -49,10 +49,15 @@ class FunnelTest {
     }
 
     @Test
-    fun `expat and non-Jordanian are external, local is not`() {
+    fun `expat is external, local is not, and there is no third track`() {
         assertTrue(Track.EXPAT.isExternal)
-        assertTrue(Track.NONJO.isExternal)
         assertFalse(Track.LOCAL.isExternal)
+
+        // D-23: the non-Jordanian track was deleted, not disabled. Asserted
+        // structurally so that reintroducing the enum value fails here and
+        // sends whoever did it to the decision rather than letting a track with
+        // no gate behind it quietly reappear.
+        assertEquals(listOf("LOCAL", "EXPAT"), Track.entries.map { it.name })
     }
 
     @Test

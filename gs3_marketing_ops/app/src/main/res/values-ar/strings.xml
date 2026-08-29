@@ -34,7 +34,6 @@
     <!-- مسارات المشترين -->
     <string name="track_local">داخل الأردن</string>
     <string name="track_expat">أردنيون مغتربون</string>
-    <string name="track_nonjo">مشترون غير أردنيين</string>
 
     <!-- مراحل العميل -->
     <string name="stage_new_enquiry">استفسار جديد</string>
@@ -71,18 +70,9 @@
     <string name="disclaimer_fees">تُحتسب رسوم التسجيل وضريبة بيع العقار على القيمة المقدَّرة من دائرة الأراضي والمساحة، وليس بالضرورة على سعر البيع. والنِّسب عرضة للتغيير بموجب التشريعات. الأرقام المعروضة استرشادية لأغراض التخطيط فقط.</string>
     <string name="disclaimer_instalments">حساب استرشادي فقط؛ شروط التمويل الفعلية يحدّدها البنك.</string>
     <string name="disclaimer_yield">نطاق تقديري مبني على الافتراضات المذكورة، وليس عائداً مضموناً.</string>
-    <string name="disclaimer_non_jordanian">الموافقة من صلاحية الجهات المختصّة وحدها. لا تضمن الشركة الموافقة ولا مدّة زمنية محدّدة. وهذا ليس استشارة قانونية.</string>
     <string name="disclaimer_company_contribution">مساهمة من الشركة في رسوم التسجيل بحدّ أقصى، وليست إسقاطاً للرسوم.</string>
     <string name="disclaimer_rendered_image">صورة تصميمية ثلاثية الأبعاد، لا صورة تنفيذ.</string>
     <string name="disclaimer_hospital_under_construction">مستشفى الأندلس (قيد الإنشاء)</string>
-
-    <!-- بوّابة المشترين غير الأردنيين -->
-    <string name="gate_title">تأكيد أهلية غير الأردنيين</string>
-    <string name="gate_explanation">هذا القسم مقفل حتى الحصول على كتاب خطّي من دائرة الأراضي والمساحة يؤكّد تصنيف وحدات المشروع وأهلية غير الأردنيين لتملّكها، ورأي خطّي من محامٍ مرخّص. حتى ذلك الحين لا يمكن تفعيل أي حملة على هذا المسار.</string>
-    <string name="gate_confirm_dls">حصلنا على الكتاب الخطّي من دائرة الأراضي والمساحة</string>
-    <string name="gate_confirm_lawyer">حصلنا على الرأي القانوني الخطّي من محامٍ مرخّص</string>
-    <string name="gate_reference_hint">الرقم المرجعي للكتاب</string>
-    <string name="gate_banner">مسار غير الأردنيين مقفل — لم تُؤكَّد الأهلية خطّياً بعد.</string>
 
     <!-- الخصومات والتسعير -->
     <string name="discount_ceiling_warning">يتجاوز الخصم سقف ٣٫٥٪، ويلزم تبرير خطّي قبل الحفظ.</string>

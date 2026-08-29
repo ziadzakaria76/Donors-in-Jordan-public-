@@ -2,7 +2,6 @@ package com.gs3.marketingops.domain.campaign
 
 import com.gs3.marketingops.domain.funnel.Track
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -95,18 +94,11 @@ class CampaignCodeTest {
     }
 
     @Test
-    fun `a non-Jordanian campaign cannot go live until eligibility is confirmed in writing`() {
-        // The gate, in domain terms. This is not a UI convention that someone
-        // can click past: a NONJO campaign simply cannot be activated until the
-        // Department of Lands and Survey statement exists.
-        val nonJordanian = spec.copy(track = Track.NONJO, market = "IRQ")
-        assertFalse(nonJordanian.canActivate(nonJordanianEligibilityCleared = false))
-        assertTrue(nonJordanian.canActivate(nonJordanianEligibilityCleared = true))
-    }
-
-    @Test
-    fun `the gate blocks only the non-Jordanian track and nothing else`() {
-        assertTrue(spec.canActivate(nonJordanianEligibilityCleared = false))
-        assertTrue(spec.copy(track = Track.LOCAL, market = "JOR").canActivate(false))
+    fun `a code naming a track this app does not have does not parse`() {
+        // What the eligibility gate used to guard, now guarded by the type
+        // system instead. `GS3-NONJO-IRQ-...` is a code someone could still
+        // have written down in an ad platform before the track was removed
+        // (D-23); pasting it back in must not produce a campaign.
+        assertNull(CampaignSpec.parse("GS3-NONJO-IRQ-CONV-LAL1-Reel30s-v1"))
     }
 }

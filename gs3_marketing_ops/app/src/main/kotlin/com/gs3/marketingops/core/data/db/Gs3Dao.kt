@@ -6,9 +6,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.gs3.marketingops.campaigns.data.MarketBudgetEntity
+import com.gs3.marketingops.compliance.data.ContractClaimEntity
 import com.gs3.marketingops.inventory.data.UnitEntity
-import com.gs3.marketingops.nonjordanian.data.ContractClaimEntity
-import com.gs3.marketingops.nonjordanian.data.EligibilityGateEntity
 import com.gs3.marketingops.outreach.data.MessageTemplateEntity
 import com.gs3.marketingops.outreach.data.ObjectionEntity
 import kotlinx.coroutines.flow.Flow
@@ -91,19 +90,6 @@ interface OutreachDao {
 
 @Dao
 interface ComplianceDao {
-
-    @Query("SELECT * FROM eligibility_gate WHERE id = 1")
-    fun observeGate(): Flow<EligibilityGateEntity?>
-
-    @Query("SELECT * FROM eligibility_gate WHERE id = 1")
-    suspend fun getGate(): EligibilityGateEntity?
-
-    /**
-     * REPLACE, not IGNORE: this row is meant to be overwritten when the gate is
-     * finally cleared, and there is only ever one of it.
-     */
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertGate(gate: EligibilityGateEntity)
 
     @Query("SELECT * FROM contract_claims ORDER BY claim")
     fun observeClaims(): Flow<List<ContractClaimEntity>>
