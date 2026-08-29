@@ -8,6 +8,14 @@ on:
     paths: ['doc2md/**', '.github/workflows/doc2md.yml']
   pull_request:
     paths: ['doc2md/**', '.github/workflows/doc2md.yml']
+  # Every workflow in this repository can be started by hand, and a test
+  # enforces it. The reason is on record: the Python suite once declared only
+  # push and pull_request, so the one thing that proved the pipeline correct
+  # was the one thing with no way to run during an event-system outage. The
+  # path filters above make that more likely here, not less -- a change
+  # entirely outside doc2md/ never triggers this workflow at all, so hand
+  # dispatch is the only way to re-run the browser checks against it.
+  workflow_dispatch:
 
 defaults:
   run:
