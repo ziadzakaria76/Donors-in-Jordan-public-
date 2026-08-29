@@ -1,0 +1,70 @@
+# Syria Tender Intelligence Monitor -- run configuration.
+# Country-specific data lives in profiles/syria.yml, not here.
+
+profile: syria
+
+scope:
+  # Interview answer: inside-Syria only. The other three categories are still
+  # classified and counted every run, and written to the excluded list, so the
+  # size of what is being left out is visible and auditable.
+  include_link_types: [inside_syria]
+  # Widening scope is a config change, not a code change:
+  #   include_link_types: [inside_syria, cross_border_hub, regional_crisis]
+
+filters:
+  sectors: all              # no sector filter; profile ranking_terms rank instead
+  keywords: none            # no keyword gate; consulting terms rank instead
+  min_value_usd: null       # no floor
+  keep_unpublished_value: true
+  notice_types: all         # GPNs kept and tagged as pipeline, not biddable
+  lookback: open            # all currently open; posted date never excludes
+  drop_expired: true
+  keep_missing_deadline: true
+  language: all             # Arabic kept in original script and flagged
+  eligibility: flag         # restricted tenders kept, badged inline
+
+state:
+  db_path: seen_tenders.db
+  new_only: false           # full open list every run, unseen items flagged NEW
+
+screening:
+  enabled: true
+  mode: flag                # flag | off   (never "exclude": that hides false positives)
+  cache_dir: .cache/sanctions
+  max_age_days: 7           # re-fetch weekly; list date is stamped into every report
+
+# Results are written to disk and downloaded; nothing is emailed.
+output:
+  dir: output
+  # docx  - the bid-review pack, with a clickable link per tender
+  # xlsx  - one row per tender, every field as a column
+  # json  - the full structured record set; drop it if you never debug a run
+  formats: [docx, xlsx, json]
+  top_n: 10
+  # A Markdown summary is always written alongside, and appended to the GitHub
+  # Actions run page, so portal health is visible without opening a file.
+
+# JavaScript fallback. Plain HTTP is always tried first; a browser is launched
+# only when extraction found nothing AND the page was diagnosed as a
+# client-rendered shell or a bot wall -- the two failures rendering can fix.
+# Per portal: browser: auto | always | never (default auto).
+# Needs `pip install playwright && playwright install chromium`; without it the
+# portal reports what it could not do and the run continues.
+portals:
+  worldbank: {enabled: true, page_size: 100, max_pages: 5}
+  ted:       {enabled: true, max_pages: 5}
+  samgov:    {enabled: true, page_size: 100, max_pages: 5}   # inert until SAM_API_KEY is set
+  uk_fts:    {enabled: true, max_pages: 5, updated_within_days: 365}
+  ungm:
+    enabled: true
+    page_size: 100
+    # UNGM uses its own numeric country ids, not ISO codes. This one cannot be
+    # guessed or derived -- read it out of the selNoticeCountry dropdown with
+    # `--capture ungm` and put it here. The portal refuses to run until it is
+    # set, because a wrong id returns nothing, silently.
+    country_id: null
+  undp:      {enabled: true, browser: auto}
+  srtf:      {enabled: true}
+  giz:       {enabled: true}
+  isdb:      {enabled: true}
+  gtai:      {enabled: true}

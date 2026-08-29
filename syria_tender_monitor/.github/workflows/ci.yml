@@ -1,0 +1,56 @@
+name: CI
+
+# push on branches: [main] plus pull_request, NOT push: ["**"] plus
+# pull_request -- the latter runs CI twice on every PR commit.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+      - name: Lint (pyflakes)
+        run: python -m pyflakes src/ tests/
+      - name: Tests
+        # The whole suite is offline: no network, no credentials, no real state.
+        run: python -m pytest tests/ -q
+
+  # The browser fallback is the one scraping path verified end to end, and the
+  # main job skips it (no Playwright, deliberately -- the suite must run without
+  # a browser). This job installs one so the verification is not merely
+  # theoretical.
+  browser-fallback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt -r requirements-browser.txt
+          playwright install --with-deps chromium
+      - name: Browser fallback tests
+        env:
+          PLAYWRIGHT_CHROMIUM_PATH: ${{ vars.PLAYWRIGHT_CHROMIUM_PATH }}
+          # Turns "browser unavailable" from a skip into a failure. A skip here
+          # would let the only end-to-end-verified path rot unnoticed.
+          REQUIRE_BROWSER: "1"
+        run: python -m pytest tests/test_browser_fallback.py -q -rs

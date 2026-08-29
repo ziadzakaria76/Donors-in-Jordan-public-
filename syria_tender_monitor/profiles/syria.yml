@@ -1,0 +1,178 @@
+# Country profile — Syria.
+#
+# Everything country-specific lives here. The code in src/syria_monitor/ takes a
+# profile as an argument and hard-codes no country anywhere, so adding a second
+# country is a second YAML file, not a refactor.
+
+key: syria
+name: Syria
+iso2: SY
+iso3: SYR
+
+# --- Country terms -----------------------------------------------------------
+# Each Latin term is matched with (?<!\w)term(?!\w) — enumerated inflections
+# rather than one clever regex. See docs in matching.py for why:
+#   \bsyria\b    misses "Syrian Arab Republic"  (the World Bank's own spelling)
+#   \bsyria\w*\b re-admits "Syriac"             (Syriac Orthodox, Syriac language)
+#   \bsyrian?\b  gets both ends right, and is kept as a regression test
+# Listing "syria" and "syrian" separately is equivalent and reads plainly.
+strong_terms:
+  - syria                     # English
+  - syrian
+  - syrians
+  - "syrian arab republic"    # formal UN name; the spelling the World Bank uses
+  - syrienne                  # French (fem.)
+  - syrien                    # German / French (masc.) — rejects "Assyrien" via (?<!\w)
+  - syriens
+  - syrie                     # French
+  - siria                     # Italian / Spanish
+  - siriana
+  - sirio
+
+# Arabic is matched as a SUBSTRING, not with word boundaries: the language is
+# agglutinative and prefixes/suffixes attach directly to the stem.
+#   سوري  matches سورية، السورية، السوري، سوريا، الجمهورية العربية السورية
+#   سوريا matches only itself and misses the formal Arabic name of the country
+# It still correctly rejects آشوري (Assyrian) and سرياني (Syriac) — different
+# root letters, so no Latin word-boundary logic needs porting onto it.
+arabic_stems:
+  - "سوري"
+
+# Negative terms — matched with the same word boundaries and removed from the
+# text before term matching, so they can never contribute evidence.
+# (The boundary rules already reject these; they are listed explicitly so the
+# intent is visible and the tests have something to assert against.)
+negative_terms:
+  - assyrian
+  - assyrians
+  - assyrien              # German
+  - syriac
+  - syriacs
+  - syriaque
+  - "آشوري"
+  - "سرياني"
+
+# --- Places ------------------------------------------------------------------
+# unambiguous: the name is effectively unique to this country -> strong evidence
+# ambiguous:   the name exists elsewhere -> weak evidence, needs corroboration
+places:
+  - canonical: Aleppo
+    variants: [aleppo, halab, alep, "حلب"]
+  - canonical: Homs
+    variants: [homs, hims, "حمص"]
+  - canonical: Hama
+    variants: [hama, hamah, "حماة"]
+  - canonical: Latakia
+    variants: [latakia, lattakia, ladhiqiyah, "al-ladhiqiyah", "اللاذقية"]
+  - canonical: Tartus
+    variants: [tartus, tartous, tartus, "طرطوس"]
+  - canonical: Idlib
+    variants: [idlib, idleb, "إدلب"]
+  - canonical: Raqqa
+    variants: [raqqa, "ar-raqqa", "al-raqqah", "al raqqah", raqqah, "الرقة"]
+  - canonical: Hasakah
+    variants: [hasakah, "al-hasakah", hassakeh, hasaka, "al hasakah", "الحسكة"]
+  - canonical: Deir ez-Zor
+    variants:
+      - "deir ez-zor"
+      - "deir ezzor"
+      - "deir al-zour"
+      - "deir al zour"
+      - "dayr az zawr"
+      - "dayr az-zawr"
+      - "deir ez zor"
+      - "دير الزور"
+  - canonical: Daraa
+    variants: [daraa, "dar'a", deraa, "درعا"]
+  - canonical: Sweida
+    variants: [sweida, "as-suwayda", "al-suwayda", suwayda, "السويداء"]
+  - canonical: Quneitra
+    variants: [quneitra, qunaytirah, "al-qunaytirah", "القنيطرة"]
+  - canonical: Damascus
+    ambiguous: true          # Damascus, Maryland / Oregon / Virginia / Georgia
+    variants: [damascus, damas, dimashq, "دمشق"]
+
+# Explicit disqualifiers for the ambiguous place names above. SAM.gov and UK
+# Find a Tender scan whole national corpora, so a bare "Damascus" match without
+# this pulls in US municipal contracts.
+place_disqualifiers:
+  - 'damascus,?\s+(md|maryland|or|oregon|va|virginia|ga|georgia)(?!\w)'
+  - 'damascus\s+(township|county|borough)(?!\w)'
+
+# --- Domain evidence ---------------------------------------------------------
+# A .sy address is a deliberate country signal, unlike a donor's Damascus-office
+# contact address on an unrelated page. Requires a non-word char after it so
+# "ministry.system" does not match.
+tld: sy
+
+# --- Neighbours ---------------------------------------------------------------
+# Used to classify cross-border-hub and refugee-hosting delivery. Not evidence
+# of a Syria link on their own.
+hub_locations:
+  - {name: Gaziantep, country: TR, variants: [gaziantep, antep, "غازي عنتاب"]}
+  - {name: Amman,     country: JO, variants: [amman, "عمان"]}
+  - {name: Beirut,    country: LB, variants: [beirut, beyrouth, "بيروت"]}
+  - {name: Erbil,     country: IQ, variants: [erbil, irbil, arbil, hawler, "أربيل"]}
+
+refugee_hosting_countries: [JO, LB, TR, IQ, EG]
+
+# --- Currency ----------------------------------------------------------------
+currency:
+  code: SYP
+  names: [syp, "syrian pound", "syrian pounds", "ل.س", "ليرة سورية"]
+  # Syria redenominated on 1 January 2026: 100 old SYP = 1 new SYP, with a
+  # 90-day dual-circulation window. The same numeral therefore means two
+  # different amounts depending on publication date, and a 100x error produces
+  # numbers that look entirely plausible.
+  # Default: do NOT convert. Report original currency + amount, flag ambiguity.
+  redenomination_date: 2026-01-01
+  dual_circulation_ends: 2026-03-31
+  convert_to_usd: false        # do not enable without deciding a rate source
+
+# --- Ranking lexicon ---------------------------------------------------------
+# Sector filtering is OFF; these terms rank instead. Arabic terms are included
+# so Arabic notices do not automatically sort last.
+ranking_terms:
+  reconstruction: [reconstruction, rehabilitation, recovery, rebuilding, "إعادة إعمار", "إعادة تأهيل"]
+  wash: [wash, water, sanitation, hygiene, sewerage, "مياه", "صرف صحي"]
+  energy: [energy, electricity, power, grid, solar, "كهرباء", "طاقة"]
+  health: [health, hospital, clinic, "primary health", "صحة", "مستشفى"]
+  pfm: ["public financial management", pfm, budget, treasury, "financial management", "إدارة مالية"]
+  demining: [demining, "de-mining", "mine action", uxo, "explosive ordnance", "إزالة الألغام"]
+  consulting: [consultancy, consulting, "technical assistance", advisory, "capacity building",
+               feasibility, evaluation, assessment, supervision, "project management",
+               design, study, training, "استشارية", "دراسة", "تقييم"]
+
+# Neighbour/host country names -> ISO2, for delivery-location classification.
+# Not evidence of a Syria link on their own.
+neighbour_names:
+  JO: [jordan, jordanie, jordanien, "الأردن"]
+  LB: [lebanon, liban, libanon, "لبنان"]
+  TR: [turkiye, türkiye, turkey, turquie, "türkei", "تركيا"]
+  IQ: [iraq, irak, "العراق"]
+  EG: [egypt, égypte, ägypten, "مصر"]
+
+# ISO3 codes, because TED reports countries as three-letter codes. Matching
+# only ISO2 leaves a Jordan-delivered TED notice unclassified rather than
+# refugee_hosting_only -- excluded either way, but invisible in the split that
+# is supposed to show how much is being excluded and why.
+neighbour_iso3:
+  JO: JOR
+  LB: LBN
+  TR: TUR
+  IQ: IRQ
+  EG: EGY
+
+# Beneficiary-nationality wording. The biggest false-positive class is not a
+# place name at all: "Syrian refugees" in a tender delivered in Jordan,
+# Lebanon, Turkiye, Iraq or Egypt. Thousands of these exist.
+beneficiary_terms:
+  - "syrian refugee"
+  - "syrian refugees"
+  - "refugees from syria"
+  - "displaced syrians"
+  - "syrian asylum"
+  - "réfugiés syriens"
+  - "syrische flüchtlinge"
+  - "اللاجئين السوريين"
+  - "لاجئين سوريين"

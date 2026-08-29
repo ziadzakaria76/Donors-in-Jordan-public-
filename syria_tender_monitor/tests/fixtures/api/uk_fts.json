@@ -1,0 +1,51 @@
+{
+  "uri": "https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages",
+  "version": "1.1",
+  "publishedDate": "2026-08-14T00:00:00Z",
+  "releases": [
+    {
+      "ocid": "ocds-h6vhtk-04a5b1",
+      "id": "2026-08-14T10:00:00Z",
+      "date": "2026-08-14T10:00:00Z",
+      "tag": ["tender"],
+      "tender": {
+        "id": "012345-2026",
+        "title": "Monitoring and evaluation of humanitarian programming in Syria",
+        "description": "Third-party monitoring across the Syrian Arab Republic.",
+        "mainProcurementCategory": "services",
+        "tenderPeriod": {"endDate": "2026-09-18T12:00:00Z"},
+        "value": {"amount": 450000, "currency": "GBP"},
+        "deliveryAddresses": [{"countryName": "Syrian Arab Republic"}],
+        "eligibilityCriteria": "Open to suppliers of any nationality.",
+        "documents": [{"url": "https://www.find-tender.service.gov.uk/Notice/012345-2026"}]
+      },
+      "parties": [
+        {
+          "id": "GB-FCDO",
+          "name": "Foreign, Commonwealth and Development Office",
+          "roles": ["buyer"],
+          "contactPoint": {"email": "procurement@fcdo.gov.uk"}
+        },
+        {"id": "GB-SUP", "name": "Example Supplier Ltd", "roles": ["supplier"]}
+      ],
+      "buyer": {"id": "GB-FCDO", "name": "Foreign, Commonwealth and Development Office"}
+    },
+    {
+      "ocid": "ocds-h6vhtk-04a5b2",
+      "date": "2026-08-14T11:00:00Z",
+      "tag": ["tender"],
+      "tender": {
+        "id": "012346-2026",
+        "title": "Assyrian heritage documentation programme",
+        "description": "Documentation of Assyrian and Syriac heritage sites in northern Iraq.",
+        "mainProcurementCategory": "services",
+        "tenderPeriod": {"endDate": "2026-10-01T12:00:00Z"},
+        "value": {"amount": 120000, "currency": "GBP"},
+        "deliveryAddresses": [{"countryName": "Iraq"}],
+        "documents": [{"url": "https://www.find-tender.service.gov.uk/Notice/012346-2026"}]
+      },
+      "parties": [{"id": "GB-BC", "name": "British Council", "roles": ["buyer"]}]
+    }
+  ],
+  "links": {"next": "https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages?cursor=eyJ4Ijoy"}
+}
