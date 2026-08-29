@@ -95,6 +95,7 @@ android {
     sourceSets {
         named("main") { kotlin.srcDir("src/main/kotlin") }
         named("test") { kotlin.srcDir("src/test/kotlin") }
+        named("androidTest") { kotlin.srcDir("src/androidTest/kotlin") }
     }
 
     packaging {
@@ -247,6 +248,15 @@ dependencies {
     testImplementation(libs.roborazzi.junit.rule)
     testImplementation(libs.kotlinx.coroutines.test)
     debugImplementation(libs.compose.ui.test.manifest)
+
+    // Instrumented tests. Deliberately a small stack: these suites use Room and
+    // the resource table directly, not Hilt and not Compose, so they need no
+    // custom test runner and no injection graph. See
+    // .github/workflows/gs3-emulator.yml for what only a device can answer.
+    androidTestImplementation(libs.junit4)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
 
 /**
