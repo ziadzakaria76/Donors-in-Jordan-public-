@@ -1,12 +1,14 @@
 """
 Generic driver for HTML portals.
 
-A portal module declares a HtmlSpec -- its source URLs, its selector hints and
-its currency -- and this module does the fetching, the cascade, pagination and
-detail enrichment. Portals that need custom logic (UNGM's POST search endpoint,
-the REST APIs) supply their own fetch function instead, but still route the
-resulting HTML through here so that --capture works for every HTML portal
-rather than only the simple ones.
+A portal declares a HtmlSpec -- its source URLs, its selector hints and its
+currency -- and this module does the fetching, the cascade, pagination and
+detail enrichment. Most portals declare theirs as data in `portals.json` and
+have no module at all; `spec_for()` below is what turns one into a spec.
+Portals that need custom logic (UNGM's POST search endpoint, the REST APIs)
+supply their own fetch function instead, but still route the resulting HTML
+through here so that --capture works for every HTML portal rather than only the
+simple ones.
 
 THE SELECTORS ARE HINTS, NOT CONTRACTS. They were written without access to the
 live pages -- see the README. If a hint is wrong the quality gate rejects it and
@@ -21,7 +23,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from .. import config
+from .. import config, portal_config
 from ..utils.text import clean
 from . import base
 from .htmlkit import LayerResult, extract, run_layers
@@ -47,7 +49,42 @@ class HtmlSpec:
     # the selector layer, so the class-independent layers stay class-independent
     # and remain a real fallback when these stop matching.
     field_selectors: dict = field(default_factory=dict)
+    # Set for a source that publishes no listing at all, so an empty result is
+    # reported as "no listing published" rather than as a broken scraper. See
+    # the ADFD and JICA entries in portals.json.
+    no_listing_reason: str = ""
     notes: str = ""
+
+
+def spec_for(key: str, **overrides) -> HtmlSpec:
+    """Build a portal's spec from portals.json, with code-owned overrides.
+
+    A module passes only the fields it owns -- UNGM's selectors, for instance,
+    which were derived from the live DOM and carry their reasoning in the
+    module. Everything else comes from the file, so a URL can be corrected from
+    a phone without a code change.
+
+    An unknown key yields a spec with no URLs rather than raising: this runs at
+    import time, and an ImportError here would turn one bad entry into a run
+    that produces nothing at all. harvest() reports the empty spec as the
+    configuration error it is.
+    """
+    portal = portal_config.get(key)
+    if portal is None:
+        return HtmlSpec(key=key, urls=[], **overrides)
+
+    fields = {
+        "urls": list(portal.urls),
+        "selectors": list(portal.selectors),
+        "field_selectors": dict(portal.field_selectors),
+        "anchor_hint": portal.anchor_hint,
+        "currency": portal.currency,
+        "filter_to_jordan": portal.filter_to_jordan,
+        "no_listing_reason": portal.no_listing_reason,
+        "notes": portal.notes,
+    }
+    fields.update(overrides)
+    return HtmlSpec(key=key, **fields)
 
 
 def _fetch(spec: HtmlSpec, url: str) -> str:
@@ -78,6 +115,14 @@ def harvest(spec: HtmlSpec) -> list[dict]:
     of these portals publish across two sites (GIZ, EBRD). Only a portal where
     every source failed raises, and it raises with the last diagnosed reason.
     """
+    if not spec.urls:
+        # A configuration fault, not a site fault, and it must not be dressed
+        # as one: "no listing found" would send someone to check a portal that
+        # was never asked for a page.
+        raise base.PortalError(
+            f"portals.json declares no source URL for '{spec.key}' -- the entry "
+            f"is missing or was rejected on load", "")
+
     records: list[dict] = []
     failures: list[str] = []
     seen_ids: set[str] = set()
@@ -114,7 +159,19 @@ def harvest(spec: HtmlSpec) -> list[dict]:
 
     if not records:
         reason = " | ".join(failures) if failures else "no notices found on any source URL"
-        raise base.PortalError(reason, spec.urls[0] if spec.urls else "")
+        url = spec.urls[0] if spec.urls else ""
+        if spec.no_listing_reason:
+            # A source that publishes nothing is not a scraper that has stopped
+            # working, and reporting it as one puts a permanent red line in
+            # every report -- which is how a reader learns to ignore the status
+            # table, and the status table is the alarm. The underlying reason
+            # is kept, so a genuine change (a bot wall, a transport error) is
+            # still visible and still distinguishable from "there is nothing
+            # here".
+            raise base.PortalError(
+                f"no listing published - {spec.no_listing_reason} Detail: {reason}",
+                url)
+        raise base.PortalError(reason, url)
 
     if spec.filter_to_jordan:
         records = base.jordan_only(records)

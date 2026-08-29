@@ -1,0 +1,21 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A document with a checked line: the bid-review pack, not a generic bell. -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M38,28h24l12,12v40a4,4 0,0 1,-4 4H38a4,4 0,0 1,-4 -4V32a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#1F4E79"
+        android:pathData="M62,28l12,12h-12z" />
+    <path
+        android:strokeColor="#1F4E79"
+        android:strokeWidth="3"
+        android:pathData="M42,68l5,5l10,-12" />
+    <path
+        android:strokeColor="#1F4E79"
+        android:strokeWidth="3"
+        android:pathData="M42,52h24M42,58h16" />
+</vector>

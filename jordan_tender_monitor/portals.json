@@ -1,0 +1,227 @@
+{
+  "version": 1,
+  "_readme": [
+    "The portal list. This file is the source of truth for which portals exist,",
+    "what they are called, whether they are enabled, and where they are read from.",
+    "Validated on load by portal_config.py: a malformed entry names itself, is",
+    "skipped, and is reported as unavailable in the run's portal status table. It",
+    "never crashes the run.",
+    "",
+    "An entry with no 'module' is data alone. It is read through the same",
+    "six-layer extraction cascade every HTML portal uses: feed, embedded JSON,",
+    "CSS selectors, header-aware tables, structural inference, anchor pattern.",
+    "That is enough for many listings from a URL alone -- and it is best-effort,",
+    "not a guarantee. The quality score and row count from the first run say",
+    "whether it worked; see PORTALS.md.",
+    "",
+    "An entry with a 'module' has bespoke fetch logic in portals/<module>.py --",
+    "a POST search endpoint or a REST API, not a page. Its 'code_owned' fields",
+    "are set in that module, and setting them here is rejected rather than",
+    "quietly ignored.",
+    "",
+    "Why each portal is configured the way it is: PORTALS.md."
+  ],
+  "portals": [
+    {
+      "key": "worldbank",
+      "name": "World Bank",
+      "enabled": true,
+      "tier": 1,
+      "module": "worldbank",
+      "urls": ["https://search.worldbank.org/api/v2/procnotices"],
+      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "notes": "REST API. Offset paging, the country-field test that beats the API's own full-text search, and the notice-id link are all in portals/worldbank.py."
+    },
+    {
+      "key": "ted",
+      "name": "EU TED",
+      "enabled": true,
+      "tier": 1,
+      "module": "ted",
+      "urls": ["https://api.ted.europa.eu/v3/notices/search"],
+      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "notes": "REST API with its own query grammar: the country is the three-letter code JOR and the page limit is 100. Both were 400s until they were fixed. portals/ted.py."
+    },
+    {
+      "key": "samgov",
+      "name": "SAM.gov (USAID / US Gov)",
+      "enabled": true,
+      "tier": 1,
+      "module": "samgov",
+      "urls": ["https://api.sam.gov/prod/opportunities/v2/search"],
+      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "notes": "REST API needing a free key (SAM_API_KEY) whose approval takes 1-4 weeks. Without it the portal reports 'not configured', which is deliberately not the same as 'unavailable'. portals/samgov.py."
+    },
+    {
+      "key": "fcdo",
+      "name": "UK Find a Tender",
+      "enabled": true,
+      "tier": 1,
+      "module": "fcdo",
+      "urls": ["https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages"],
+      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "notes": "OCDS API over the whole UK corpus, which is why country matching is on word boundaries -- Jordanstown and Ammanford are in it. portals/fcdo.py."
+    },
+    {
+      "key": "ungm",
+      "name": "UNGM (UNDP, UNICEF, WFP, UNOPS, UNHCR, UNRWA)",
+      "enabled": true,
+      "tier": 2,
+      "module": "ungm",
+      "urls": ["https://www.ungm.org/Public/Notice"],
+      "code_owned": ["selectors", "field_selectors", "filter_to_jordan"],
+      "anchor_hint": "/Public/Notice/",
+      "currency": "USD",
+      "notes": "The richest Jordan source. Its rows come from a POST search endpoint filtered to Jordan and paged to the end, not from this URL, which is 141 KB of pure navigation. The selectors and the sibling-span field selectors were derived from the live DOM and carry their reasoning in portals/ungm.py; editing them here would be ignored, so it is rejected."
+    },
+    {
+      "key": "ebrd",
+      "name": "EBRD",
+      "enabled": true,
+      "tier": 2,
+      "urls": [
+        "https://www.ebrd.com/home/work-with-us/project-procurement/procurement-notices.html",
+        "https://ecepp.ebrd.com/delta/noticeSearchResults.html"
+      ],
+      "selectors": [
+        "div.procurement-notice",
+        "article.notice",
+        "li.search-result",
+        "table.noticeTable tbody tr"
+      ],
+      "anchor_hint": "/procurement",
+      "currency": "EUR",
+      "filter_to_jordan": true,
+      "notes": "ebrd.com plus ECEPP; ECEPP carries the consultancy assignments. Verified live: 4,012 notices scanned, 119 Jordan."
+    },
+    {
+      "key": "eib",
+      "name": "EIB",
+      "enabled": true,
+      "tier": 2,
+      "urls": ["https://www.eib.org/en/about/procurement/all/index.htm"],
+      "selectors": [
+        "div.eib-list__item",
+        "article.teaser",
+        "li.list-item",
+        "table tbody tr"
+      ],
+      "anchor_hint": "/about/procurement/",
+      "currency": "EUR",
+      "filter_to_jordan": true,
+      "notes": "Corporate and project procurement in one listing. Returns a bot wall from a data-centre IP; the selectors are unverified."
+    },
+    {
+      "key": "giz",
+      "name": "GIZ",
+      "enabled": true,
+      "tier": 2,
+      "urls": ["https://ausschreibungen.giz.de/Satellite/company/welcome.do"],
+      "selectors": [
+        "div.tender-item",
+        "tr.tableRow",
+        "table.publicationTable tbody tr",
+        "li.result"
+      ],
+      "anchor_hint": "/Satellite/notice",
+      "currency": "EUR",
+      "filter_to_jordan": true,
+      "notes": "The German ausschreibungen portal, verified live at quality 1.00. giz.de/en/partner/contractor/tenders was removed after --capture showed it carries no listing at all -- its repeated blocks were the main menu."
+    },
+    {
+      "key": "kfw",
+      "name": "KfW (via Germany Trade & Invest)",
+      "enabled": true,
+      "tier": 2,
+      "urls": ["https://www.gtai.de/en/trade/tenders"],
+      "selectors": [
+        "div.gtai-teaser",
+        "article.teaser",
+        "li.search-result",
+        "table tbody tr"
+      ],
+      "anchor_hint": "/tenders/",
+      "currency": "EUR",
+      "filter_to_jordan": true,
+      "notes": "KfW does NOT publish tender notices on kfw.de -- Germany Trade & Invest is entrusted with them. Pointing this at kfw.de would make the portal report unavailable forever while looking like an honest failure."
+    },
+    {
+      "key": "isdb",
+      "name": "IsDB",
+      "enabled": true,
+      "tier": 2,
+      "urls": ["https://www.isdb.org/project-procurement/tenders"],
+      "selectors": [
+        "div.views-row",
+        "div.tender-card",
+        "article.node--type-tender",
+        "table tbody tr"
+      ],
+      "anchor_hint": "/project-procurement/",
+      "currency": "USD",
+      "filter_to_jordan": true,
+      "notes": "Jordan is a member country. Member-country restrictions are flagged by the eligibility detector, never dropped. Read cleanly live: 144 notices, no open Jordan ones that day."
+    },
+    {
+      "key": "sfd",
+      "name": "Saudi Fund for Development",
+      "enabled": true,
+      "tier": 3,
+      "urls": [
+        "https://www.sfd.gov.sa/en/tenders-view",
+        "https://www.sfd.gov.sa/ar/tenders-view"
+      ],
+      "selectors": [
+        "div.tender-item",
+        "div.card",
+        "table tbody tr",
+        "li.tender"
+      ],
+      "anchor_hint": "tender",
+      "currency": "SAR",
+      "filter_to_jordan": true,
+      "notes": "Arabic and English. Saudi-firm restrictions are flagged, not excluded -- a JV route may still be open. Times out from a data-centre IP."
+    },
+    {
+      "key": "adfd",
+      "name": "Abu Dhabi Fund for Development",
+      "enabled": true,
+      "tier": 3,
+      "urls": [
+        "https://www.adfd.ae/en/what-we-do/tenders",
+        "https://www.adfd.ae/en/media-centre/news"
+      ],
+      "selectors": [
+        "div.tender-item",
+        "div.card",
+        "div.news-item",
+        "table tbody tr"
+      ],
+      "currency": "AED",
+      "filter_to_jordan": true,
+      "no_listing_reason": "ADFD's tenders page carries no listing (rendered or not); its financed tenders are issued by the beneficiary government.",
+      "notes": "Four URLs and two fetch strategies, including a real browser, all returned chrome and zero rows. anchor_hint is deliberately absent: pinning it to /News/ silently excluded every tender link. See PORTALS.md."
+    },
+    {
+      "key": "jica",
+      "name": "JICA",
+      "enabled": true,
+      "tier": 3,
+      "urls": [
+        "https://www.jica.go.jp/english/overseas/jordan/others/procurement.html",
+        "https://www.jica.go.jp/jordan/english/office/others/procurement.html"
+      ],
+      "selectors": [
+        "div.js-accordion-content li",
+        "ul.list-normal li",
+        "table tbody tr",
+        "div.section li"
+      ],
+      "anchor_hint": "procurement",
+      "currency": "JPY",
+      "filter_to_jordan": false,
+      "no_listing_reason": "JICA's Jordan office has no procurement page; its notices, when there are any, appear on the office index or via the Ministry of Planning.",
+      "notes": "Both URL spellings 404 today, while Bangladesh and Indonesia answer on both -- so this is not a broken scraper and no URL will fix it. The office index was tried and removed: it put two of its own section headings in the report as tenders. Every source here must be a procurement page, not an index."
+    }
+  ]
+}

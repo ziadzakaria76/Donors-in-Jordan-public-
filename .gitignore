@@ -5,17 +5,24 @@
 # Local databases
 *.db
 
-# Generated reports -- keep the directory, ignore its contents.
-# The ** prefix matters: a pattern containing a slash is anchored to this
-# file's directory, so a bare "output/*" would only cover a top-level output/
-# and would happily commit every report written to
-# jordan_tender_monitor/output/.
-**/output/*
-!**/output/.gitkeep
-
-# Local state -- keep the directory, ignore the database
-**/data/*
-!**/data/.gitkeep
+# Generated reports and local state -- keep the directory, ignore its contents.
+#
+# SCOPED TO THE MONITOR, and that is the whole point. These were written as
+# **/output/* and **/data/*, on the reasoning that a pattern containing a slash
+# is anchored to this file's directory so a bare "output/*" would miss
+# jordan_tender_monitor/output/. True, and the fix over-reached: **/data/*
+# matches ANY directory called data at ANY depth, which silently swallowed the
+# Android app's entire data package -- twelve source files, including every
+# model and the API client. `git add -A` said nothing, the commit looked
+# complete, and the build failed with 240 unresolved references pointing at
+# files that were on disk the whole time.
+#
+# An ignore rule that hides source is the same failure as a scraper that
+# returns zero: the output looks like a result. Name the directory.
+jordan_tender_monitor/output/*
+!jordan_tender_monitor/output/.gitkeep
+jordan_tender_monitor/data/*
+!jordan_tender_monitor/data/.gitkeep
 
 # Logs
 *.log
@@ -32,3 +39,19 @@ jordan_tender_monitor/tests/fixtures/live/
 
 # Static site build deps
 node_modules/
+
+# Android
+#
+# The keystore and its password NEVER go in the repository -- a signing key in
+# git is a signing key anyone who ever cloned it can use, and rotating it means
+# every existing install can no longer be updated. If release signing is set
+# up, both live in repository secrets. See android/ANDROID.md.
+*.jks
+*.keystore
+android/local.properties
+android/**/build/
+android/.gradle/
+android/.idea/
+android/out/
+android/app/release/
+local.properties
