@@ -99,7 +99,7 @@ the real request body from the capture's network trace.
 | `--dry-run` | Scrape, filter, rank, print. Writes nothing, sends nothing, leaves the seen-database untouched. |
 | `--run` | Full run. Writes `output/*.docx`, `*.xlsx`, `*.json`. **Does not send.** |
 | `--run --send` | Delivers by Microsoft Graph. |
-| `--capture PORTAL` | Fetches live pages to `tests/fixtures/live/`, prints per-layer row counts and quality, which layer won, and the selectors the page actually uses. |
+| `--capture PORTAL` | Fetches live pages to `tests/fixtures/live/`, prints per-layer row counts and quality, which layer won, and the selectors the page actually uses. `--capture all` walks every HTML portal. Under GitHub Actions the report is written to the run summary, so it can be read from a phone. |
 | `--self-test` | Pipeline over fixtures with the database and output directory redirected. |
 | `--portal NAME` | Limit a run to one or more portals (repeatable). |
 

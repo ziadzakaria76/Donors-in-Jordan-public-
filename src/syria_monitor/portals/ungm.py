@@ -82,6 +82,12 @@ class UngmPortal(HtmlPortal):
         }
 
     def pages(self):
+        # Without a country id the search body cannot be built -- but the
+        # dropdown page is precisely where that id is read from, so capture must
+        # still be able to fetch it. Refusing both would make the documented way
+        # of obtaining the id impossible to follow.
+        if not self.cfg.get("country_id"):
+            return [("dropdown", NOTICE_PAGE)]
         return [("search", SEARCH_ENDPOINT), ("dropdown", NOTICE_PAGE)]
 
     def fetch_page(self, label: str, url: str) -> tuple[str, int]:

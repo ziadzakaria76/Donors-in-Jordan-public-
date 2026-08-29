@@ -169,3 +169,52 @@ def test_uk_fts_pagination_cannot_loop_forever(profile, gate):
     records = UkFindATenderPortal({}, profile, LoopingFetcher(), gate).fetch_tenders()
     assert LoopingFetcher.calls <= 3
     assert records
+
+
+def test_capture_ungm_works_without_the_country_id_it_exists_to_find(profile, gate):
+    """The documented way to obtain the id is `--capture ungm`. If capture
+    refused to run without the id, that instruction would be impossible to
+    follow."""
+    portal = build("ungm", StubFetcher(fixture("drupal_views.html")), profile, gate,
+                   cfg={"country_id": None})
+    labels = [label for label, _ in portal.pages()]
+    assert labels == ["dropdown"], "the dropdown page is where the id is read from"
+
+    captured = portal.capture()
+    assert captured, "capture must still fetch what it can without the id"
+    assert captured[0][0] == "dropdown"
+
+
+def test_capture_reads_the_country_id_out_of_the_dropdown(profile, gate, capsys):
+    """The whole point: turn a live page into the number for config.yml."""
+    from syria_monitor.cli import capture
+    from syria_monitor.config import Config
+
+    dropdown = ('<html><body><select id="selNoticeCountry">'
+                '<option value="2395">Jordan</option>'
+                '<option value="2401">Syrian Arab Republic</option>'
+                '<option value="2500">Yemen</option>'
+                '</select></body></html>')
+
+    class Cfg(Config):
+        pass
+
+    cfg = Cfg({"profile": "syria", "portals": {"ungm": {"enabled": True, "country_id": None}}},
+              profile)
+
+    import syria_monitor.cli as cli_mod
+    original = cli_mod._build
+
+    def stub_build(_cfg, name):
+        return build(name, StubFetcher(dropdown), profile, gate, cfg={"country_id": None})
+
+    cli_mod._build = stub_build
+    try:
+        capture(cfg, "ungm")
+    finally:
+        cli_mod._build = original
+
+    printed = capsys.readouterr().out
+    assert "set portals.ungm.country_id: 2401" in printed
+    assert "Syrian Arab Republic" in printed
+    assert "2500" not in printed, "only the matching country should be suggested"

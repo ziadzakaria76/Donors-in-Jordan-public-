@@ -61,39 +61,82 @@ def check_portals(cfg) -> int:
 
 
 def capture(cfg, name: str) -> int:
-    if name not in REGISTRY:
-        print(f"unknown portal '{name}'. Known: {', '.join(REGISTRY)}")
+    """Fetch a portal's live pages and report what the cascade makes of them.
+
+    `--capture all` walks every HTML portal, which is how a first pass over the
+    whole set gets done in one command -- including from a phone, via the
+    workflow, since the report is mirrored into the CI run summary.
+    """
+    targets = HTML_PORTALS if name == "all" else [name]
+    if name != "all" and name not in REGISTRY:
+        print(f"unknown portal '{name}'. Known: {', '.join(REGISTRY)}, or 'all'")
         return 2
-    portal = _build(cfg, name)
+
     LIVE_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"Capturing {portal.label} -> {LIVE_DIR}")
+    lines: list[str] = []
 
-    captured = portal.capture()
-    if not captured:
-        print(f"  nothing captured: {getattr(portal, '_capture_error', 'no pages defined')}")
-        return 1
+    def say(text: str = "") -> None:
+        print(text)
+        lines.append(text)
 
-    for label, html, status, result in captured:
-        path = LIVE_DIR / f"{name}-{label}.html"
-        path.write_text(html or "", encoding="utf-8")
-        print(f"  {label}: HTTP {status}, {len(html or '')} bytes -> {path}")
-        if result is None:
+    failures = 0
+    for target in targets:
+        portal = _build(cfg, target)
+        say(f"## {portal.label}  ({portal.url})")
+        reason = portal.unavailable_reason()
+        if reason:
+            # Reported, not obeyed. A run skips such a portal; a capture is how
+            # you find out what it needs, so it goes ahead with whatever pages
+            # it can reach.
+            say(f"  NOTE: {reason}")
+
+        captured = portal.capture()
+        if not captured:
+            failures += 1
+            say(f"  nothing captured: {getattr(portal, '_capture_error', 'no pages defined')}")
+            say()
             continue
-        print("    layer results (quality >= 0.45 wins):")
-        for attempt in result.attempts:
-            note = f"  {attempt.note}" if attempt.note else ""
-            print(f"      {attempt.layer:<15} rows={len(attempt.rows):<5} "
-                  f"quality={attempt.quality:.2f}{note}")
-        print(f"    winner: {result.layer} ({result.quality:.2f})")
-        if result.diagnosis:
-            print(f"    diagnosis: {result.diagnosis}")
-        _print_structure(html)
-        if name == "ungm":
-            _print_ungm_countries(html)
-    return 0
+
+        for label, html, status, result in captured:
+            path = LIVE_DIR / f"{target}-{label}.html"
+            path.write_text(html or "", encoding="utf-8")
+            say(f"  {label}: HTTP {status}, {len(html or '')} bytes -> {path.name}")
+            if result is None:
+                continue
+            say("    layer results (quality >= 0.45 wins):")
+            for attempt in result.attempts:
+                note = f"  {attempt.note}" if attempt.note else ""
+                say(f"      {attempt.layer:<15} rows={len(attempt.rows):<5} "
+                    f"quality={attempt.quality:.2f}{note}")
+            say(f"    winner: {result.layer} ({result.quality:.2f})")
+            if result.diagnosis:
+                failures += 1
+                say(f"    diagnosis: {result.diagnosis}")
+            for extra in _structure_lines(html):
+                say(extra)
+            if target == "ungm":
+                for extra in _ungm_country_lines(html):
+                    say(extra)
+        say()
+
+    _write_step_summary("Capture report", lines)
+    return 1 if failures else 0
 
 
-def _print_structure(html: str) -> None:
+def _write_step_summary(title: str, lines: list[str]) -> None:
+    """Mirror a report into the GitHub Actions run page, when running there.
+
+    This is what makes --capture usable without a terminal: the answer is on
+    the run summary rather than buried in a log.
+    """
+    target = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not target:
+        return
+    with open(target, "a", encoding="utf-8") as fh:
+        fh.write(f"# {title}\n\n```\n" + "\n".join(lines) + "\n```\n")
+
+
+def _structure_lines(html: str) -> list[str]:
     """Report the selectors the page actually uses, derived structurally."""
     from bs4 import BeautifulSoup
     from collections import Counter
@@ -104,11 +147,10 @@ def _print_structure(html: str) -> None:
         for cls in classes:
             counter[f"{element.name}.{cls}"] += 1
     common = [f"{sel} x{n}" for sel, n in counter.most_common(12) if n >= 3]
-    if common:
-        print("    repeated selectors on this page: " + ", ".join(common))
+    return ["    repeated selectors on this page: " + ", ".join(common)] if common else []
 
 
-def _print_ungm_countries(html: str) -> None:
+def _ungm_country_lines(html: str) -> list[str]:
     """Read the numeric country ids out of the live dropdown.
 
     UNGM uses its own ids, not ISO codes, and there is no table to derive one
@@ -120,13 +162,13 @@ def _print_ungm_countries(html: str) -> None:
     select = soup.find("select", id=COUNTRY_SELECT_ID) or soup.find("select",
                                                                     attrs={"name": COUNTRY_SELECT_ID})
     if not select:
-        print(f"    {COUNTRY_SELECT_ID} not found on this page -- capture the notice page itself")
-        return
+        return [f"    {COUNTRY_SELECT_ID} not found on this page -- capture the notice page itself"]
     options = [(o.get("value"), o.get_text(strip=True)) for o in select.find_all("option")]
-    print(f"    {COUNTRY_SELECT_ID}: {len(options)} options")
+    out = [f"    {COUNTRY_SELECT_ID}: {len(options)} options"]
     for value, text in options:
         if "syria" in text.lower() or "syrian" in text.lower():
-            print(f"      >>> set portals.ungm.country_id: {value}    ({text})")
+            out.append(f"      >>> set portals.ungm.country_id: {value}    ({text})")
+    return out
 
 
 def _print_result(result, cfg) -> None:
@@ -162,7 +204,8 @@ def main(argv=None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--capture", metavar="PORTAL",
-                        help=f"one of: {', '.join(HTML_PORTALS)} (REST portals dump their payload)")
+                        help=f"one of: {', '.join(HTML_PORTALS)}, or 'all' "
+                             "(REST portals dump their payload)")
     parser.add_argument("--self-test", action="store_true",
                         help="pipeline over committed fixtures; never touches real state")
     parser.add_argument("--portal", action="append",

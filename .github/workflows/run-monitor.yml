@@ -3,10 +3,20 @@ name: Run monitor
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: "Dry run only -- scrape and print, write nothing"
-        type: boolean
-        default: false
+      mode:
+        description: "What to do"
+        type: choice
+        default: run
+        options:
+          - run          # scrape and write the report files
+          - dry-run      # scrape and print, write nothing
+          - check        # reachability only
+          - capture      # fetch live pages and report what the cascade finds
+      capture_portal:
+        description: "Portal to capture (only used when mode = capture)"
+        type: choice
+        default: all
+        options: [all, ungm, undp, srtf, giz, isdb, gtai, worldbank, ted, samgov, uk_fts]
   schedule:
     # 03:00 UTC = 06:00 Europe/Amman (UTC+3, no DST). GitHub Actions cron is
     # always UTC; there is no local-time option.
@@ -33,12 +43,6 @@ jobs:
           pip install -r requirements-browser.txt
           playwright install --with-deps chromium
 
-      - name: Check portal reachability
-        continue-on-error: true
-        run: python -m syria_monitor.cli --check-portals
-        env:
-          PYTHONPATH: src
-
       - name: Run monitor
         env:
           PYTHONPATH: src
@@ -49,11 +53,12 @@ jobs:
           PLAYWRIGHT_CHROMIUM_PATH: ${{ vars.PLAYWRIGHT_CHROMIUM_PATH }}
           SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            python -m syria_monitor.cli --dry-run
-          else
-            python -m syria_monitor.cli --run
-          fi
+          case "${{ inputs.mode }}" in
+            dry-run) python -m syria_monitor.cli --dry-run ;;
+            check)   python -m syria_monitor.cli --check-portals ;;
+            capture) python -m syria_monitor.cli --capture "${{ inputs.capture_portal }}" ;;
+            *)       python -m syria_monitor.cli --run ;;
+          esac
 
       # Uploaded so a run triggered from a phone can be read on the run summary
       # page without downloading anything.
@@ -70,5 +75,6 @@ jobs:
             output/*.xlsx
             output/*.json
             output/*-summary.md
+            tests/fixtures/live/*.html
           if-no-files-found: warn
           retention-days: 90

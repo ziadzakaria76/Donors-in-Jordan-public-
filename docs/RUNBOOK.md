@@ -80,7 +80,7 @@ nine portals run normally. Nothing else is blocked by this.
 
 ---
 
-## Stage 4 — Unlock UNGM  (20 min, needs network)
+## Stage 4 — Unlock UNGM  (20 min, needs network — or a phone, see below)
 
 UNGM is the richest single Syria source and it is deliberately disabled until
 you do this. It uses its own numeric country ids, not ISO codes; the value
@@ -90,6 +90,9 @@ cannot be derived, and a wrong one returns nothing *silently*.
    ```bash
    PYTHONPATH=src python -m syria_monitor.cli --capture ungm
    ```
+   **From a phone instead:** GitHub → Actions → **Run monitor** → Run workflow →
+   mode `capture`, portal `ungm`. The id appears on the run summary page, and
+   the captured HTML comes back as an artifact. Requires Stage 1 to be done.
 2. Read the line it prints:
    ```
    >>> set portals.ungm.country_id: NNNN    (Syrian Arab Republic)
@@ -107,7 +110,7 @@ cannot be derived, and a wrong one returns nothing *silently*.
 
 ---
 
-## Stage 5 — Confirm the other portals really parse  (1–2 hours, needs network)
+## Stage 5 — Confirm the other portals really parse  (1–2 hours, needs network — or a phone)
 
 No scraper in this repository has ever run against a live page. This is where
 that gets fixed. For each HTML portal:
@@ -116,7 +119,10 @@ that gets fixed. For each HTML portal:
 PYTHONPATH=src python -m syria_monitor.cli --capture undp     # then srtf, giz, isdb, gtai
 ```
 
-For each one, read the printed per-layer table:
+**From a phone instead:** Actions → Run monitor → mode `capture`, portal `all`.
+One run walks every HTML portal and puts the whole report on the run summary.
+
+For each one, read the per-layer table:
 
 - **A layer wins with quality ≥ 0.45** → that portal works. Move on.
 - **Nothing clears the bar** → read the diagnosis line:
