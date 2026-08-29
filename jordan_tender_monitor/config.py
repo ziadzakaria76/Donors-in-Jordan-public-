@@ -14,6 +14,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from . import portal_config
+
 # --------------------------------------------------------------------------
 # Paths
 #
@@ -288,52 +290,38 @@ NATIONAL_ONLY_MARKERS = [
 
 # --------------------------------------------------------------------------
 # Q10 -- PORTALS: all 13 enabled, tiered by reliability.
-# A quiet portal costs one request per run; a disabled portal yields nothing
-# permanently. Set a value to False to skip that portal entirely.
+#
+# THE PORTAL LIST IS DATA, NOT CODE. It lives in portals.json and is read and
+# validated by portal_config.py; the three dictionaries below are built from
+# it. A quiet portal costs one request per run; a disabled portal yields
+# nothing permanently, so set "enabled": false in the file rather than deleting
+# an entry you might want back.
+#
+# They stay plain dictionaries because that is what the rest of the codebase
+# reads, and because the test suite swaps their contents to run the scraper
+# against stand-ins. refresh_portals() rebuilds them after the file is
+# re-read.
 # --------------------------------------------------------------------------
-ENABLED_PORTALS: dict[str, bool] = {
-    # Tier 1 -- REST APIs, most reliable
-    "worldbank": True,
-    "ted": True,
-    "samgov": True,
-    "fcdo": True,
-    # Tier 2 -- HTML scraping, high yield
-    "ungm": True,
-    "ebrd": True,
-    "eib": True,
-    "giz": True,
-    "kfw": True,
-    "isdb": True,
-    # Tier 3 -- announcement-only, low yield
-    "sfd": True,
-    "adfd": True,
-    "jica": True,
-}
-
-PORTAL_NAMES: dict[str, str] = {
-    "worldbank": "World Bank",
-    "ted": "EU TED",
-    "samgov": "SAM.gov (USAID / US Gov)",
-    "fcdo": "UK Find a Tender",
-    "ungm": "UNGM (UNDP, UNICEF, WFP, UNOPS, UNHCR, UNRWA)",
-    "ebrd": "EBRD",
-    "eib": "EIB",
-    "giz": "GIZ",
-    "kfw": "KfW (via Germany Trade & Invest)",
-    "isdb": "IsDB",
-    "sfd": "Saudi Fund for Development",
-    "adfd": "Abu Dhabi Fund for Development",
-    "jica": "JICA",
-}
-
+ENABLED_PORTALS: dict[str, bool] = {}
+PORTAL_NAMES: dict[str, str] = {}
 # Reliability tier, shown in the report so a quiet Tier 3 portal is not
 # mistaken for a broken one.
-PORTAL_TIERS: dict[str, int] = {
-    "worldbank": 1, "ted": 1, "samgov": 1, "fcdo": 1,
-    "ungm": 2, "ebrd": 2, "eib": 2, "giz": 2, "kfw": 2, "isdb": 2,
-    "sfd": 3, "adfd": 3, "jica": 3,
-}
+PORTAL_TIERS: dict[str, int] = {}
 TIER_LABELS = {1: "API", 2: "HTML", 3: "announcements only"}
+
+
+def refresh_portals() -> None:
+    """Rebuild the portal dictionaries from the loaded portals.json."""
+    ENABLED_PORTALS.clear()
+    PORTAL_NAMES.clear()
+    PORTAL_TIERS.clear()
+    for portal in portal_config.REGISTRY.portals:
+        ENABLED_PORTALS[portal.key] = portal.enabled
+        PORTAL_NAMES[portal.key] = portal.name
+        PORTAL_TIERS[portal.key] = portal.tier
+
+
+refresh_portals()
 
 # --------------------------------------------------------------------------
 # Scraping behaviour

@@ -1,0 +1,116 @@
+name: doc2md
+
+# Scoped by path: the Doc2MD PWA is independent of the Python tender monitor,
+# so a change to one should not spend CI minutes on the other.
+on:
+  push:
+    branches: [main]
+    paths: ['doc2md/**', '.github/workflows/doc2md.yml']
+  pull_request:
+    paths: ['doc2md/**', '.github/workflows/doc2md.yml']
+
+defaults:
+  run:
+    working-directory: doc2md
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: doc2md/package-lock.json
+
+      # This job drives no browser, so it still skips the ~150 MB download.
+      # The browser checks moved to the `smoke` job below rather than staying
+      # un-run: see the note there.
+      - run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+      - name: Unit tests
+        run: npm test
+
+      # Covers the quality gate: zero TypeScript errors, and a build that
+      # actually emits the service worker and manifest.
+      - name: Build
+        run: npm run build
+
+      - name: Check the initial bundle stayed under 300 KB
+        run: node scripts/check-bundle-size.mjs
+
+  # The 45 browser checks, which nothing ran until now.
+  #
+  # They were written, committed, and left out of CI on the reasoning that CI
+  # does not drive a browser. The effect was that a suite covering the things
+  # no unit test can reach -- the service worker installing, a PDF converting
+  # with the network cut, the Android share-target POST round-tripping through
+  # the worker -- reported on nothing, on any commit. One of them checks a
+  # claim the README makes in prose, that the app issues no external network
+  # calls at runtime, by recording every request the page makes. That claim was
+  # unverified on every commit too.
+  #
+  # A SEPARATE JOB, not more steps on `build`. The script has five fixed
+  # `waitForTimeout` sleeps, which is the classic way a browser suite turns
+  # flaky on a loaded runner. Kept apart, a flaky browser check cannot stop the
+  # unit tests and the bundle budget from reporting -- and those are the two
+  # signals a contributor needs on every push.
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: doc2md/package-lock.json
+
+      - run: npm ci
+
+      # --with-deps pulls the shared libraries a headless Chromium needs on a
+      # bare runner. Without them the browser downloads fine and then fails to
+      # launch, which reads as a broken test rather than a missing package.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      # The server and the checks in ONE step. A background process started in
+      # an earlier step is not something to rely on between steps, and a smoke
+      # run against a server that quietly died fails in a way that looks like
+      # the app is broken.
+      #
+      # CHROME is deliberately unset: Playwright launches the browser installed
+      # above. The script used to default to one sandbox's path, which is why
+      # it could not run anywhere else.
+      - name: Browser checks
+        run: |
+          # The local binary, not `npx`: npx spawns vite as a child, so $! is
+          # the wrapper and killing it leaves the server running. Checked --
+          # the port stayed open.
+          ./node_modules/.bin/vite preview --port 4173 --host 127.0.0.1 \
+            > /tmp/preview.log 2>&1 &
+          PREVIEW=$!
+          # --retry-connrefused: the port is not open the instant vite starts.
+          curl -sS --retry 30 --retry-delay 1 --retry-connrefused \
+            -o /dev/null http://127.0.0.1:4173/
+          set +e
+          node scripts/smoke.mjs
+          STATUS=$?
+          set -e
+          kill "$PREVIEW" 2>/dev/null || true
+          exit $STATUS
+
+      # The script prints PASS/FAIL per check to stdout, so the log is the
+      # report. This is for the case where the server, not a check, is the
+      # problem.
+      - name: The preview server's log, if it is the suspect
+        if: failure()
+        run: cat /tmp/preview.log || true

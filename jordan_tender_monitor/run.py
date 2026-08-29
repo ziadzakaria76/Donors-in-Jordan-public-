@@ -88,7 +88,12 @@ def cmd_check_portals() -> int:
             detail += f" via {h.layer or 'api'}"
             mark = "OK        "
         elif h.status == "no listing":
-            print(f"  NO LISTING  {h.name}: {h.reason}")
+            # Was a bare print() that then fell through to the shared line
+            # below with `mark` and `detail` left over from the previous
+            # portal -- so ADFD and JICA, which report this on every run,
+            # printed a second line carrying another portal's status, and the
+            # very first portal raised NameError.
+            mark, detail = "NO LISTING", h.reason
         elif h.status == "unconfigured":
             mark, detail = "NOT SET UP", h.reason
         else:
@@ -211,6 +216,83 @@ def cmd_capture(portal_key: str) -> int:
         print("Nothing was captured -- every source URL failed. The portal is "
               "unreachable from here, so its selectors cannot be verified.\n")
         return 1
+    return 0
+
+
+def cmd_probe(raw: str) -> int:
+    """Try a candidate portal without adding it to portals.json.
+
+    Used by the phone app's "test it before saving" step. The result is a
+    document rather than printed text, because the app has to render it -- but
+    it is printed as well, so the same command is usable by hand.
+
+    Reads '-' from stdin, which is how the workflow passes a JSON blob that
+    would otherwise have to survive shell quoting.
+    """
+    import json as _json
+
+    from jordan_tender_monitor import probe as prober
+
+    if raw.strip() == "-":
+        raw = sys.stdin.read()
+
+    try:
+        candidate = _json.loads(raw)
+    except _json.JSONDecodeError as exc:
+        print(f"\nThat is not valid JSON: {exc.msg} at line {exc.lineno}, "
+              f"column {exc.colno}.\n")
+        return 2
+    if not isinstance(candidate, dict):
+        print("\nExpected one portal entry as a JSON object, e.g.\n"
+              '  {"key": "example", "name": "Example", '
+              '"urls": ["https://example.org/tenders"]}\n')
+        return 2
+
+    path = prober.write_probe(candidate)
+    document = _json.loads(path.read_text(encoding="utf-8"))
+    verdict = document.get("verdict", {})
+
+    print(f"\nProbing {candidate.get('key')!r}...\n")
+    for source in document.get("sources", []):
+        print(f"  {source['url']}")
+        if not source["fetched"]:
+            print(f"    FAILED: {source['error']}\n")
+            continue
+        print(f"    {source['bytes']:,} bytes")
+        print(f"    {'layer':16} {'rows':>5} {'quality':>8}  note")
+        for layer in source["layers"]:
+            flag = "  <-- WINS" if layer["wins"] else ""
+            print(f"    {layer['layer']:16} {layer['rows']:5} "
+                  f"{layer['quality']:8.2f}  {layer['note'][:52]}{flag}")
+        if source["diagnosis"]:
+            print(f"    Diagnosis: {source['diagnosis']}")
+        if source["sample_rows"]:
+            label = ("best-scoring (rejected)" if source["sample_rejected"]
+                     else "winning")
+            print(f"\n    Sample rows from the {label} "
+                  f"'{source['sample_from']}' layer:")
+            for row in source["sample_rows"]:
+                print(f"      title  : {(row['title'] or '')[:88]}")
+                print(f"      url    : {row['url']}")
+                print(f"      posted : {row['posted_text']!r}   "
+                      f"closing: {row['closing_text']!r}")
+                print(f"      raw    : {(row['raw_text'] or '')[:160]!r}\n")
+
+    if document.get("rejected"):
+        print("  This entry would be REJECTED on load:")
+        for problem in document["rejected"]:
+            print(f"    {problem}")
+
+    print(f"\n  {verdict.get('headline', '')}")
+    if verdict.get("detail"):
+        print(f"  {verdict['detail']}")
+    if verdict.get("advice"):
+        print(f"  {verdict['advice']}")
+    print(f"\n  wrote {path}\n")
+
+    # Zero whether or not the portal turned out usable: the probe RAN. A
+    # non-zero exit would turn "this URL is not a listing" into a failed
+    # workflow run, and the app could not tell that apart from a broken probe.
     return 0
 
 
@@ -910,6 +992,12 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--capture", metavar="PORTAL",
                        help="fetch a portal's live pages and report which "
                             "extraction layer works")
+    group.add_argument("--probe", metavar="JSON",
+                       help="try a portal that is NOT in portals.json yet: "
+                            "takes one portal entry as JSON, fetches its "
+                            "pages, and writes probe_<key>.json saying what "
+                            "each layer found. Reads '-' from stdin. Nothing "
+                            "is committed and no state is touched")
     group.add_argument("--self-test", action="store_true",
                        help="run the pipeline on offline fixtures in a temp dir")
     group.add_argument("--test-alert", action="store_true",
@@ -936,6 +1024,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_check_portals()
     if args.capture:
         return cmd_capture(args.capture)
+    if args.probe:
+        return cmd_probe(args.probe)
     if args.test_alert:
         return cmd_test_alert()
     if args.self_test:

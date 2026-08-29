@@ -1,0 +1,133 @@
+name: Android app
+
+# Builds the APK and attaches it to the run, so it can be installed from the
+# phone with no Android Studio anywhere in the loop.
+#
+# It also COMPILES the app, which is the only place that happens: the app is
+# developed in an environment with no Android SDK, so a green run here is the
+# first evidence that a change builds at all.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The version code is the commit count, so the whole history is
+          # needed. A shallow clone would stamp every build versionCode 1, and
+          # Android would then install any of them over any other without a
+          # word about which is newer.
+          fetch-depth: 0
+
+      - name: Work out the version
+        id: version
+        run: |
+          CODE=$(git rev-list --count HEAD)
+          echo "APK_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+          echo "APK_VERSION_NAME=0.0.$CODE-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "name=0.0.$CODE-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # The unit tests are the ones that can run without a device: token
+      # redaction, the API client's failure paths, report parsing and the
+      # artifact reader. Anything needing the Android Keystore or a real
+      # screen is NOT covered here, and ANDROID.md says so plainly.
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Lint
+        id: lint
+        run: ./gradlew --no-daemon lintDebug
+        continue-on-error: true
+
+      # Lint does not fail the build -- a warning about a deprecated Compose
+      # overload should not stop an APK reaching the phone. But a step that
+      # goes green while hiding what it found is exactly the silent failure
+      # this project keeps refusing to ship, so print the findings into the log
+      # and the summary where they cannot be missed.
+      - name: Say what lint found
+        if: always()
+        run: |
+          REPORT=app/build/reports/lint-results-debug.xml
+          {
+            echo "### Android lint"
+            if [ ! -f "$REPORT" ]; then
+              echo ""
+              echo 'Lint produced no report. Its step outcome was'
+              echo '"${{ steps.lint.outcome }}". Nothing was checked, so treat'
+              echo 'this build as unlinted rather than clean.'
+              exit 0
+            fi
+            FATAL=$(grep -c 'severity="Fatal"' "$REPORT" || true)
+            ERROR=$(grep -c 'severity="Error"' "$REPORT" || true)
+            WARN=$(grep -c 'severity="Warning"' "$REPORT" || true)
+            echo ""
+            echo "$FATAL fatal, $ERROR error, $WARN warning."
+            echo ""
+            if [ "$FATAL" != "0" ] || [ "$ERROR" != "0" ]; then
+              echo '```'
+              grep -o 'id="[^"]*" severity="\(Fatal\|Error\)" message="[^"]*"' \
+                "$REPORT" | head -40
+              echo '```'
+              echo ""
+              echo "These did NOT fail the build. The APK above was built anyway."
+            fi
+            echo 'Full report: the "android-test-report" artifact on this run.'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Build the debug APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      # Named after the version it reports, not after the run: the run number
+      # is gone the moment the file leaves the Actions page, and "which build
+      # is on my phone" is otherwise unanswerable.
+      - name: Name the APK after its version
+        run: |
+          mkdir -p out
+          cp app/build/outputs/apk/debug/app-debug.apk \
+             "out/jordan-tenders-${{ steps.version.outputs.name }}.apk"
+
+      - name: Upload the APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jordan-tenders-apk-${{ github.run_number }}
+          path: android/out/*.apk
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload the test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-report-${{ github.run_number }}
+          path: android/app/build/reports/
+          if-no-files-found: warn
+          retention-days: 14

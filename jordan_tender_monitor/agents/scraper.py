@@ -14,7 +14,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 
-from .. import config, portals
+from .. import config, portal_config, portals
 from ..portals import base as base_module
 from ..portals.base import PortalError
 
@@ -125,6 +125,36 @@ def _run_one(key: str, module) -> PortalHealth:
     return health
 
 
+def _config_health(only: list[str] | None = None) -> list[PortalHealth]:
+    """A status line for every portal portals.json could not give us.
+
+    A rejected entry is skipped, and a skipped portal that said nothing would
+    simply vanish from the report -- which is the failure this codebase keeps
+    finding, dressed as configuration. It reports as unavailable, with the
+    file's own diagnosis as the reason, so a typo pushed from a phone is
+    visible in the same table as a bot wall.
+
+    A file that could not be read at all is one line rather than thirteen,
+    because that is the honest description: nothing was configured, so nothing
+    can be said about any individual portal.
+    """
+    registry = portal_config.REGISTRY
+    out = [PortalHealth(key=problem.key, name=f"{problem.key} (portals.json)",
+                        tier=2, status="unavailable",
+                        reason=f"portals.json rejected this entry: {problem.message}",
+                        urls=[registry.path])
+           for problem in registry.problems
+           if not only or problem.key in only]
+    if registry.fatal:
+        out.insert(0, PortalHealth(
+            key="portals.json", name="portals.json", tier=1,
+            status="unavailable",
+            reason=f"the portal list {registry.fatal}. No portal could be "
+                   f"configured, so nothing was read this run",
+            urls=[registry.path]))
+    return out
+
+
 def scrape(only: list[str] | None = None) -> ScrapeResult:
     """Poll every enabled portal in parallel and collect the results."""
     selected = portals.enabled()
@@ -132,7 +162,7 @@ def scrape(only: list[str] | None = None) -> ScrapeResult:
         selected = {k: v for k, v in selected.items() if k in only}
 
     records: list[dict] = []
-    health: list[PortalHealth] = []
+    health: list[PortalHealth] = _config_health(only)
 
     with ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as pool:
         futures = {pool.submit(_run_one, key, module): key

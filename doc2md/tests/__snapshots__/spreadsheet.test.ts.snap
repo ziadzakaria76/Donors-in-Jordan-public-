@@ -1,0 +1,59 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`spreadsheet converter — CSV > handles BOM, semicolons, quotes, newlines and Arabic 1`] = `
+"# suppliers
+
+| Ref | Supplier | Notes | Amount |
+| --- | --- | --- | --- |
+| A-1 | Al-Nahda; Sons | Line one<br>Line two | 1.250,00 |
+| A-2 | He said "yes" | مذكرة تفاهم | 980,50 |"
+`;
+
+exports[`spreadsheet converter — XLSX > converts a clean workbook 1`] = `
+"# orders
+
+## Sheet: Orders
+
+| Item | Qty | Unit price | Total | Ordered | Margin |
+| --- | ---: | ---: | ---: | --- | ---: |
+| Widget | 3 | 12.5 | 37.5 | 2026-01-15 | 12.5% |
+| Gadget | 10 | 4 | 40 | 2026-02-02 | 40.0% |"
+`;
+
+exports[`spreadsheet converter — XLSX > handles a messy workbook: titles, merges, spacers, RTL, errors 1`] = `
+"# budget
+
+## Sheet: Budget
+
+Q3 Budget Review
+
+Prepared 4 August 2026
+
+| Category | Line item | Amount (JOD) |
+| --- | --- | ---: |
+| Operations | Rent | 120000 |
+| Operations | Utilities | 18500 |
+| Operations | Cleaning \\| security | 9000 |
+| Grants | Sub-grants | 450000 |
+|  | Ratio | #DIV/0! |
+
+## Sheet: المانحون
+
+| الجهة المانحة | القطاع | القيمة |
+| --- | --- | ---: |
+| البنك الدولي | المياه | 250000 |
+| الاتحاد الأوروبي | التعليم | 130000 |
+
+## Sheet: Outline
+
+| Outline | Note |
+| --- | --- |
+| 1. Programme | Top level |
+|    1.1 Water | Nested one |
+|       1.1.1 Rural | Nested two |
+| 2. Governance | Top level |
+
+## Sheet: Blank
+
+<!-- empty sheet -->"
+`;

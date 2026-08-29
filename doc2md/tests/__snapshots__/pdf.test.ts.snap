@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PDF converter > converts the whole report 1`] = `
+"# Donor Landscape Review
+
+## Executive summary
+
+Funding across the reviewed portals rose sharply over the period under review, with the largest single increase recorded in the water sector, where three new facilities were announced.
+
+A second paragraph starts here and stops short.
+
+### Priority sectors
+
+- Water and sanitation
+- Education
+  - Vocational training
+
+1. Submit the concept note
+2. Await clearance
+
+## Allocations by donor
+
+| Donor | Sector | Value |
+| --- | --- | ---: |
+| World Bank | Water | 250,000 |
+| EBRD | Transport | 410,000 |
+| IsDB | Education | 130,000 |
+
+### Notes in Arabic
+
+وزارة التخطيط والتعاون الدولي تعلن عن فرص تمويل جديدة"
+`;

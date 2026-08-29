@@ -3,6 +3,15 @@
 No install, no server, no laptop. GitHub runs the monitor; you tap a button and
 read the results.
 
+**There is also an app.** Same runs, fewer taps: the last report readable
+offline, a Run button, the full portal health table, the Word and Excel packs,
+portal management, and a notification when a run finishes. Install it from the
+repository's Releases page — see
+[`android/ANDROID.md`](../android/ANDROID.md). Everything below still works
+exactly as it did, and is what to fall back on if the app misbehaves; it is
+also the only route that has actually been used, since the app has never been
+run on a device.
+
 ---
 
 ## One-time setup
@@ -16,10 +25,10 @@ Two optional extras:
   that portal works: **Settings → Secrets and variables → Actions → New
   repository secret**, named `SAM_API_KEY`. Without it, SAM.gov reports as *not
   configured* and everything else runs normally.
-- **Failure notifications.** GitHub emails you when a workflow run fails, and a
-  total portal outage deliberately makes the run fail. Check it is on at
-  **github.com/settings/notifications → Actions**. This replaces the Azure mail
-  setup entirely — no credentials, no client secret.
+- **Notifications.** GitHub emails you when a run *fails*, and a total portal
+  outage deliberately makes the run fail — so alerting works with no credentials
+  at all. To hear about successful runs too, see *Getting told, instead of
+  remembering to look* below; the system itself sends nothing.
 
 ---
 
@@ -114,23 +123,72 @@ and does not mean anything is wrong.
 them entirely, and the top of every hour is the busiest minute on the platform
 because that is where most people point their crons. This workflow was set to
 04:00 and fired zero times before the minute was moved. If a morning ever
-passes with no run, check the Actions tab -- and note that GitHub also disables
-scheduled workflows automatically in a repository with no activity for 60 days,
-which a monitor nobody commits to will eventually hit.
+passes with no run, check the Actions tab.
+
+---
+
+## Getting told, instead of remembering to look
+
+**The system itself sends nothing.** `EMAIL_METHOD = "none"` in `config.py`: it
+writes the Word and Excel files and stops there. That is deliberate -- it is
+what let the whole Azure `Mail.Send` credential be dropped -- but it means a
+good morning is silent, and by default GitHub only emails you when a run
+*fails*. So the only thing that currently reaches you unprompted is bad news.
+
+To be told about every run, turn on GitHub's own notifications:
+
+**github.com -> your avatar -> Settings -> Notifications -> "Actions"**
+
+* tick **Email** (and/or Web)
+* **untick "Only notify for failed workflows"** -- this is the one that matters
+
+Three things to know before you do:
+
+* **It is global, not per-repository.** GitHub offers no way to switch this on
+  for one repo. Every repository whose Actions you are subscribed to will start
+  emailing you.
+
+* **The subject line does not carry the count.** It reads "Run succeeded:
+  Jordan tender monitor". You have to open it -- but the run page you land on
+  already renders the whole report, and the artifact filename carries the
+  number (`jordan_tenders_..._95-opportunities.docx`).
+
+* **Quiet days email you too.** Scheduled runs report only what is new, so most
+  mornings will legitimately say nothing new was found. That is the system
+  working, not failing.
+
+Notifications for a scheduled run go to whoever last modified the workflow
+file, which for this repository is its owner.
+
+**If you would rather have the files themselves in your inbox** than a link to
+fetch them, that is a different setting: `EMAIL_METHOD = "smtp"` (or `"graph"`)
+in `config.py` plus credentials in `.env`. The delivery code is retained and
+still tested. Read the `ApplicationAccessPolicy` warning above that setting
+before granting `Mail.Send` as an Azure *application* permission -- it is
+tenant-wide otherwise, meaning the app could send as any mailbox in the
+organisation.
 
 ---
 
 ## Before you trust the results
 
-The CSS selectors in this codebase have never been checked against a live page —
-see the main README. From your phone you can start that verification:
+Every portal has now been read live and its result checked against what the
+source actually publishes. Two remain genuinely unreachable (EIB behind a bot
+wall, the Saudi Fund timing out), two publish no listing at all (ADFD, JICA),
+and SAM.gov needs a key. The portal status table names each one every run.
 
-**Actions → Run workflow → Limit to these portals: `ungm`**
+That does not make the results permanently trustworthy: donor sites redesign,
+and a portal that silently starts returning nothing looks exactly like a quiet
+week. The check you can run from a phone is the same one that found every fault
+so far:
 
-Then read the portal status table in the summary. Repeat for `ebrd`, `eib`,
-`giz`, `kfw`, `isdb`, `sfd`, `adfd`, `jica`. Any portal reporting a diagnosed
-failure needs its selectors or its URL corrected — that work needs a real
-editor, but the diagnosis you can do entirely from the phone.
+**Actions → Run workflow → What to do: `diagnose portals (--capture)` → Limit to
+these portals: `ungm`**
+
+The summary then reports, per extraction layer, how many rows were found and at
+what quality, which layer won, the selectors the page really uses, and the
+network calls it makes. Repeat for any portal whose count looks wrong. Fixing
+it needs a real editor; diagnosing it does not.
 
 ---
 

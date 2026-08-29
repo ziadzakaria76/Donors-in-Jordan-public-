@@ -26,13 +26,25 @@ from __future__ import annotations
 import logging
 import re
 
+from .. import portal_config
 from ..utils import text as textutil
 from . import base
 
 log = logging.getLogger(__name__)
 
-API = "https://search.worldbank.org/api/v2/procnotices"
 KEY = "worldbank"
+# The endpoint comes from portals.json, so it can be corrected without a code
+# change. Empty when that entry is missing or was rejected -- see
+# base.require_url, which turns that into a diagnosed failure rather than an
+# ImportError.
+API = portal_config.primary_url(KEY)
+
+# The fields portals.json therefore must not set: this portal is a REST
+# API and has no HtmlSpec at all, so a selector in the file would be read,
+# accepted and then used by nothing. The loader rejects the entry instead,
+# and a test keeps this list and the file's `code_owned` in step.
+CODE_OWNED = ("selectors", "field_selectors", "anchor_hint", "currency",
+              "filter_to_jordan")
 
 # The public page for a notice. The API returns the identifier; it does not
 # return this address, which is why every World Bank row reached the first
@@ -209,7 +221,7 @@ def _fetch_all_items() -> list:
             "rows": PAGE_SIZE,
             "os": page * PAGE_SIZE,
         }
-        payload = base.fetch_json(API, params=params)
+        payload = base.fetch_json(base.require_url(API, KEY), params=params)
         batch = _items_from(payload)
         if total is None:
             total = _reported_total(payload)

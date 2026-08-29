@@ -33,9 +33,11 @@ os.environ.setdefault("JTM_LOG_FILE", str(Path(_TMP) / "test.log"))
 logging.disable(logging.CRITICAL)
 
 from jordan_tender_monitor import config  # noqa: E402
-from jordan_tender_monitor.tests import (harness, test_browser,  # noqa: E402
-                                         test_capture, test_extraction,
-                                         test_pipeline, test_portals_api)
+from jordan_tender_monitor.tests import (harness, test_app_contract,  # noqa: E402
+                                         test_browser, test_capture,
+                                         test_extraction, test_pipeline,
+                                         test_portal_config, test_portals_api,
+                                         test_probe, test_report_json)
 
 
 def main() -> int:
@@ -49,7 +51,15 @@ def main() -> int:
                       test_pipeline.TESTS)
     harness.run_suite("REST API portal modules", test_portals_api.TESTS)
     harness.run_suite("Capture and the portal registry", test_capture.TESTS)
+    harness.run_suite("The portal list as data (portals.json)",
+                      test_portal_config.TESTS)
+    harness.run_suite("The JSON report the Android app reads",
+                      test_report_json.TESTS)
+    harness.run_suite("Testing a portal before it is added (--probe)",
+                      test_probe.TESTS)
     harness.run_suite("The headless-browser path (UNGM)", test_browser.TESTS)
+    harness.run_suite("The contract between the pipeline and the app",
+                      test_app_contract.TESTS)
 
     return harness.report()
 
