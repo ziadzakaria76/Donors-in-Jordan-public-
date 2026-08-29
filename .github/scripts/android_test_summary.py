@@ -90,9 +90,13 @@ def main(argv: list[str]) -> int:
         print("Full reports, a screenshot of the screen at the end, and the "
               "device log are in this run's artifacts.")
     else:
-        print("All passed. This is the only place the Keystore-backed token "
-              "store, Room's generated SQL, and the screens themselves are "
-              "exercised at all.")
+        # Deliberately does not name what was covered. This script is shared
+        # verbatim by both Android apps so the two branches cannot conflict on
+        # it, and they do not test the same things: naming one app's suite here
+        # printed a confident, false summary on the other app's runs. What is
+        # true of both is the only thing worth asserting.
+        print("All passed, against a real Android system image. The JVM suite "
+              "cannot reach what these cover.")
 
     return 0
 
