@@ -2,14 +2,14 @@
 
     --check-portals      reachability only, no parsing
     --dry-run            scrape, filter, print. Sends nothing.
-    --run                full run, writes output files. Sends nothing without --send.
-    --send               deliver by Graph (only meaningful with --run)
+    --run                full run, writes output files. Nothing is delivered:
+                         the report is the files, and you download them.
     --capture PORTAL     fetch a portal's live pages, save them, report per-layer
                          row counts, quality, the winning layer, and the
                          structural selectors the page actually uses
     --self-test          run the pipeline over committed fixtures, never touching
                          real state
-r"""
+"""
 
 from __future__ import annotations
 

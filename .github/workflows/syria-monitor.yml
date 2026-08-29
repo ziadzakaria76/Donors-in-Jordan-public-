@@ -1,4 +1,13 @@
-name: Run monitor
+name: Syria tender monitor
+
+# Imported with the project from its own repository, where it lived at
+# .github/workflows/run-monitor.yml. It has to sit here instead: GitHub only
+# reads workflows from the repository root, so a copy left inside
+# syria_tender_monitor/.github/ would look active in the diff and never run.
+#
+# Everything else about it is unchanged. `defaults.run.working-directory` does
+# the work the move would otherwise need, so the commands below are the same
+# ones the project's README documents for a local run.
 
 on:
   workflow_dispatch:
@@ -22,15 +31,33 @@ on:
     # always UTC; there is no local-time option.
     - cron: "0 3 * * *"
 
+# Never let two runs write the seen-tenders database at once. The other two
+# projects in this repository have their own groups and are unaffected.
+concurrency:
+  group: syria-tender-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: syria_tender_monitor
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: syria_tender_monitor/requirements.txt
+
       - run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -60,21 +87,22 @@ jobs:
             *)       python -m syria_monitor.cli --run ;;
           esac
 
-      # Uploaded so a run triggered from a phone can be read on the run summary
-      # page without downloading anything.
       # This is how the report is delivered: download it from the run page.
       # The Markdown summary is also appended to the run summary by the CLI,
       # so portal health is visible in the run list without downloading.
+      #
+      # These paths are NOT affected by working-directory above -- upload
+      # resolves them against the workspace root -- so they carry the prefix.
       - name: Upload report files
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: syria-tender-report
+          name: syria-tender-report-${{ github.run_number }}
           path: |
-            output/*.docx
-            output/*.xlsx
-            output/*.json
-            output/*-summary.md
-            tests/fixtures/live/*.html
+            syria_tender_monitor/output/*.docx
+            syria_tender_monitor/output/*.xlsx
+            syria_tender_monitor/output/*.json
+            syria_tender_monitor/output/*-summary.md
+            syria_tender_monitor/tests/fixtures/live/*.html
           if-no-files-found: warn
           retention-days: 90

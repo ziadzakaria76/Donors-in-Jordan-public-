@@ -55,7 +55,15 @@ def _executable_path() -> Optional[str]:
 def available() -> bool:
     """True when Playwright can be imported. Does not launch a browser."""
     import importlib.util
-    return importlib.util.find_spec("playwright.sync_api") is not None
+    # find_spec() imports the parent package to read its __path__, so asking
+    # for a submodule of a package that is not installed raises rather than
+    # returning None. Playwright is an optional extra and is absent on every
+    # machine that has not asked for it, which is the normal case -- so this
+    # has to answer False, not blow up the caller.
+    try:
+        return importlib.util.find_spec("playwright.sync_api") is not None
+    except (ImportError, ValueError):
+        return False
 
 
 def render(url: str, timeout_ms: int = 30000, settle_ms: int = 1500,

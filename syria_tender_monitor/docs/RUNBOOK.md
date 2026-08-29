@@ -7,53 +7,38 @@ Legend: ⏱ = elapsed time you wait on someone else, not effort.
 
 ---
 
-## Stage 1 — Get the code onto GitHub  (10 min)
+## Stage 1 — Get the code onto GitHub  ✅ done
 
-The branch exists only as a git bundle until this is done. **Everything else in
-this runbook depends on it**, including the phone-friendly capture steps, whose
-workflow file has not reached GitHub yet.
+The code is in this repository, under `syria_tender_monitor/`, imported from the
+bundle with its history intact. Nothing here is left to do.
 
-**From a phone:** start a new Claude Code session on this repo, attach
-`syria-tender-monitor.bundle`, and ask it to fetch the branch and push it. A
-session created after the GitHub App install has working credentials; the one
-that produced this code does not.
+Two things changed in the move, and the rest of this runbook assumes both:
 
-**From a computer instead:**
+- **Every path and command below is relative to `syria_tender_monitor/`.**
+  Start with `cd syria_tender_monitor`.
+- **The workflows moved to the repository root**, because that is the only
+  place GitHub reads them from. `run-monitor.yml` is now
+  `.github/workflows/syria-monitor.yml`, named **Syria tender monitor** in the
+  Actions tab; `ci.yml` folded into the repository's existing
+  `.github/workflows/tests.yml` as the jobs `syria` and
+  `syria-browser-fallback`. Both run from `syria_tender_monitor/`, so the
+  commands they issue are the ones documented here.
 
-1. Move `syria-tender-monitor.bundle` to a machine with `git`
-   (email, Drive, or cable).
-2. Clone the repo, or use an existing clone:
-   ```bash
-   git clone https://github.com/ziadzakaria76/Donors-in-Jordan-public-
-   cd Donors-in-Jordan-public-
-   ```
-3. Import the branch and push it:
-   ```bash
-   git fetch /path/to/syria-tender-monitor.bundle \
-     claude/admiring-brown-wn1rmw:claude/admiring-brown-wn1rmw
-   git push -u origin claude/admiring-brown-wn1rmw
-   ```
-4. Check you got the right thing before opening the PR:
-   ```bash
-   git log --oneline -3        # head should be the SHA quoted in the chat
-   ```
-5. On github.com, use the **Compare & pull request** banner. Paste `PR-body.md`
-   as the description. Mark it **draft**.
-
-**Done when:** the branch is on GitHub and CI has run. Expect the `test` job
-green on 3.11 and 3.12, and the `browser-fallback` job green.
-
-> Why this can't be done for you: the Claude session's GitHub credentials were
-> issued before the app was installed and cannot be refreshed from inside it.
-> A *new* Claude session, given the bundle, would have working credentials.
+**Done when:** CI has run on the branch. Expect the `syria` job green on 3.11
+and 3.12, and `syria-browser-fallback` green. The `test` and `website-content`
+jobs in the same workflow belong to the other two projects in this repository
+and are unrelated.
 
 ---
 
 ## Stage 2 — Prove it runs  (15 min, same computer)
 
 ```bash
+cd syria_tender_monitor                 # every path below is relative to here
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q              # expect: 457 passed
+python -m pytest tests/ -q              # expect: 456 passed, 1 skipped
+                                        # (the skip is the browser test; it
+                                        #  passes once Playwright is installed)
 python -m pyflakes src/ tests/          # expect: no output
 
 PYTHONPATH=src python -m syria_monitor.cli --self-test
@@ -104,7 +89,7 @@ cannot be derived, and a wrong one returns nothing *silently*.
    ```bash
    PYTHONPATH=src python -m syria_monitor.cli --capture ungm
    ```
-   **From a phone instead:** GitHub → Actions → **Run monitor** → Run workflow →
+   **From a phone instead:** GitHub → Actions → **Syria tender monitor** → Run workflow →
    mode `capture`, portal `ungm`. The id appears on the run summary page, and
    the captured HTML comes back as an artifact. Requires Stage 1 to be done.
 2. Read the line it prints:
@@ -133,7 +118,8 @@ that gets fixed. For each HTML portal:
 PYTHONPATH=src python -m syria_monitor.cli --capture undp     # then srtf, giz, isdb, gtai
 ```
 
-**From a phone instead:** Actions → Run monitor → mode `capture`, portal `all`.
+**From a phone instead:** Actions → **Syria tender monitor** → mode `capture`,
+portal `all`.
 One run walks every HTML portal and puts the whole report on the run summary.
 
 For each one, read the per-layer table:
@@ -172,10 +158,11 @@ syria-tenders-2026-08-28-summary.md    short summary, always written
 Pick how you want to reach them:
 
 - **Local runs** — they are simply in `output/`.
-- **Scheduled runs** — Actions → Run monitor → the run → **Artifacts** →
+- **Scheduled runs** — Actions → **Syria tender monitor** → the run → **Artifacts** →
   `syria-tender-report` (kept 90 days). The summary is also on the run page
   itself, so you can see whether a run was healthy without downloading.
-- **Somewhere shared** — add a step after "Run monitor" that copies `output/*`
+- **Somewhere shared** — add a step after "Run monitor" in
+  `.github/workflows/syria-monitor.yml` that copies `output/*`
   to wherever your team looks (a share, a bucket, a Drive folder). Nothing in
   the code needs to change for that.
 
@@ -208,7 +195,7 @@ Already configured: `0 3 * * *` UTC = 06:00 Europe/Amman, daily.
 
 1. Repo → Settings → Secrets and variables → Actions → **Secrets**: add
    `SAM_API_KEY` (the only secret this system uses).
-2. Trigger **Run monitor** manually once (Actions tab → Run workflow) and read
+2. Trigger **Syria tender monitor** manually once (Actions tab → Run workflow) and read
    the run summary; the Word/Excel/JSON files upload as artifacts.
 3. Leave the schedule on. The summary on each run page states portal health,
    so a quiet day and a broken scraper are distinguishable at a glance from the

@@ -2,11 +2,19 @@
 
 Monitors donor and IFI procurement portals for Syria-related consulting
 opportunities, classifies them by delivery location, screens named parties
-against sanctions lists, and delivers a ranked report by email.
+against sanctions lists, and writes a ranked report you download as Word,
+Excel and JSON.
 
 Country-specific data lives in `profiles/syria.yml`. The code takes a profile as
 an argument and hard-codes no country, so a second country is a second YAML
 file, not a refactor.
+
+This is one of three unrelated projects in this repository (see the [root
+README](../README.md)); it shares no code with either of the others. **Every
+path and command below is relative to `syria_tender_monitor/`** -- start with
+`cd syria_tender_monitor`. The one exception is the two GitHub workflows, which
+have to sit at the repository root because that is the only place GitHub reads
+them from.
 
 ---
 
@@ -34,8 +42,8 @@ here. Nobody should read "the tests pass" as "the scrapers work".
 - The extraction cascade against Drupal views, Bootstrap cards, header tables
   (including the unclosed `<td>`), Next.js JSON, site-level JSON-LD, RSS, RTL
   Arabic, a Cloudflare wall, a JavaScript shell and an over-broad selector.
-- Report writers: Arabic through JSON and Excel, real RTL through Word, a
-  zero-row workbook, the email overflow path, delivery without credentials.
+- Report writers: Arabic through JSON and Excel, real RTL through Word, and a
+  zero-row workbook.
 - Sanctions screening logic against synthetic lists.
 
 ### Not verified at all
@@ -62,6 +70,7 @@ here. Nobody should read "the tests pass" as "the scrapers work".
 ## First run
 
 ```bash
+cd syria_tender_monitor       # every path below is relative to here
 pip install -r requirements-dev.txt
 cp .env.example .env          # fill in; .env is gitignored and must stay that way
 
@@ -97,13 +106,10 @@ the real request body from the capture's network trace.
 |---|---|
 | `--check-portals` | Reachability only. No parsing. |
 | `--dry-run` | Scrape, filter, rank, print. Writes nothing, sends nothing, leaves the seen-database untouched. |
-| `--run` | Full run. Writes `output/*.docx`, `*.xlsx`, `*.json`. **Does not send.** |
-| `--run --send` | Delivers by Microsoft Graph. |
+| `--run` | Full run. Writes `output/*.docx`, `*.xlsx`, `*.json`. Delivers nothing -- the files are the report. |
 | `--capture PORTAL` | Fetches live pages to `tests/fixtures/live/`, prints per-layer row counts and quality, which layer won, and the selectors the page actually uses. `--capture all` walks every HTML portal. Under GitHub Actions the report is written to the run summary, so it can be read from a phone. |
 | `--self-test` | Pipeline over fixtures with the database and output directory redirected. |
 | `--portal NAME` | Limit a run to one or more portals (repeatable). |
-
-`--send` is deliberately separate from `--run`: review the files first.
 
 ---
 
@@ -150,8 +156,8 @@ end-to-end-verified path in the repository.
 On a runner, `playwright install chromium` fetches its own browser and no path
 is needed. Where a machine ships its own Chromium and the download is
 unavailable, set the repository variable `PLAYWRIGHT_CHROMIUM_PATH` (Settings →
-Secrets and variables → Actions → Variables); both workflows pass it through,
-and an empty value is ignored.
+Secrets and variables → Actions → Variables); both root workflows pass it
+through, and an empty value is ignored.
 
 ---
 
@@ -226,8 +232,8 @@ ls output/
 
 From GitHub Actions — this is the download path for scheduled runs:
 
-1. **Actions** → **Run monitor** → the run you want
-2. **Artifacts** → `syria-tender-report` (kept 90 days)
+1. **Actions** → **Syria tender monitor** → the run you want
+2. **Artifacts** → `syria-tender-report-<run number>` (kept 90 days)
 
 The Markdown summary is also appended to the **run summary page**, so portal
 health is readable from the run itself without downloading anything. That
@@ -242,16 +248,21 @@ in May.
 `0 3 * * *` UTC = **06:00 Europe/Amman**, daily. GitHub Actions cron is always
 UTC; Amman is UTC+3 year-round, so no DST arithmetic is needed.
 
-Two workflows:
-- **CI** — pyflakes plus the full offline suite on Python 3.11 and 3.12.
-- **Run monitor** — `workflow_dispatch` (triggerable from a phone) plus the
-  daily schedule, uploading the Word, Excel and JSON files as run artifacts.
+Two workflows, both at the repository root, because GitHub reads workflows
+from nowhere else:
+- **tests** (`.github/workflows/tests.yml`), jobs `syria` and
+  `syria-browser-fallback` — pyflakes plus the full offline suite on Python
+  3.11 and 3.12, and the browser fallback against real Chromium. The workflow
+  also carries the other two projects' jobs; they are independent of these.
+- **Syria tender monitor** (`.github/workflows/syria-monitor.yml`) —
+  `workflow_dispatch` (triggerable from a phone) plus the daily schedule,
+  uploading the Word, Excel and JSON files as run artifacts.
 
 ## Knowing when it breaks
 
-Portal health is in the subject line, because a monitor that says
-"0 opportunities" whether every portal failed or nothing matched goes unnoticed
-for weeks:
+Portal health is the first line of the Markdown summary, and so the heading
+of the run summary page, because a monitor that says "0 opportunities" whether
+every portal failed or nothing matched goes unnoticed for weeks:
 
 ```
 Syria tenders -- 6 new, 34 open | all 10 portals OK
