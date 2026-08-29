@@ -169,7 +169,44 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-chromium_missing = not (browser_mod.available() and browser_mod._executable_path())
+def _chromium_present() -> bool:
+    """Is there a Chromium this machine can actually launch?
+
+    By launching one, because nothing cheaper answers it honestly:
+
+    - `_executable_path()` answers "is there an override". It returns None to
+      mean "no override, let Playwright use its own download" -- the normal,
+      working case on a runner that just ran `playwright install chromium`.
+      Reading that None as "no browser" failed this test on exactly the
+      machines the browser job exists to cover, while passing on a sandbox that
+      happens to set PLAYWRIGHT_BROWSERS_PATH.
+    - `chromium.executable_path` names the full browser, but a headless
+      `launch()` runs the separate headless-shell build. Either can be present
+      without the other.
+
+    So do what `browser.render()` does, with the same arguments, and see. It
+    costs about a second when a browser is there and fails fast when it is not.
+    """
+    if not browser_mod.available():
+        return False
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception:
+        return False
+
+    launch_kwargs = {"args": ["--no-sandbox", "--disable-dev-shm-usage"]}
+    explicit = browser_mod._executable_path()
+    if explicit:
+        launch_kwargs["executable_path"] = explicit
+    try:
+        with sync_playwright() as playwright:
+            playwright.chromium.launch(**launch_kwargs).close()
+        return True
+    except Exception:
+        return False
+
+
+chromium_missing = not _chromium_present()
 
 # CI sets REQUIRE_BROWSER=1 in the job that installs Playwright. Without it a
 # broken install would show up as a skip, and the only end-to-end-verified path
