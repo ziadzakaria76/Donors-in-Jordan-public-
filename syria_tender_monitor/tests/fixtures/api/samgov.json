@@ -1,0 +1,41 @@
+{
+  "totalRecords": 2,
+  "limit": 100,
+  "offset": 0,
+  "opportunitiesData": [
+    {
+      "noticeId": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "title": "Technical assistance for health system recovery, Syria",
+      "solicitationNumber": "SFOP0009876",
+      "fullParentPathName": "STATE, DEPARTMENT OF.BUREAU OF NEAR EASTERN AFFAIRS",
+      "postedDate": "2026-08-05",
+      "type": "Solicitation",
+      "baseType": "Presolicitation",
+      "responseDeadLine": "2026-09-25T17:00:00-04:00",
+      "classificationCode": "R499",
+      "typeOfSetAsideDescription": "Total Small Business Set-Aside",
+      "placeOfPerformance": {
+        "city": {"name": "Damascus"},
+        "country": {"code": "SY", "name": "SYRIA"}
+      },
+      "pointOfContact": [
+        {"type": "primary", "email": "grants@state.gov", "fullName": "Contracting Officer"}
+      ],
+      "description": "https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "uiLink": "https://sam.gov/opp/a1b2c3d4e5f60718293a4b5c6d7e8f90/view"
+    },
+    {
+      "noticeId": "ffffffffffffffffffffffffffffffff",
+      "title": "Grounds maintenance services, Damascus, Maryland",
+      "postedDate": "2026-08-06",
+      "type": "Combined Synopsis/Solicitation",
+      "responseDeadLine": "2026-09-12T17:00:00-04:00",
+      "placeOfPerformance": {
+        "city": {"name": "Damascus"},
+        "state": {"name": "Maryland"},
+        "country": {"code": "USA", "name": "UNITED STATES"}
+      },
+      "uiLink": "https://sam.gov/opp/ffffffffffffffffffffffffffffffff/view"
+    }
+  ]
+}

@@ -1,12 +1,19 @@
 # Donors in Jordan
 
-Two unrelated projects share this repository. They have no code in common, and
-neither one builds, imports or deploys the other.
+Three unrelated projects share this repository. They have no code in common,
+and none of them builds, imports or deploys another.
 
 | Project | What it is | Where it lives |
 | --- | --- | --- |
 | **General Sherman Housing** | A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential developer | [`website/`](website/) |
 | **[Jordan Tender Intelligence Monitor](#jordan-tender-intelligence-monitor)** | A Python system that watches 13 donor and IFI procurement portals for Jordan-related consulting work | [`jordan_tender_monitor/`](jordan_tender_monitor/) |
+| **[Syria Tender Intelligence Monitor](#syria-tender-intelligence-monitor)** | A separate Python system, country-agnostic by design, watching 10 portals for Syria-related work | [`syria_tender_monitor/`](syria_tender_monitor/) |
+
+The two tender monitors are **separate codebases that solve the same problem
+twice**, not one system with two configurations. They share no module, no
+dependency file and no test. Read
+[Two monitors, one problem](#two-monitors-one-problem) before changing either
+under the impression that the other will follow.
 
 ---
 
@@ -151,6 +158,54 @@ or rotate. `.env` is never committed and holds only the optional SAM.gov API
 key. If you later switch delivery back on, read the `Mail.Send` scoping warning
 in the [full README](jordan_tender_monitor/README.md#security) first: as an
 Azure *application* permission it is tenant-wide.
+
+---
+
+# Syria Tender Intelligence Monitor
+
+A second, independent monitor: it watches 10 donor and IFI portals for
+Syria-related consulting opportunities, classifies each notice by where the work
+is actually delivered, screens named parties against sanctions lists, and writes
+a ranked Word bid-review pack, an Excel working file and a JSON record set to
+disk. Nothing is emailed — the report is the files, and you download them.
+
+Full documentation: **[`syria_tender_monitor/README.md`](syria_tender_monitor/README.md)**
+Setup, step by step: **[`syria_tender_monitor/docs/RUNBOOK.md`](syria_tender_monitor/docs/RUNBOOK.md)**
+
+```bash
+cd syria_tender_monitor
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q                            # 456 passed, 1 skipped
+PYTHONPATH=src python -m syria_monitor.cli --self-test # whole pipeline, fixtures, no network
+```
+
+**Portals:** World Bank, EU TED, SAM.gov and UK Find a Tender (REST APIs); UNGM,
+UNDP, SRTF, GIZ, IsDB and KfW via Germany Trade & Invest (HTML).
+
+**Read its README's "What is verified, and what is not" section before trusting
+any output.** No scraper in it has ever run against a live page: every URL, and
+every HTML portal's page structure, is unverified. It ships no CSS selectors on
+purpose and relies on class-independent extraction, and UNGM refuses to run
+until you supply the numeric country id that `--capture ungm` reads off the
+page. That is the honest starting state, not a defect to be surprised by later.
+
+## Two monitors, one problem
+
+They are not a fork of each other and neither is the successor. The differences
+that matter if you are deciding which to touch:
+
+| | Jordan | Syria |
+| --- | --- | --- |
+| Country | Hard-coded throughout | A profile argument; `profiles/syria.yml` holds the country data, so a second country is a second YAML file |
+| Layout | Flat package, run with `python run.py` | `src/` layout, run with `python -m syria_monitor.cli` |
+| Tests | Custom harness, `tests/run_all.py` | pytest, 457 tests |
+| Extras | Email delivery, Windows deployment guide | Delivery-location classification, sanctions screening, a tri-state country gate |
+| Live status | Ran against live portals on 3 August 2026; results above | Never run against a live page |
+
+Merging them is a real option and a real project; nothing here has been done
+towards it. Until someone does it, a fix to a shared-looking bug — a date
+format, a portal's layout change — has to be made twice, by hand, in two
+places.
 
 ---
 

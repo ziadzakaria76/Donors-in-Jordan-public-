@@ -1,0 +1,25 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Local state
+.cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# Run outputs
+output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# Captured live pages (may be large; fixtures under tests/fixtures/ are committed by hand)
+tests/fixtures/live/
