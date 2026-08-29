@@ -107,8 +107,14 @@ manual runs default to the whole current pipeline.
 To change it, edit the `cron` line in `.github/workflows/monitor.yml`. GitHub
 cron is always UTC.
 
-Scheduled runs can start a few minutes late when GitHub is busy. That is normal
-and does not mean anything is wrong.
+**Expect it late, and by more than a few minutes.** The cron asks for 04:17;
+across nine measured mornings GitHub actually started the run between 04:54 and
+05:48 UTC -- 37 to 91 minutes late, median 40. So in practice the report lands
+around **08:00 in Amman**, not 07:17. That is GitHub queueing scheduled work,
+not a fault, and there is no cron setting that fixes it: `schedule` is
+best-effort and carries no delivery promise. If you need a guaranteed time, the
+answer is an external scheduler calling `workflow_dispatch`, not a different
+cron line.
 
 **Why :17 and not :00.** GitHub delays scheduled runs under load and can drop
 them entirely, and the top of every hour is the busiest minute on the platform
@@ -163,10 +169,14 @@ organisation.
 
 ## Before you trust the results
 
-Every portal has now been read live and its result checked against what the
-source actually publishes. Two remain genuinely unreachable (EIB behind a bot
-wall, the Saudi Fund timing out), two publish no listing at all (ADFD, JICA),
-and SAM.gov needs a key. The portal status table names each one every run.
+Every portal has been read live and its result checked against what the source
+actually publishes. At the time of writing two were genuinely unreachable (EIB
+behind a bot wall, the Saudi Fund timing out), two published no listing at all
+(ADFD, JICA), and SAM.gov needed a key.
+
+**Do not trust that list -- trust the run.** Portals break, recover and get
+fixed, so the portal status table in every run is the authority and this
+paragraph is only a snapshot. If the two disagree, the table is right.
 
 That does not make the results permanently trustworthy: donor sites redesign,
 and a portal that silently starts returning nothing looks exactly like a quiet
