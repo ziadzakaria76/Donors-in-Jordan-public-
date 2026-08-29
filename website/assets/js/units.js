@@ -8,9 +8,9 @@
   const grid = $("#unit-grid");
   if (!grid) return;
 
-  const { UNITS, PROJECTS, DISTRICTS, UNIT_TYPES } = window.DATA;
+  const { UNITS, PROJECTS, DISTRICTS, UNIT_TYPES, ORIENTATIONS } = window.DATA;
 
-  const FILTERS = ["project", "district", "beds", "type", "floor", "minArea", "maxPrice", "status", "sort"];
+  const FILTERS = ["project", "district", "beds", "type", "floor", "orientation", "minArea", "maxPrice", "status", "sort"];
   const state = Object.fromEntries(FILTERS.map((k) => [k, ""]));
   state.status = "available";
   state.sort = "priceAsc";
@@ -38,6 +38,13 @@
       + Object.entries(UNIT_TYPES).map(([id, d]) => option(id, tx(d), state.type === id)).join("");
     $("#f-floor").innerHTML = option("", anyLabel, !state.floor)
       + floors.map((f) => option(f, f === 0 ? t("filter.ground") : `${t("unit.floor")} ${f}`, String(state.floor) === String(f))).join("");
+    /* Aspect is a real buying criterion in Amman, not a detail: a north-facing
+       flat is cooler through the summer and a south-facing one is bright in
+       winter, and buyers ask for one or the other by name. The schedule has
+       carried it from the start; it just was not filterable. */
+    $("#f-orientation").innerHTML = option("", anyLabel, !state.orientation)
+      + [...new Set(UNITS.map((u) => u.orientation))]
+        .map((o) => option(o, tx(ORIENTATIONS[o]), state.orientation === o)).join("");
     $("#f-status").innerHTML = ["available", "reserved", "sold"]
       .map((s) => option(s, t(`status.${s}`), state.status === s)).join("")
       + option("", anyLabel, !state.status);
@@ -72,6 +79,7 @@
       if (state.beds && u.beds < Number(state.beds)) return false;
       if (state.type && u.type !== state.type) return false;
       if (state.floor !== "" && String(u.floor) !== String(state.floor)) return false;
+      if (state.orientation && u.orientation !== state.orientation) return false;
       if (state.minArea && u.area < Number(state.minArea)) return false;
       if (state.maxPrice && u.price > Number(state.maxPrice)) return false;
       if (state.status && u.status !== state.status) return false;
@@ -98,6 +106,7 @@
       beds: () => `${state.beds}+ ${t("unit.beds")}`,
       type: () => tx(UNIT_TYPES[state.type]),
       floor: () => (Number(state.floor) === 0 ? t("filter.ground") : `${t("unit.floor")} ${state.floor}`),
+      orientation: () => tx(ORIENTATIONS[state.orientation]),
       minArea: () => `${state.minArea}+ ${t("unit.sqm")}`,
       maxPrice: () => `≤ ${window.I18N.price(Number(state.maxPrice))}`,
       status: () => t(`status.${state.status}`),
@@ -135,6 +144,10 @@
     chips();
     writeUrl();
     initReveals();
+    /* compare.js hangs its toggles off the cards, and the grid is rebuilt from
+       scratch on every filter change. It listens for this rather than being
+       called directly, so units.html works with the script and without it. */
+    document.dispatchEvent(new CustomEvent("unitsrendered"));
   }
 
   /* -------------------------------------------------------------- events */

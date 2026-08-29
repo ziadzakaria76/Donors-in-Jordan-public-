@@ -1,0 +1,108 @@
+name: Syria tender monitor
+
+# Imported with the project from its own repository, where it lived at
+# .github/workflows/run-monitor.yml. It has to sit here instead: GitHub only
+# reads workflows from the repository root, so a copy left inside
+# syria_tender_monitor/.github/ would look active in the diff and never run.
+#
+# Everything else about it is unchanged. `defaults.run.working-directory` does
+# the work the move would otherwise need, so the commands below are the same
+# ones the project's README documents for a local run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "What to do"
+        type: choice
+        default: run
+        options:
+          - run          # scrape and write the report files
+          - dry-run      # scrape and print, write nothing
+          - check        # reachability only
+          - capture      # fetch live pages and report what the cascade finds
+      capture_portal:
+        description: "Portal to capture (only used when mode = capture)"
+        type: choice
+        default: all
+        options: [all, ungm, undp, srtf, giz, isdb, gtai, worldbank, ted, samgov, uk_fts]
+  schedule:
+    # 03:00 UTC = 06:00 Europe/Amman (UTC+3, no DST). GitHub Actions cron is
+    # always UTC; there is no local-time option.
+    - cron: "0 3 * * *"
+
+# Never let two runs write the seen-tenders database at once. The other two
+# projects in this repository have their own groups and are unaffected.
+concurrency:
+  group: syria-tender-monitor
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: syria_tender_monitor
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: syria_tender_monitor/requirements.txt
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Optional: the JavaScript fallback. Without this the run still works --
+      # portals needing a browser report that they could not be read, and the
+      # other nine carry on.
+      - name: Install browser support
+        run: |
+          pip install -r requirements-browser.txt
+          playwright install --with-deps chromium
+
+      - name: Run monitor
+        env:
+          PYTHONPATH: src
+          # Leave the repository variable unset on a normal runner: Playwright
+          # finds the browser it just installed. Set it only where a machine
+          # ships its own Chromium and the download is unavailable -- an empty
+          # value is ignored, so this is safe either way.
+          PLAYWRIGHT_CHROMIUM_PATH: ${{ vars.PLAYWRIGHT_CHROMIUM_PATH }}
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+        run: |
+          case "${{ inputs.mode }}" in
+            dry-run) python -m syria_monitor.cli --dry-run ;;
+            check)   python -m syria_monitor.cli --check-portals ;;
+            capture) python -m syria_monitor.cli --capture "${{ inputs.capture_portal }}" ;;
+            *)       python -m syria_monitor.cli --run ;;
+          esac
+
+      # This is how the report is delivered: download it from the run page.
+      # The Markdown summary is also appended to the run summary by the CLI,
+      # so portal health is visible in the run list without downloading.
+      #
+      # These paths are NOT affected by working-directory above -- upload
+      # resolves them against the workspace root -- so they carry the prefix.
+      - name: Upload report files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: syria-tender-report-${{ github.run_number }}
+          path: |
+            syria_tender_monitor/output/*.docx
+            syria_tender_monitor/output/*.xlsx
+            syria_tender_monitor/output/*.json
+            syria_tender_monitor/output/*-summary.md
+            syria_tender_monitor/tests/fixtures/live/*.html
+          if-no-files-found: warn
+          retention-days: 90

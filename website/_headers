@@ -41,6 +41,29 @@
 /assets/css/*
   Cache-Control: public, max-age=0, must-revalidate
 
+# The admin panel and its API. Never cached, by anyone, ever.
+#
+# The panel reads the live schedule and writes it back, so a cached GET means
+# editing yesterday's copy and committing it over today's. The pages are also
+# behind Cloudflare Access, and a shared cache holding a page served to an
+# authenticated editor is a page served to whoever asks next.
+#
+# noindex is belt and braces: robots.txt disallows /admin/ too, but robots.txt
+# is a request and this is a header.
+/admin/*
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+/api/*
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+
+# tools/ is served because the panel imports the validator and the vocabulary
+# straight from it -- one definition of what a valid unit is, shared by the
+# browser, the Function, the CLI and CI. Same no-cache rule as the site's own
+# JavaScript, and for the same reason: these files decide what may be published.
+/tools/*
+  Cache-Control: public, max-age=0, must-revalidate
+
 # frame-ancestors: the site embeds a map, but is never itself meant to be
 # embedded. Framing it elsewhere would let someone wrap the real prices and
 # phone number in their own page. X-Frame-Options repeats it for older browsers.

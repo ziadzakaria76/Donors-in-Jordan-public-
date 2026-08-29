@@ -1,29 +1,40 @@
 /* =============================================================================
-   SITE CONTENT — this is the only file you need to edit to change what the
-   site says or sells. Every text field is an object: { ar: "…", en: "…" }.
+   SITE CONTENT — GENERATED. Do not edit by hand.
+
+   Every project, price, unit and caption in this file comes from content.json,
+   which is what the admin panel writes. Edit content.json, run `npm run data`,
+   and commit both. An edit made here instead is caught by `npm run check` and
+   lost at the next regeneration — the deploy does not rebuild this file,
+   precisely so that the mismatch is a failed check rather than a silent
+   overwrite of somebody's correction.
+
+   The enumerations below — districts, amenities, orientations, unit types,
+   project statuses — are deliberately NOT in content.json. They are the
+   vocabulary that content is checked against, and a panel able to invent a new
+   orientation would defeat the check that catches a mistyped one.
 
    WHAT IS REAL HERE: the company name and logo, the phone, WhatsApp and email,
    and the projects and their unit schedules, which come from the sales
-   brochures. The invented content that this file once carried — the payment
-   plans, the track-record figures, the testimonials, the founding year and the
-   commercial registration — has been removed rather than left to be published
-   by accident. Anything still marked «REPLACE» is unfinished, not false.
+   brochures. The invented content this file once carried — the payment plans,
+   the track-record figures, the testimonials, the founding year and the
+   commercial registration — was removed rather than left to be published by
+   accident. Anything still empty is unfinished, not false.
    ========================================================================== */
 
 const COMPANY = {
   name: { ar: "شركة جنرال شيرمان للإسكان", en: "General Sherman Housing" },
   short: { ar: "جنرال شيرمان", en: "General Sherman" },
   tagline: { ar: "نبني مستقبلك", en: "We build your future" },
-  founded: null,                      // «REPLACE» — unverified, so no page states one
+  founded: null,                       // «REPLACE» — unverified, so no page states one
   intro: {
     ar: "شركة أردنية للتطوير العقاري متخصصة في الشقق السكنية الفاخرة في غرب عمّان، تجمع بين العمارة الهادئة والتشطيبات عالية الجودة والتسليم في موعده.",
     en: "A Jordanian residential developer specialising in luxury apartments across West Amman — restrained architecture, high-specification finishes, and delivery on schedule.",
   },
   phone: "+962 7 9073 0903",
   phoneHref: "+962790730903",
-  whatsapp: "962790730903",           // same mobile as `phone` — change if WhatsApp is on another line
+  whatsapp: "962790730903",            // same mobile as `phone` — change if WhatsApp is on another line
   email: "Mohammed.Zakaria90@hotmail.com",
-  salesEmail: "Mohammed.Zakaria90@hotmail.com",   // one address for both for now
+  salesEmail: "Mohammed.Zakaria90@hotmail.com", // one address for both for now
   /* Registered with Cloudflare. Apex, no `www` — the www host should 301 here
      so Google sees one address, not two. This string must stay in step with
      SITE in tools/build-pages.mjs, which stamps the canonical, og:url and
@@ -34,10 +45,7 @@ const COMPANY = {
      one in and restore the markup (README → "Removed sections") to bring the
      office back. */
   address: { ar: "", en: "" },
-  hours: {
-    ar: "السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً",
-    en: "Saturday – Thursday, 9:00 – 18:00",
-  },
+  hours: { ar: "السبت – الخميس، ٩:٠٠ صباحاً – ٦:٠٠ مساءً", en: "Saturday – Thursday, 9:00 – 18:00" },
   mapQuery: "",
   /* Where a copy of each enquiry is recorded. WhatsApp is the delivery and
      always runs; this is the record, and runs as well once it is configured.
@@ -75,9 +83,7 @@ const COMPANY = {
 
 /* --------------------------------------------------------------- districts */
 
-const DISTRICTS = {
-  "marj-al-hamam": { ar: "مرج الحمام", en: "Marj Al-Hamam" },
-};
+const DISTRICTS = { "marj-al-hamam": { ar: "مرج الحمام", en: "Marj Al-Hamam" } };
 
 /* ---------------------------------------------------------------- projects
    Each project carries its own schedule of units, stated one at a time as the
@@ -93,15 +99,9 @@ const PROJECTS = [
     district: "marj-al-hamam",
     status: "selling",
     image: "sherman3-1",
-    address: {
-      ar: "مرج الحمام — بالقرب من دوار الكتاب",
-      en: "Marj Al-Hamam — near Al-Kitab Circle",
-    },
+    address: { ar: "مرج الحمام — بالقرب من دوار الكتاب", en: "Marj Al-Hamam — near Al-Kitab Circle" },
     mapQuery: "Al Kitab Circle, Marj Al Hamam, Amman, Jordan",
-    tagline: {
-      ar: "أربع عشرة شقة في مرج الحمام، بأسعار تبدأ من ٩٠،٠٠٠ دينار",
-      en: "Fourteen apartments in Marj Al-Hamam, from 90,000 JOD",
-    },
+    tagline: { ar: "أربع عشرة شقة في مرج الحمام، بأسعار تبدأ من ٩٠،٠٠٠ دينار", en: "Fourteen apartments in Marj Al-Hamam, from 90,000 JOD" },
     description: {
       ar: "يتميّز المشروع بموقعه الاستراتيجي الحيوي، إذ يقع على شارعين بواجهتين شرقية وغربية، مما يمنحه تهوية وإضاءة طبيعية ممتازة. كما يقع بالقرب من مجموعة من الخدمات الأساسية، مثل المؤسسات التعليمية والمرافق الصحية، بالإضافة إلى قربه من مراكز التسوق التي تسهّل الوصول إلى احتياجات السكان اليومية. ويبرز المشروع أيضاً من خلال التشطيبات الفاخرة عالية الجودة التي توفر الراحة والفخامة. صور الواجهات تصاميم ثلاثية الأبعاد، أما صور المدخل فهي من التنفيذ.",
       en: "The building stands on two streets, with an east and a west frontage that give it exceptional natural light and cross-ventilation. It sits close to schools and universities, health facilities, and the shopping that covers daily needs — and its finishes are the other half of the argument, specified by name throughout. The elevation images are 3D design studies; the entrance photographs are of the building as built.",
@@ -113,7 +113,10 @@ const PROJECTS = [
       { ar: "تركيب تدفئة غاز مركزي من شركة جو غاز، وتأسيس نحاس للتكييف", en: "Central gas heating installed by JoGas, and copper pipework prepared for air conditioning" },
       { ar: "مصعد إيطالي من مصاعد استرا مكفول ٢٤ شهراً", en: "Italian Astra lift, guaranteed for 24 months" },
       { ar: "كراج ومستودع خاصّان لكل شقة", en: "A private garage bay and a private store for every apartment" },
-      { ar: "أبواب أمان رئيسية تركية نخب أول، وأبواب داخلية خشب سويد نخب أول ملبس قشرة جوز ودهان إيطالي", en: "First-grade Turkish security entrance doors; internal doors in first-grade Swedish timber with walnut veneer and Italian lacquer" },
+      {
+        ar: "أبواب أمان رئيسية تركية نخب أول، وأبواب داخلية خشب سويد نخب أول ملبس قشرة جوز ودهان إيطالي",
+        en: "First-grade Turkish security entrance doors; internal doors in first-grade Swedish timber with walnut veneer and Italian lacquer",
+      },
       { ar: "شبابيك ألمنيوم دبل جلاس بمقطع فلسطيني خاص وأباجورات كهربائية", en: "Double-glazed aluminium windows on a bespoke Palestinian profile, with electric shutters" },
       { ar: "أطقم حمامات معلّقة تركية ومغاسل بورسلان فاخرة", en: "Turkish wall-hung sanitaryware and porcelain basins" },
       { ar: "كاميرات مراقبة للعمارة وإنتركم كاميرا مع ACCESS POINT", en: "Building CCTV, and video intercom with access point" },
@@ -135,7 +138,10 @@ const PROJECTS = [
       {
         group: { ar: "المراكز الصحية", en: "Health" },
         items: [
-          { name: { ar: "مستشفى الأندلس (قيد الإنشاء)", en: "Al-Andalus Hospital (under construction)" }, mins: 4 },
+          {
+            name: { ar: "مستشفى الأندلس (قيد الإنشاء)", en: "Al-Andalus Hospital (under construction)" },
+            mins: 4,
+          },
           { name: { ar: "عيادات هيلث كير", en: "Health Care Clinics" }, mins: 9 },
           { name: { ar: "مستشفى دار السلام", en: "Dar Al-Salam Hospital" }, mins: 18 },
           { name: { ar: "مستشفى الحمايدة", en: "Al-Hamaydeh Hospital" }, mins: 23 },
@@ -144,8 +150,14 @@ const PROJECTS = [
       {
         group: { ar: "الخدمات ومراكز التسوّق", en: "Services and shopping" },
         items: [
-          { name: { ar: "دوار الجندي — مرج الحمام", en: "Al-Jundi Circle — Marj Al-Hamam" }, mins: 6 },
-          { name: { ar: "دوار الدلة — مرج الحمام", en: "Al-Dallah Circle — Marj Al-Hamam" }, mins: 9 },
+          {
+            name: { ar: "دوار الجندي — مرج الحمام", en: "Al-Jundi Circle — Marj Al-Hamam" },
+            mins: 6,
+          },
+          {
+            name: { ar: "دوار الدلة — مرج الحمام", en: "Al-Dallah Circle — Marj Al-Hamam" },
+            mins: 9,
+          },
           { name: { ar: "دوار عبدون", en: "Abdoun Circle" }, mins: 15 },
           { name: { ar: "الدوار السابع", en: "7th Circle" }, mins: 18 },
         ],
@@ -155,8 +167,14 @@ const PROJECTS = [
        two are different kinds of image and the captions say so — see the
        gallery note in i18n.js. */
     gallery: [
-      "sherman3-1", "sherman3-2", "sherman3-3", "sherman3-4",
-      "sherman3-lobby-1", "sherman3-lobby-2", "sherman3-lobby-3", "sherman3-lobby-4",
+      "sherman3-1",
+      "sherman3-2",
+      "sherman3-3",
+      "sherman3-4",
+      "sherman3-lobby-1",
+      "sherman3-lobby-2",
+      "sherman3-lobby-3",
+      "sherman3-lobby-4",
     ],
     /* The brochure's schedule of fourteen apartments. Every one is priced, so
        every one is available; the brochure marks none as sold. Bedroom and
@@ -164,20 +182,20 @@ const PROJECTS = [
        summary page — model A is a four-bedroom with six bathrooms, model B a
        three-bedroom with four, and the rest are three and three. */
     units: [
-      { code: "1",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "southwest", area: 235, outdoor: 170, beds: 4, baths: 6, type: "apartment", plan: "plan-3a", price: 151000, status: "available" },
-      { code: "2",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "northeast", area: 193, outdoor: 120, beds: 3, baths: 4, type: "apartment", plan: "plan-3b", price: 129000, status: "available" },
-      { code: "3",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "south",     area: 151, outdoor: 30,  beds: 3, baths: 3, type: "apartment", plan: "plan-3c", price: 107000, status: "available" },
-      { code: "4",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3d", price: 98000,  status: "available" },
-      { code: "5",  floor: 0, floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "north",     area: 153, outdoor: 70,  beds: 3, baths: 3, type: "apartment", plan: "plan-3e", price: 115000, status: "available" },
-      { code: "6",  floor: 1, floorLabel: { ar: "الطابق الأول", en: "First floor" },   orientation: "south",     area: 151, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3f", price: 90000,  status: "available" },
-      { code: "7",  floor: 1, floorLabel: { ar: "الطابق الأول", en: "First floor" },   orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3g", price: 90000,  status: "available" },
-      { code: "8",  floor: 1, floorLabel: { ar: "الطابق الأول", en: "First floor" },   orientation: "north",     area: 153, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3h", price: 92000,  status: "available" },
-      { code: "9",  floor: 2, floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "south",     area: 151, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3f", price: 90000,  status: "available" },
-      { code: "10", floor: 2, floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3g", price: 90000,  status: "available" },
-      { code: "11", floor: 2, floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "north",     area: 153, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3h", price: 92000,  status: "available" },
-      { code: "12", floor: 3, floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "south", area: 186, outdoor: 120, beds: 3, baths: 3, type: "roof",      plan: "plan-3i", price: 131000, status: "available" },
-      { code: "13", floor: 3, floorLabel: { ar: "الطابق الثالث", en: "Third floor" },  orientation: "east",      area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-3g", price: 90000,  status: "available" },
-      { code: "14", floor: 3, floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "north", area: 186, outdoor: 110, beds: 3, baths: 3, type: "roof",      plan: "plan-3j", price: 131000, status: "available" },
+      { code: "1",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "southwest",  area: 235,  outdoor: 170,  beds: 4, baths: 6, type: "apartment", plan: "plan-3a",  price: 151000,  status: "available" },
+      { code: "2",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "northeast",  area: 193,  outdoor: 120,  beds: 3, baths: 4, type: "apartment", plan: "plan-3b",  price: 129000,  status: "available" },
+      { code: "3",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "south",      area: 151,  outdoor: 30,   beds: 3, baths: 3, type: "apartment", plan: "plan-3c",  price: 107000,  status: "available" },
+      { code: "4",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "east",       area: 152,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3d",  price: 98000,   status: "available" },
+      { code: "5",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "north",      area: 153,  outdoor: 70,   beds: 3, baths: 3, type: "apartment", plan: "plan-3e",  price: 115000,  status: "available" },
+      { code: "6",   floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" }, orientation: "south",      area: 151,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3f",  price: 90000,   status: "available" },
+      { code: "7",   floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" }, orientation: "east",       area: 152,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3g",  price: 90000,   status: "available" },
+      { code: "8",   floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" }, orientation: "north",      area: 153,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3h",  price: 92000,   status: "available" },
+      { code: "9",   floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "south",      area: 151,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3f",  price: 90000,   status: "available" },
+      { code: "10",  floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "east",       area: 152,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3g",  price: 90000,   status: "available" },
+      { code: "11",  floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "north",      area: 153,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3h",  price: 92000,   status: "available" },
+      { code: "12",  floor: 3,  floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "south",      area: 186,  outdoor: 120,  beds: 3, baths: 3, type: "roof",      plan: "plan-3i",  price: 131000,  status: "available" },
+      { code: "13",  floor: 3,  floorLabel: { ar: "الطابق الثالث", en: "Third floor" }, orientation: "east",       area: 152,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-3g",  price: 90000,   status: "available" },
+      { code: "14",  floor: 3,  floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "north",      area: 186,  outdoor: 110,  beds: 3, baths: 3, type: "roof",      plan: "plan-3j",  price: 131000,  status: "available" },
     ],
   },
   {
@@ -188,15 +206,9 @@ const PROJECTS = [
        or still under construction, and the site does not guess. Add
        status: "selling" | "delivered" | "upcoming" to show a badge. */
     image: "sherman2-exterior-day",
-    address: {
-      ar: "مرج الحمام — طريق ناعور، بعد كازية السلام",
-      en: "Marj Al-Hamam — Naour Road, past the Al-Salam petrol station",
-    },
+    address: { ar: "مرج الحمام — طريق ناعور، بعد كازية السلام", en: "Marj Al-Hamam — Naour Road, past the Al-Salam petrol station" },
     mapQuery: "Marj Al Hamam, Amman, Jordan",
-    tagline: {
-      ar: "ثلاث عشرة شقة في مرج الحمام، أربعٌ منها ما تزال متاحة",
-      en: "Thirteen apartments in Marj Al-Hamam, four of them still available",
-    },
+    tagline: { ar: "ثلاث عشرة شقة في مرج الحمام، أربعٌ منها ما تزال متاحة", en: "Thirteen apartments in Marj Al-Hamam, four of them still available" },
     description: {
       ar: "يتميّز المشروع بموقعه الاستراتيجي الحيوي، حيث يوفّر إطلالة رائعة ويقع بالقرب من مجموعة من الخدمات الأساسية مثل المؤسسات التعليمية والمرافق الصحية، إضافةً إلى قربه من مراكز التسوق التي تتيح سهولة الوصول إلى احتياجات السكان اليومية. كما يبرز المشروع بفضل التشطيبات الفاخرة عالية الجودة التي توفّر راحة وفخامة.",
       en: "The building sits on a well-connected site with an open outlook, close to schools and universities, health facilities, and the shopping that covers daily needs. Its finishes are the other half of the argument: high-specification throughout, and specified by name.",
@@ -230,7 +242,10 @@ const PROJECTS = [
         group: { ar: "المراكز الصحية", en: "Health" },
         items: [
           { name: { ar: "عيادات هيلث كير", en: "Health Care Clinics" }, mins: 5 },
-          { name: { ar: "مستشفى الأندلس (قيد الإنشاء)", en: "Al-Andalus Hospital (under construction)" }, mins: 5 },
+          {
+            name: { ar: "مستشفى الأندلس (قيد الإنشاء)", en: "Al-Andalus Hospital (under construction)" },
+            mins: 5,
+          },
           { name: { ar: "مستشفى دار السلام", en: "Dar Al-Salam Hospital" }, mins: 13 },
           { name: { ar: "مستشفى الحمايدة", en: "Al-Hamaydeh Hospital" }, mins: 22 },
         ],
@@ -238,35 +253,54 @@ const PROJECTS = [
       {
         group: { ar: "الخدمات ومراكز التسوّق", en: "Services and shopping" },
         items: [
-          { name: { ar: "دوار الدلة — مرج الحمام", en: "Al-Dallah Circle — Marj Al-Hamam" }, mins: 7 },
-          { name: { ar: "دوار الجندي — مرج الحمام", en: "Al-Jundi Circle — Marj Al-Hamam" }, mins: 7 },
+          {
+            name: { ar: "دوار الدلة — مرج الحمام", en: "Al-Dallah Circle — Marj Al-Hamam" },
+            mins: 7,
+          },
+          {
+            name: { ar: "دوار الجندي — مرج الحمام", en: "Al-Jundi Circle — Marj Al-Hamam" },
+            mins: 7,
+          },
           { name: { ar: "دوار عبدون", en: "Abdoun Circle" }, mins: 14 },
           { name: { ar: "الدوار السابع", en: "7th Circle" }, mins: 22 },
         ],
       },
     ],
     gallery: [
-      "sherman2-exterior-day", "sherman2-exterior-dusk", "sherman2-lobby-1", "sherman2-lobby-2",
-      "sherman2-entrance", "sherman2-living-1", "sherman2-living-2", "sherman2-interior-1",
-      "sherman2-interior-3", "sherman2-interior-5", "sherman2-interior-7", "sherman2-lobby-3",
-      "sherman2-interior-2", "sherman2-interior-4", "sherman2-interior-6", "sherman2-lobby-4",
+      "sherman2-exterior-day",
+      "sherman2-exterior-dusk",
+      "sherman2-lobby-1",
+      "sherman2-lobby-2",
+      "sherman2-entrance",
+      "sherman2-living-1",
+      "sherman2-living-2",
+      "sherman2-living-3",
+      "sherman2-interior-1",
+      "sherman2-interior-3",
+      "sherman2-interior-5",
+      "sherman2-interior-7",
+      "sherman2-lobby-3",
+      "sherman2-interior-2",
+      "sherman2-interior-4",
+      "sherman2-interior-6",
+      "sherman2-lobby-4",
     ],
     /* Every apartment as listed in the brochure's schedule. Prices are per unit
        and do not follow a formula, so they are stated, not derived. */
     units: [
-      { code: "0",  floor: -1, floorLabel: { ar: "طابق التسوية", en: "Lower ground floor" }, orientation: "south",     area: 190, outdoor: 120, beds: 3, baths: 4, type: "apartment", plan: "plan-a", price: 117000, status: "available" },
-      { code: "1",  floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" },      orientation: "west",      area: 154, outdoor: 50,  beds: 3, baths: 3, type: "apartment", plan: "plan-b", price: 105000, status: "available" },
-      { code: "2",  floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" },      orientation: "northeast", area: 152, outdoor: 110, beds: 3, baths: 3, type: "apartment", plan: "plan-c", status: "sold" },
-      { code: "3",  floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" },      orientation: "southeast", area: 147, outdoor: 60,  beds: 3, baths: 3, type: "apartment", plan: "plan-d", status: "sold" },
-      { code: "4",  floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" },        orientation: "west",      area: 154, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-e", status: "sold" },
-      { code: "5",  floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" },        orientation: "northeast", area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-f", price: 88000, status: "available" },
-      { code: "6",  floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" },        orientation: "southeast", area: 147, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-g", status: "sold" },
-      { code: "7",  floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" },      orientation: "west",      area: 154, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-e", status: "sold" },
-      { code: "8",  floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" },      orientation: "northeast", area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-f", status: "sold" },
-      { code: "9",  floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" },      orientation: "southeast", area: 147, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-g", status: "sold" },
-      { code: "10", floor: 3,  floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "west",      area: 190, outdoor: 89, beds: 3, baths: 3, type: "roof", plan: "plan-h", status: "sold" },
-      { code: "11", floor: 3,  floorLabel: { ar: "الطابق الثالث", en: "Third floor" },       orientation: "northeast", area: 152, outdoor: 0,   beds: 3, baths: 3, type: "apartment", plan: "plan-f", price: 88000, status: "available" },
-      { code: "12", floor: 3,  floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "southeast", area: 181, outdoor: 89, beds: 3, baths: 3, type: "roof", plan: "plan-i", status: "sold" },
+      { code: "0",   floor: -1, floorLabel: { ar: "طابق التسوية", en: "Lower ground floor" }, orientation: "south",      area: 190,  outdoor: 120,  beds: 3, baths: 4, type: "apartment", plan: "plan-a",   price: 117000,  status: "available" },
+      { code: "1",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "west",       area: 154,  outdoor: 50,   beds: 3, baths: 3, type: "apartment", plan: "plan-b",   price: 105000,  status: "available" },
+      { code: "2",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "northeast",  area: 152,  outdoor: 110,  beds: 3, baths: 3, type: "apartment", plan: "plan-c",   status: "sold" },
+      { code: "3",   floor: 0,  floorLabel: { ar: "الطابق الأرضي", en: "Ground floor" }, orientation: "southeast",  area: 147,  outdoor: 60,   beds: 3, baths: 3, type: "apartment", plan: "plan-d",   status: "sold" },
+      { code: "4",   floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" }, orientation: "west",       area: 154,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-e",   status: "sold" },
+      { code: "5",   floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" }, orientation: "northeast",  area: 152,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-f",   price: 88000,   status: "available" },
+      { code: "6",   floor: 1,  floorLabel: { ar: "الطابق الأول", en: "First floor" }, orientation: "southeast",  area: 147,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-g",   status: "sold" },
+      { code: "7",   floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "west",       area: 154,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-e",   status: "sold" },
+      { code: "8",   floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "northeast",  area: 152,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-f",   status: "sold" },
+      { code: "9",   floor: 2,  floorLabel: { ar: "الطابق الثاني", en: "Second floor" }, orientation: "southeast",  area: 147,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-g",   status: "sold" },
+      { code: "10",  floor: 3,  floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "west",       area: 190,  outdoor: 89,   beds: 3, baths: 3, type: "roof",      plan: "plan-h",   status: "sold" },
+      { code: "11",  floor: 3,  floorLabel: { ar: "الطابق الثالث", en: "Third floor" }, orientation: "northeast",  area: 152,  outdoor: 0,    beds: 3, baths: 3, type: "apartment", plan: "plan-f",   price: 88000,   status: "available" },
+      { code: "12",  floor: 3,  floorLabel: { ar: "الطابق الثالث مع روف", en: "Third floor with roof" }, orientation: "southeast",  area: 181,  outdoor: 89,   beds: 3, baths: 3, type: "roof",      plan: "plan-i",   status: "sold" },
     ],
   },
   {
@@ -276,56 +310,49 @@ const PROJECTS = [
     status: "delivered",
     image: "sherman1-1",
     tagline: { ar: "مشروعنا السابق، مُسلَّم ومسكون", en: "Our previous scheme, delivered and occupied" },
-    description: {
-      ar: "المشروع الأول لشركة جنرال شيرمان للإسكان، وقد سُلِّم بالكامل. تفاصيل المشروع ووحداته متاحة عند الطلب.",
-      en: "General Sherman Housing's first scheme, delivered in full. Details are available on request.",
-    },
+    description: { ar: "المشروع الأول لشركة جنرال شيرمان للإسكان، وقد سُلِّم بالكامل. تفاصيل المشروع ووحداته متاحة عند الطلب.", en: "General Sherman Housing's first scheme, delivered in full. Details are available on request." },
     gallery: ["sherman1-1", "sherman1-2", "sherman1-3", "sherman1-4"],
-    units: [],
+    units: [
+
+    ],
   },
 ];
 
-
 /* ------------------------------------------------------- image captions
-   What each photograph is, in both languages. Lives here rather than in the
-   gallery renderer because it is content, and because two pages need it: the
-   gallery page builds itself from these keys, and a project page uses them to
-   caption its own images instead of numbering them. A numbered caption was
-   fine while a project's gallery was four images of one kind; General Sherman
-   3 now mixes 3D studies of the elevations with photographs of the entrance as
-   built, and "image 5 of 8" does not tell a buyer which is which.
-
-   An image with no entry here still renders — the project page falls back to
-   numbering it — so this map is a caption list, not a permission list. */
+   What each photograph is, in both languages. The gallery page builds itself
+   from these keys; a project page uses them to caption its images instead of
+   numbering them. An image with no entry still renders — the project page
+   falls back to numbering it — so this is a caption list, not a permission
+   list. */
 
 const IMAGE_CAPTIONS = {
-    "sherman2-exterior-day": { ar: "جنرال شيرمان ٢ — الواجهة من الشارع", en: "General Sherman 2 — the building from the street" },
-    "sherman2-exterior-dusk": { ar: "جنرال شيرمان ٢ — المبنى عند المغيب", en: "General Sherman 2 — the building at dusk" },
-    "sherman2-entrance": { ar: "جنرال شيرمان ٢ — المدخل الرئيسي", en: "General Sherman 2 — the main entrance" },
-    "sherman2-lobby-1": { ar: "جنرال شيرمان ٢ — المدخل بارتفاع طابقين", en: "General Sherman 2 — the double-height lobby" },
-    "sherman2-lobby-2": { ar: "جنرال شيرمان ٢ — بهو المدخل", en: "General Sherman 2 — entrance hall" },
-    "sherman2-lobby-3": { ar: "جنرال شيرمان ٢ — المصعد والمداخل", en: "General Sherman 2 — lift and apartment doors" },
-    "sherman2-lobby-4": { ar: "جنرال شيرمان ٢ — تفاصيل المدخل", en: "General Sherman 2 — entrance detail" },
-    "sherman2-living-1": { ar: "جنرال شيرمان ٢ — الصالون وأرضيات الرخام", en: "General Sherman 2 — reception room with marble floors" },
-    "sherman2-living-2": { ar: "جنرال شيرمان ٢ — المعيشة", en: "General Sherman 2 — living area" },
-    "sherman2-living-3": { ar: "جنرال شيرمان ٢ — مساحة الاستقبال", en: "General Sherman 2 — reception space" },
-    "sherman2-interior-1": { ar: "جنرال شيرمان ٢ — غرفة نوم", en: "General Sherman 2 — bedroom" },
-    "sherman2-interior-2": { ar: "جنرال شيرمان ٢ — غرفة بأرضية خشبية", en: "General Sherman 2 — room with wood flooring" },
-    "sherman2-interior-3": { ar: "جنرال شيرمان ٢ — الحمّام", en: "General Sherman 2 — bathroom" },
-    "sherman2-interior-4": { ar: "جنرال شيرمان ٢ — ممر الغرف", en: "General Sherman 2 — bedroom corridor" },
-    "sherman2-interior-5": { ar: "جنرال شيرمان ٢ — الممر الداخلي", en: "General Sherman 2 — internal corridor" },
-    "sherman2-interior-6": { ar: "جنرال شيرمان ٢ — باب الشقة", en: "General Sherman 2 — apartment entrance door" },
-    "sherman2-interior-7": { ar: "جنرال شيرمان ٢ — تشطيبات الأبواب", en: "General Sherman 2 — door finishes" },
-    "sherman1-1": { ar: "جنرال شيرمان ١ — المشروع المُسلَّم", en: "General Sherman 1 — the delivered scheme" },
-    "sherman1-3": { ar: "جنرال شيرمان ١ — الواجهة", en: "General Sherman 1 — elevation" },
-    "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع", en: "General Sherman 3 — the scheme's design" },
-    "sherman3-2": { ar: "جنرال شيرمان ٣ — تصميم الواجهة", en: "General Sherman 3 — elevation design" },
-    "sherman3-3": { ar: "جنرال شيرمان ٣ — المدخل والإنارة ليلاً", en: "General Sherman 3 — the entrance and its lighting at night" },
-    "sherman3-4": { ar: "جنرال شيرمان ٣ — المشروع ليلاً", en: "General Sherman 3 — the scheme at night" },
-    "sherman3-lobby-1": { ar: "جنرال شيرمان ٣ — مدخل العمارة", en: "General Sherman 3 — the building entrance" },
-    "sherman3-lobby-2": { ar: "جنرال شيرمان ٣ — بهو المدخل", en: "General Sherman 3 — the entrance hall" },
-    "sherman3-lobby-3": { ar: "جنرال شيرمان ٣ — تشطيبات المدخل", en: "General Sherman 3 — entrance finishes" },
-    "sherman3-lobby-4": { ar: "جنرال شيرمان ٣ — المدخل من الدرج", en: "General Sherman 3 — the entrance from the stair" },
+  "sherman2-exterior-day": { ar: "جنرال شيرمان ٢ — الواجهة من الشارع", en: "General Sherman 2 — the building from the street" },
+  "sherman2-exterior-dusk": { ar: "جنرال شيرمان ٢ — المبنى عند المغيب", en: "General Sherman 2 — the building at dusk" },
+  "sherman2-entrance": { ar: "جنرال شيرمان ٢ — المدخل الرئيسي", en: "General Sherman 2 — the main entrance" },
+  "sherman2-lobby-1": { ar: "جنرال شيرمان ٢ — المدخل بارتفاع طابقين", en: "General Sherman 2 — the double-height lobby" },
+  "sherman2-lobby-2": { ar: "جنرال شيرمان ٢ — بهو المدخل", en: "General Sherman 2 — entrance hall" },
+  "sherman2-lobby-3": { ar: "جنرال شيرمان ٢ — المصعد والمداخل", en: "General Sherman 2 — lift and apartment doors" },
+  "sherman2-lobby-4": { ar: "جنرال شيرمان ٢ — تفاصيل المدخل", en: "General Sherman 2 — entrance detail" },
+  "sherman2-living-1": { ar: "جنرال شيرمان ٢ — الصالون وأرضيات الرخام", en: "General Sherman 2 — reception room with marble floors" },
+  "sherman2-living-2": { ar: "جنرال شيرمان ٢ — المعيشة", en: "General Sherman 2 — living area" },
+  "sherman2-living-3": { ar: "جنرال شيرمان ٢ — مساحة الاستقبال", en: "General Sherman 2 — reception space" },
+  "sherman2-interior-1": { ar: "جنرال شيرمان ٢ — غرفة نوم", en: "General Sherman 2 — bedroom" },
+  "sherman2-interior-2": { ar: "جنرال شيرمان ٢ — غرفة بأرضية خشبية", en: "General Sherman 2 — room with wood flooring" },
+  "sherman2-interior-3": { ar: "جنرال شيرمان ٢ — الحمّام", en: "General Sherman 2 — bathroom" },
+  "sherman2-interior-4": { ar: "جنرال شيرمان ٢ — ممر الغرف", en: "General Sherman 2 — bedroom corridor" },
+  "sherman2-interior-5": { ar: "جنرال شيرمان ٢ — الممر الداخلي", en: "General Sherman 2 — internal corridor" },
+  "sherman2-interior-6": { ar: "جنرال شيرمان ٢ — باب الشقة", en: "General Sherman 2 — apartment entrance door" },
+  "sherman2-interior-7": { ar: "جنرال شيرمان ٢ — تشطيبات الأبواب", en: "General Sherman 2 — door finishes" },
+  "sherman1-1": { ar: "جنرال شيرمان ١ — المشروع المُسلَّم", en: "General Sherman 1 — the delivered scheme" },
+  "sherman1-3": { ar: "جنرال شيرمان ١ — الواجهة", en: "General Sherman 1 — elevation" },
+  "sherman3-1": { ar: "جنرال شيرمان ٣ — تصميم المشروع", en: "General Sherman 3 — the scheme's design" },
+  "sherman3-2": { ar: "جنرال شيرمان ٣ — تصميم الواجهة", en: "General Sherman 3 — elevation design" },
+  "sherman3-3": { ar: "جنرال شيرمان ٣ — المدخل والإنارة ليلاً", en: "General Sherman 3 — the entrance and its lighting at night" },
+  "sherman3-4": { ar: "جنرال شيرمان ٣ — المشروع ليلاً", en: "General Sherman 3 — the scheme at night" },
+  "sherman3-lobby-1": { ar: "جنرال شيرمان ٣ — مدخل العمارة", en: "General Sherman 3 — the building entrance" },
+  "sherman3-lobby-2": { ar: "جنرال شيرمان ٣ — بهو المدخل", en: "General Sherman 3 — the entrance hall" },
+  "sherman3-lobby-3": { ar: "جنرال شيرمان ٣ — تشطيبات المدخل", en: "General Sherman 3 — entrance finishes" },
+  "sherman3-lobby-4": { ar: "جنرال شيرمان ٣ — المدخل من الدرج", en: "General Sherman 3 — the entrance from the stair" },
 };
 
 /* ---------------------------------------------------------------- amenities */
@@ -343,10 +370,12 @@ const AMENITIES = {
   playground: { ar: "منطقة ألعاب", en: "Children's play area" },
 };
 
-/* ------------------------------------------------------------ testimonials */
+/* ------------------------------------------------------------ testimonials
+   Only entries marked published render. The quotes that once sat here were
+   invented for the build; the section stays empty until real, permissioned
+   ones exist, and the draft flag is what lets the panel hold one before it is
+   ready rather than publishing it by accident. */
 
-/* Empty for the same reason: the quotes here were invented. Add real,
-   permissioned quotes and restore the section markup to bring it back. */
 const TESTIMONIALS = [];
 
 /* ---------------------------------------------------------------- process */

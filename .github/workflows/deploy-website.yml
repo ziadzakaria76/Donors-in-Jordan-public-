@@ -99,17 +99,77 @@ jobs:
       # old build. It must match the project's production branch exactly
       # (Pages project -> Settings -> Production branch). Override it with the
       # CLOUDFLARE_PAGES_PRODUCTION_BRANCH variable if that is not "main".
+      #
+      # RUN IT FROM website/, NOT FROM THE REPOSITORY ROOT. Wrangler finds the
+      # Pages Functions at `path.join(process.cwd(), "functions")` -- relative
+      # to the working directory, never to the directory being uploaded, and
+      # wrangler 4 removed the --functions-directory flag that used to say so.
+      #
+      # Run from the root, `website/functions` is invisible: the upload
+      # succeeds, the run goes green, and every /api/* route 404s to the static
+      # error page. That is exactly how the admin panel first shipped. The
+      # smoke test below exists so it cannot happen again quietly.
+      #
+      # `functions` is on wrangler's asset ignore-list, so it is compiled into
+      # the Worker rather than served as downloadable source.
       - name: Deploy to Cloudflare Pages
         id: deploy
+        working-directory: website
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
         run: |
-          npx --yes wrangler@4 pages deploy website \
+          npx --yes wrangler@4 pages deploy . \
             --project-name="${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
             --branch="$BRANCH" \
-            --commit-dirty=true | tee deploy.log
+            --commit-dirty=true | tee ../deploy.log
+
+      # Ask the live site whether the deploy actually did anything.
+      #
+      # Twice now this project has had a green deploy and an unchanged site:
+      # once because the Pages project had no Git connection, once because
+      # wrangler could not see the functions directory. Both times the failure
+      # was invisible from inside the repository. So the workflow now checks.
+      #
+      # /api/session is the probe because it can only answer if the Functions
+      # compiled. Three answers are all fine, and they are the three states the
+      # panel can legitimately be in:
+      #
+      #   503 JSON  Functions live, Access variables not set yet
+      #   401 JSON  Functions live, Access set, this request has no assertion
+      #   302       Access is in front, redirecting to its login
+      #
+      # A 404 means no Worker: the static error page answered instead.
+      - name: Check the API actually shipped
+        if: success()
+        run: |
+          set -u
+          # The one place the domain is written down. check-content.mjs already
+          # asserts this agrees with build-pages.mjs, sitemap.xml and robots.txt,
+          # so probing it also proves those four still name the same site.
+          SITE=$(node -p 'require("./website/content.json").company.domain.replace(/\/$/, "")')
+          echo "Probing $SITE"
+          # Pages needs a moment to promote the new deployment.
+          sleep 20
+          code=$(curl -sS -o /tmp/probe.txt -w '%{http_code}' --max-time 30 "$SITE/api/session" || echo 000)
+          printf 'GET /api/session -> %s\n' "$code"
+          head -c 400 /tmp/probe.txt || true
+          printf '\n'
+          case "$code" in
+            401|503)
+              grep -q '"error"' /tmp/probe.txt \
+                && echo "Functions are live." \
+                || { echo "Got $code but not our JSON -- something else answered."; exit 1; }
+              ;;
+            302|303) echo "Redirected -- Cloudflare Access is in front of it. Functions are live." ;;
+            404)
+              echo "::error::/api/session returned 404. The Pages Functions did not ship, so the admin panel cannot work."
+              echo "Wrangler resolves functions/ from its working directory. This step must run from website/."
+              exit 1
+              ;;
+            *) echo "::warning::Unexpected $code from /api/session." ;;
+          esac
 
       # A green run is not proof the live site changed. Say so, and say how to
       # tell, rather than letting a preview deployment look like a success.

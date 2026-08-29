@@ -165,3 +165,81 @@ jobs:
       - name: Check the site content against its images, pages and sitemap
         run: node tools/check-content.mjs
         working-directory: website
+
+  # The Syria monitor is the third, unrelated project in this repository. It
+  # keeps its own dependency set and its own suite, so it gets its own job
+  # rather than more steps on the one above: a Jordan dependency change must
+  # not be able to turn this red, or the reverse.
+  #
+  # These jobs came in with the project, from the CI workflow of the repository
+  # it was imported from. Only the paths and the working directory changed.
+  syria:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    defaults:
+      run:
+        working-directory: syria_tender_monitor
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: syria_tender_monitor/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: python -m pyflakes src/ tests/
+
+      # The whole suite is offline: no network, no credentials, no real state.
+      - name: Offline test suite
+        run: python -m pytest tests/ -q
+
+      - name: Pipeline self-test on fixtures
+        env:
+          PYTHONPATH: src
+        run: python -m syria_monitor.cli --self-test
+
+  # The browser fallback is the one scraping path verified end to end, and the
+  # job above skips it (no Playwright, deliberately -- the suite must run
+  # without a browser). This job installs one so the verification is not merely
+  # theoretical.
+  syria-browser-fallback:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: syria_tender_monitor
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: syria_tender_monitor/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt -r requirements-browser.txt
+          playwright install --with-deps chromium
+
+      - name: Browser fallback tests
+        env:
+          PLAYWRIGHT_CHROMIUM_PATH: ${{ vars.PLAYWRIGHT_CHROMIUM_PATH }}
+          # Turns "browser unavailable" from a skip into a failure. A skip here
+          # would let the only end-to-end-verified path rot unnoticed.
+          REQUIRE_BROWSER: "1"
+        run: python -m pytest tests/test_browser_fallback.py -q -rs

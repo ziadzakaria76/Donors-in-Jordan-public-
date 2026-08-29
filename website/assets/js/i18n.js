@@ -70,6 +70,7 @@ const T = {
   "nav.projects": { ar: "مشاريعنا", en: "Projects" },
   "nav.units": { ar: "الوحدات المتاحة", en: "Available units" },
   "nav.gallery": { ar: "معرض الصور", en: "Gallery" },
+  "nav.faq": { ar: "أسئلة شائعة", en: "FAQ" },
   "nav.contact": { ar: "اتصل بنا", en: "Contact" },
   "nav.menu": { ar: "القائمة", en: "Menu" },
   "nav.skip": { ar: "تخطَّ إلى المحتوى", en: "Skip to content" },
@@ -91,7 +92,48 @@ const T = {
   "cta.reset": { ar: "مسح الفلاتر", en: "Clear filters" },
   "cta.downloadPlan": { ar: "تحميل المخطط", en: "Download plan" },
 
+  /* FAQ page */
+  "faq.eyebrow": { ar: "قبل أن تسأل", en: "Before you ask" },
+  "faq.title": { ar: "أسئلة شائعة", en: "Frequently asked questions" },
+  "faq.lead": {
+    ar: "الأسئلة التي تتكرّر في كل زيارة، بإجابات مكتوبة. إن لم تجد سؤالك، اسألنا مباشرةً.",
+    en: "The questions that come up on every visit, answered in writing. If yours is not here, ask us directly.",
+  },
+  "faq.all": { ar: "كل الأسئلة الشائعة", en: "All frequently asked questions" },
+  "faq.ctaBody": {
+    ar: "سؤالك ليس هنا؟ اسأل فريق المبيعات مباشرةً — كلّهم مهندسون.",
+    en: "Not the question you had? Ask the sales team directly — they are all engineers.",
+  },
+
   /* unit + project vocabulary */
+  /* Scarcity. Every one of these is computed from the schedule and stated only
+     when it is literally true — "last one at this size" appears when exactly
+     one available unit of that area remains, and not otherwise. Manufactured
+     urgency on a 90,000-dinar purchase is the fastest way to lose a buyer who
+     checks. */
+  "scarcity.lastSize": { ar: "آخر وحدة بهذه المساحة", en: "Last one at this size" },
+  "scarcity.lastInProject": { ar: "آخر وحدة متاحة في المشروع", en: "The last available unit in this project" },
+  "scarcity.fewLeft": { ar: "متبقّي {n} من {total} في هذا المشروع", en: "{n} of {total} left in this project" },
+
+  /* Comparison */
+  "compare.add": { ar: "أضف للمقارنة", en: "Add to compare" },
+  "compare.remove": { ar: "إزالة من المقارنة", en: "Remove from compare" },
+  "compare.added": { ar: "في المقارنة", en: "In compare" },
+  "compare.title": { ar: "مقارنة الوحدات", en: "Compare units" },
+  "compare.open": { ar: "قارن {n}", en: "Compare {n}" },
+  "compare.clear": { ar: "مسح", en: "Clear" },
+  "compare.full": { ar: "يمكنك مقارنة ثلاث وحدات في المرة الواحدة.", en: "You can compare three units at a time." },
+  "compare.tray": { ar: "وحدات للمقارنة", en: "Units to compare" },
+  "compare.perSqm": { ar: "سعر المتر", en: "Price per m²" },
+  "compare.total": { ar: "المساحة الإجمالية", en: "Total area" },
+  "compare.aspect": { ar: "الاتجاه", en: "Aspect" },
+  "compare.project": { ar: "المشروع", en: "Project" },
+  "compare.cheapest": { ar: "الأقل سعراً", en: "Lowest price" },
+  "compare.largest": { ar: "الأكبر مساحةً", en: "Largest" },
+  "compare.bestValue": { ar: "الأفضل سعراً للمتر", en: "Best price per m²" },
+
+  "filter.orientation": { ar: "الاتجاه", en: "Aspect" },
+
   "unit.unit": { ar: "الوحدة", en: "Unit" },
   "unit.beds": { ar: "غرف نوم", en: "Bedrooms" },
   "unit.baths": { ar: "حمّامات", en: "Bathrooms" },
@@ -118,6 +160,9 @@ const T = {
   "project.delivery": { ar: "التسليم", en: "Delivery" },
   "project.amenities": { ar: "مرافق المشروع", en: "Building amenities" },
   "project.highlights": { ar: "أبرز ما يميّزه", en: "What sets it apart" },
+  "project.progressEyebrow": { ar: "سير العمل", en: "Construction progress" },
+  "project.progressTitle": { ar: "مراحل الإنجاز", en: "How the building is progressing" },
+  "project.progressLead": { ar: "تقرير مؤرّخ بما تمّ تنفيذه على أرض الواقع.", en: "A dated report of what has actually been built." },
   "project.nearbyEyebrow": { ar: "الموقع والخدمات", en: "Location and services" },
   "project.nearbyTitle": { ar: "ما حول المشروع", en: "What is around the project" },
   "project.nearbyLead": { ar: "أزمنة الوصول بالسيارة كما وردت في كتيّب المشروع.", en: "Drive times as published in the project brochure." },
@@ -293,6 +338,12 @@ const T = {
     ar: "فريق الصيانة تابع للشركة وليس مقاولاً خارجياً، ويستجيب خلال ٤٨ ساعة في السنة الأولى.",
     en: "The maintenance team is our own staff, not an outside contractor, and responds within 48 hours during the first year.",
   },
+  "about.workEyebrow": { ar: "ما بنيناه", en: "What we have built" },
+  "about.workTitle": { ar: "ثلاثة مبانٍ في مرج الحمام", en: "Three buildings in Marj Al-Hamam" },
+  "about.workLead": {
+    ar: "مبنىً مُسلَّم يمكنك زيارته، ومشروعان قيد البيع. هذا سجلّنا كاملاً — لا أرقام مجمّعة، بل عناوين يمكنك الذهاب إليها.",
+    en: "One delivered building you can go and look at, and two selling. That is the whole record — not an aggregate figure, but addresses you can drive to.",
+  },
   "about.ctaTitle": { ar: "تعال شاهد المشاريع على الطبيعة", en: "Come and see the buildings for yourself" },
   "about.ctaBody": {
     ar: "جولة الموقع تستغرق نحو ساعة، ونرافقك فيها بأنفسنا — بما في ذلك المشاريع قيد الإنشاء.",
@@ -317,26 +368,6 @@ const T = {
   "contact.hours": { ar: "ساعات العمل", en: "Opening hours" },
   "contact.faqEyebrow": { ar: "أسئلة شائعة", en: "Common questions" },
   "contact.faqTitle": { ar: "قبل أن تسأل", en: "Before you ask" },
-  "contact.q1": { ar: "هل يمكن لغير الأردنيين تملّك شقة؟", en: "Can non-Jordanians buy an apartment?" },
-  "contact.a1": {
-    ar: "نعم. يستطيع مواطنو الدول العربية والأجانب التملّك في الأردن بموافقة من مجلس الوزراء، ونتولى نحن تجهيز المعاملة ومتابعتها. المدة المعتادة بين شهرين وأربعة أشهر.",
-    en: "Yes. Arab and foreign nationals may own property in Jordan subject to Cabinet approval, and we prepare and follow up the application for you. It usually takes two to four months.",
-  },
-  "contact.q2": { ar: "ما الذي يشمله السعر المعلن؟", en: "What does the quoted price include?" },
-  "contact.a2": {
-    ar: "السعر يشمل الوحدة بمساحتها الصافية وحصتها من المساحات المشتركة، والتشطيبات المذكورة في العقد، وموقف السيارة والمستودع. لا يشمل رسوم التسجيل الحكومية إلا إذا نُصّ على ذلك في خطة الدفع.",
-    en: "The price covers the unit's net area and its share of common areas, the finishes listed in the contract, the parking bay and the store. Government registration fees are excluded unless your payment plan states otherwise.",
-  },
-  "contact.q3": { ar: "هل يمكن تعديل التشطيبات أو التوزيع الداخلي؟", en: "Can finishes or the internal layout be changed?" },
-  "contact.a3": {
-    ar: "يمكن تعديل التشطيبات ومواد الأرضيات والمطبخ قبل مرحلة معينة من التنفيذ. تعديل الجدران الداخلية غير الإنشائية ممكن أيضاً بموافقة المهندس المشرف وبفارق تكلفة يُحتسب مسبقاً.",
-    en: "Finishes, flooring and the kitchen can be changed up to a defined construction stage. Non-structural internal walls can also be adjusted with the supervising engineer's approval, at a cost difference agreed in advance.",
-  },
-  "contact.q4": { ar: "ما هي الضمانات بعد التسليم؟", en: "What warranties apply after handover?" },
-  "contact.a4": {
-    ar: "سنتان على التشطيبات والأعمال الكهربائية والميكانيكية، وعشر سنوات على الهيكل الإنشائي، إضافةً إلى فريق صيانة يستجيب خلال ٤٨ ساعة في السنة الأولى.",
-    en: "Two years on finishes and on electrical and mechanical works, ten years on the structure, plus a maintenance team that responds within 48 hours during the first year.",
-  },
 
   /* 404 */
   "e404.title": { ar: "هذه الصفحة لم تعد موجودة", en: "This page is no longer here" },
@@ -367,6 +398,19 @@ const I18N = {
     const entry = typeof key === "string" ? T[key] : key;
     if (!entry) return typeof key === "string" ? key : "";
     return entry[lang] ?? entry.ar ?? "";
+  },
+
+  /**
+   * Resolve a key and substitute {placeholders}.
+   *
+   * Needed because Arabic and English put the same facts in different orders:
+   * "3 of 14 left in this project" against "متبقّي 3 من 14 في هذا المشروع".
+   * Building that by concatenating a number between two fragments works in one
+   * language and reads as nonsense in the other, so the whole sentence lives in
+   * the dictionary and the numbers are dropped into it.
+   */
+  fill(key, values) {
+    return I18N.t(key).replace(/\{(\w+)\}/g, (_, name) => values[name] ?? "");
   },
 
   /** Format a number in Western digits, which is what Jordanian sites use. */

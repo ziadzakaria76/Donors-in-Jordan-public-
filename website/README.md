@@ -291,8 +291,56 @@ Two details in `submitForm` matter if you edit it:
 
 ## Editing the content
 
-`assets/js/data.js` is the only file you need for content changes. Every piece
-of text is a `{ ar, en }` pair.
+`content.json` is the file you edit. Every piece of text in it is a
+`{ ar, en }` pair.
+
+```bash
+npm run data     # content.json → assets/js/data.js
+npm run check
+```
+
+Then commit both files.
+
+### Editing it in a browser
+
+`/admin/` edits `content.json` from a browser, so a price change does not need
+a text editor and a git client. It is described in full under
+[The admin panel](#the-admin-panel) below.
+
+### Why there are two files
+
+`assets/js/data.js` is what the browser loads, and it is also the site's
+documentation: its comments record why the founding year is `null`, why the
+testimonials array is empty, why a sold unit carries no price, and why the
+commercial registration is absent rather than invented. Those comments are the
+reason nobody has quietly re-added the content that was removed.
+
+An admin panel writing to that file directly would delete every one of them —
+rewriting a commented source file from a web form is how comments die. So the
+two jobs are split:
+
+| | |
+|---|---|
+| `content.json` | what a person or the panel edits — projects, units, prices, FAQs, testimonials, captions, the company's own details |
+| `tools/build-data.mjs` | the prose, the enumerations, and the code around them |
+| `assets/js/data.js` | generated from both, never edited by hand |
+
+The enumerations stay in the generator on purpose. Districts, amenities,
+orientations, unit types and project statuses are not content — they are the
+vocabulary the content is checked *against*, and a panel able to invent a new
+orientation would defeat the check that catches a mistyped one.
+
+Project provenance notes live in `content.json` alongside the project they
+describe, under `notes`, keyed by field name. "The brochure marks none as sold"
+and "no status, because the brochure does not say" are the record of why the
+data looks the way it does; losing them is how a gap in a brochure turns into a
+guess on a page.
+
+`npm run check` renders `content.json` and compares the result to the committed
+`data.js`, so an edit made in the wrong file fails while it is still a diff.
+The deploy deliberately does *not* regenerate `data.js` — if it did, a
+correction typed into the generated file would ship once and then vanish, which
+is the worst kind of failure, because the price was right when you checked it.
 
 ### Checking an edit
 
@@ -300,7 +348,8 @@ of text is a `{ ar, en }` pair.
 npm run check
 ```
 
-Reads `data.js` and asserts what the rest of the site assumes about it: that
+Reads `data.js` and asserts what the rest of the site assumes about it: that it
+matches `content.json`, that
 every image and floor plan it names exists at the widths the manifest promises,
 that unit ids are unique, that every orientation, type, district, amenity and
 status resolves to a label, that an available unit carries a price, that a plan
@@ -355,6 +404,126 @@ UI strings live in `assets/js/i18n.js` as `{ ar, en }` pairs keyed by
 what search engines and no-JS visitors see — and repeated in `i18n.js` so that
 switching back from English restores it. **If you change a string in the HTML,
 change its twin in `i18n.js`.**
+
+---
+
+## The admin panel
+
+`/admin/` is a small editing tool for the content: projects, the unit schedules
+and their prices, construction progress, FAQs and testimonials. It has no
+database. It saves by committing `content.json` and the rendered `data.js` to
+this repository as one commit, which means every edit is a diff with an author
+and a date, CI runs on it, the deploy is the ordinary deploy, and undoing a
+mistake is `git revert` rather than a support request.
+
+```
+browser  ->  /api/content (PUT)  ->  validate  ->  render data.js
+                                        |
+                           one commit on main, both files
+                                        |
+                      CI: npm run check -> wrangler pages deploy
+```
+
+### One definition of what is valid
+
+`tools/validate-content.mjs` holds the rules that need nothing but the content
+-- unit ids unique, every orientation and amenity resolving to a label, an
+available unit carrying a price, both languages filled in together. It runs in
+four places from one file:
+
+| where | when |
+|---|---|
+| the panel, in your browser | as you type |
+| the Pages Function | before it commits anything |
+| `npm run check` | before you push |
+| CI | before anything deploys |
+
+`tools/render-data.mjs` also holds the five enumerations -- districts,
+amenities, unit types, orientations, project statuses -- and this is the whole
+point of the split. They are the vocabulary the content is checked *against*. A
+panel that could add an orientation would be a panel where a typo passes
+validation, so the panel offers them as a closed list and adding a real one is
+a code change, reviewed as a diff.
+
+Both files import nothing at all. They have to run in a Workers runtime and in
+a browser as well as in Node, so a single `import ... from "node:fs"` in either
+would break the deploy and the panel at once. `npm run check` asserts they stay
+clean.
+
+### What it cannot do
+
+- **Add an image.** Photographs are re-cut to several widths by
+  `npm run assets`, which needs the original file. The panel edits captions and
+  the order images appear in; adding one is still a commit.
+- **Invent vocabulary.** See above.
+- **Show leads.** Decided, not deferred — see below.
+
+### Leads: the site keeps none
+
+Every form hands the enquiry to WhatsApp first, synchronously, so delivery
+survives even if the rest fails. It then posts a copy to Web3Forms, which
+emails it to the sales inbox. WhatsApp is the channel a buyer in Amman actually
+replies on; the email is the record.
+
+The panel shows no lead list, and that is the arrangement rather than a gap.
+Reading submissions back needs the Web3Forms Submissions API, which is a paid
+feature. The alternative was a Cloudflare database of our own — which would
+mean this site holds buyers' names and phone numbers. It does not, and a panel
+that listed leads would be a panel with a copy of every enquiry in it. Holding
+one is a different commitment from passing one along.
+
+**The operational catch:** Web3Forms keeps submissions for 30 days on the free
+plan. After that the copy in their dashboard is gone, so the inbox is the
+durable archive and the dashboard is a recent view. Do not delete an enquiry
+email expecting to find it again later.
+
+Revisit this if enquiries ever need to be searched, exported or reported on.
+Not before.
+
+### Setting it up
+
+The panel needs Cloudflare Access in front of it and a GitHub token to commit
+with. Neither lives in this repository.
+
+**1. Put Access in front of it.** Cloudflare Zero Trust -> Access ->
+Applications -> Add an application -> Self-hosted. Free for up to 50 users.
+
+- Cover **both** paths: `your-domain.com/admin` *and* `your-domain.com/api`.
+  An Access policy on `/admin` alone would leave the write API facing the
+  internet. The panel refuses to work in that case rather than trusting it, but
+  the point is not to be in that position.
+- Policy: *Emails* -> your address. Session duration is up to you; a week is
+  reasonable for one person.
+- Copy the **Application Audience (AUD) tag** from the application overview.
+
+**2. Set the variables.** Cloudflare dashboard -> Workers & Pages -> the
+project -> Settings -> Variables and Secrets:
+
+| name | kind | value |
+|---|---|---|
+| `ACCESS_TEAM_DOMAIN` | plaintext | `yourteam.cloudflareaccess.com` |
+| `ACCESS_AUD` | plaintext | the AUD tag from step 1 |
+| `GITHUB_REPO` | plaintext | `owner/repository` |
+| `GITHUB_BRANCH` | plaintext | `main` (optional) |
+| `GITHUB_TOKEN` | **encrypted** | see below |
+
+`GITHUB_TOKEN` is a fine-grained personal access token (GitHub -> Settings ->
+Developer settings -> Personal access tokens -> Fine-grained tokens) scoped to
+**this repository only**, with **Contents: read and write**. Nothing else. It
+must be stored **encrypted** -- a plaintext variable is readable by anyone who
+can open the dashboard.
+
+If any of these is missing, the panel names the missing one at load rather than
+failing at the end of a long edit.
+
+### Why the assertion is verified rather than trusted
+
+The Function verifies the Access JWT signature itself instead of trusting the
+`Cf-Access-Authenticated-User-Email` header. "Access is in front of it" is a
+claim about a setting in someone's dashboard -- the same class of claim as the
+Git connection that was silently absent while `main` stopped reaching the site
+for twelve hours. If the policy is ever removed or scoped to the wrong path,
+verifying turns that into a 401 instead of a stranger with commit access.
 
 ---
 
@@ -553,6 +722,9 @@ website/
 ├── about.html               Commitments and process
 ├── contact.html             Contact form, direct channels, map, FAQ
 ├── 404.html
+├── content.json           ← all content lives here; assets/js/data.js is built from it
+├── admin/                   The editing panel (behind Cloudflare Access)
+├── functions/api/           Pages Functions: the panel's read and write API
 ├── assets/
 │   ├── css/main.css         Design system; CSS logical properties throughout, so
 │   │                        one stylesheet serves both RTL and LTR
@@ -561,13 +733,17 @@ website/
 │   ├── img/                 Photographs (.webp at several widths) and floor plans
 │   └── js/
 │       ├── img-manifest.js   Generated — which widths exist per image
-│       ├── data.js          ← all content lives here
+│       ├── data.js          Generated from ../../content.json — do not edit
 │       ├── i18n.js          ← all interface strings live here
 │       ├── app.js           Header, language switch, modals, lightbox, forms, cards
 │       ├── pages.js         Home, project index, gallery, contact page modules
 │       ├── units.js         Inventory filtering, sorting, URL state
 │       ├── project.js       Project detail page
-├── tools/                   Optional generators (images, page scaffolding)
+├── tools/                   render-data.mjs (pure: content.json → data.js) and
+│                           validate-content.mjs (pure: the publishable rules) — both
+│                           also run in the Worker and in the panel, so neither may
+│                           import node:*. Plus build-data.mjs, check-content.mjs and
+│                           the optional image and page-scaffolding generators.
 ├── netlify.toml, vercel.json, robots.txt, sitemap.xml
 ```
 

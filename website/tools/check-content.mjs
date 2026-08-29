@@ -24,17 +24,55 @@
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { render } from "./render-data.mjs";
+import { validate } from "./validate-content.mjs";
+import { rendered } from "./build-pages.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const img = (name) => existsSync(resolve(ROOT, "assets/img", name));
 const read = (rel) => readFileSync(resolve(ROOT, rel), "utf8");
 
 const DATA = (await import(resolve(ROOT, "assets/js/data.js"))).default;
-const { COMPANY, PROJECTS, DISTRICTS, AMENITIES, ORIENTATIONS, UNIT_TYPES, PROJECT_STATUS } = DATA;
+const { COMPANY, PROJECTS } = DATA;
 
 const errors = [];
 const notes = [];
 const check = (ok, message) => { if (!ok) errors.push(message); };
+
+/* ----------------------------------------------------- data.js is generated
+   content.json is the edited file and data.js is rendered from it, so a change
+   made directly in data.js works locally, ships once, and then disappears the
+   next time anyone regenerates — the worst kind of failure, because the price
+   was right when you checked it.
+
+   Rendering content.json here and comparing catches that while it is still a
+   diff. If this fails after an intentional edit to the generator, run
+   `npm run data` and commit the result. */
+
+check(read("assets/js/data.js") === render(JSON.parse(read("content.json"))),
+  "assets/js/data.js does not match content.json — it is generated, so edit content.json and run `npm run data`");
+
+/* ------------------------------------------------ three runtimes, one module
+   render-data.mjs and validate-content.mjs are imported by a Cloudflare Pages
+   Function and by the admin panel in the browser, as well as by this script.
+   Neither has `node:fs` — the Function would fail to bundle and the deploy
+   would break, and the panel would fail to load with a bare import error.
+
+   That is easy to undo by accident: adding one convenience import at the top
+   of the validator is a natural thing to do and breaks two runtimes silently,
+   because the third one — this one — would keep passing. */
+
+for (const file of ["tools/render-data.mjs", "tools/validate-content.mjs"]) {
+  const bad = [...read(file).matchAll(/^import[^;]*?from\s+"(node:[^"]+)"/gm)].map((m) => m[1]);
+  check(!bad.length,
+    `${file} imports ${bad.join(", ")}, but it also runs in a Worker and in the browser, where that does not exist — keep filesystem work in build-data.mjs`);
+}
+
+/* The admin panel imports those two directly. A moved or renamed file is a
+   panel that fails to boot, and nothing else in the repository would notice. */
+for (const spec of [...read("admin/admin.js").matchAll(/from\s+"(\.\.\/[^"]+)"/g)].map((m) => m[1])) {
+  check(existsSync(resolve(ROOT, "admin", spec)), `admin/admin.js imports ${spec}, which is not there`);
+}
 
 /* --------------------------------------------------------------- images
    picture() offers the browser only the widths the manifest lists, and
@@ -88,64 +126,29 @@ for (const p of PROJECTS) {
   }
 }
 
-/* ---------------------------------------------------------------- units */
+/* -------------------------------------------------- every <img> resolves
+   The page-hero image is the largest, most visible request a page makes, and
+   the scaffolder used to name a 1920 for every one of them. Most of these
+   photographs come out of a sales brochure and stop at 1600, so a hero picked
+   from those 404s on its `src` and again in its srcset — a blank band across
+   the top of the page, in front of a buyer.
 
-const seen = new Set();
-for (const p of PROJECTS) {
-  check(DISTRICTS[p.district], `${p.id}: district "${p.district}" has no label in DISTRICTS`);
-  if (p.status) check(PROJECT_STATUS[p.status], `${p.id}: status "${p.status}" has no label in PROJECT_STATUS`);
-  for (const a of p.amenities || []) check(AMENITIES[a], `${p.id}: amenity "${a}" has no label in AMENITIES`);
+   Rather than trust the fix, check the output: every image URL the generated
+   pages name has to exist on disk. */
 
-  for (const u of p.units || []) {
-    const at = `${p.id} unit ${u.code}`;
-    const id = `${p.id}-${u.code}`;
-    check(!seen.has(id), `duplicate unit id ${id} — unit ids are element ids on the project page, so two of them break the deep link to both`);
-    seen.add(id);
-
-    check(ORIENTATIONS[u.orientation], `${at}: orientation "${u.orientation}" has no label — the card would render a blank where the aspect goes`);
-    check(UNIT_TYPES[u.type], `${at}: type "${u.type}" has no label`);
-    check(u.floorLabel?.ar && u.floorLabel?.en, `${at}: floorLabel is missing a language`);
-    check(Number.isFinite(u.area) && u.area > 0, `${at}: area is ${u.area}`);
-    check(Number.isFinite(u.outdoor ?? 0) && (u.outdoor ?? 0) >= 0, `${at}: outdoor is ${u.outdoor}`);
-    check(u.beds > 0 && u.baths > 0, `${at}: beds/baths are ${u.beds}/${u.baths}`);
-    check(["available", "reserved", "sold"].includes(u.status), `${at}: status "${u.status}" is not available, reserved or sold`);
-
-    /* An available unit with no price renders as sold: unitCard treats a
-       missing price as unsellable, so the schedule would hide it. */
-    if (u.status === "available") check(u.price > 0, `${at}: is available but carries no price, so the site will show it as unsellable`);
-    if (u.type === "roof") check((u.outdoor ?? 0) > 0, `${at}: is typed "roof" but has no outdoor area`);
-
-    /* Plan tabs are labelled by area, so one drawing shared by units of
-       different sizes would label itself with only the first unit's. */
-    const sharing = (p.units || []).filter((x) => x.plan && x.plan === u.plan);
-    check(sharing.every((x) => x.area === u.area),
-      `${p.id}: plan ${u.plan} is shared by units of different areas (${[...new Set(sharing.map((x) => x.area))].join(", ")})`);
-  }
-
-  if (p.status === "selling") {
-    check((p.units || []).some((u) => u.status === "available"),
-      `${p.id}: is marked "selling" but no unit is available`);
+for (const [file, html] of rendered) {
+  for (const m of html.matchAll(/assets\/img\/([\w-]+\.webp)/g)) {
+    check(img(m[1]), `${file} requests assets/img/${m[1]}, which is not on disk`);
   }
 }
 
-/* ------------------------------------------------------ both languages */
+/* ------------------------------------------- the rules that need no disk
+   Unit ids, the vocabulary every label resolves against, prices on available
+   units, both languages filled in together. They live in validate-content.mjs
+   because the admin panel runs them too — in the browser as you type, and in
+   the Function before it commits. One list, three places. */
 
-const walk = (node, at) => {
-  if (!node || typeof node !== "object") return;
-  const keys = Object.keys(node);
-  if (keys.includes("ar") || keys.includes("en")) {
-    check(node.ar !== undefined && node.en !== undefined,
-      `${at}: bilingual text is missing "${node.ar === undefined ? "ar" : "en"}"`);
-    if (typeof node.ar === "string" && typeof node.en === "string") {
-      check(!!node.ar.trim() === !!node.en.trim(), `${at}: one language is filled in and the other is empty`);
-    }
-    return;
-  }
-  for (const [key, value] of Object.entries(node)) walk(value, `${at}.${key}`);
-};
-walk(PROJECTS, "PROJECTS");
-walk(DATA.PROCESS, "PROCESS");
-walk(DATA.FAQS, "FAQS");
+for (const e of validate(JSON.parse(read("content.json")))) errors.push(e);
 
 /* ------------------------------------------------------- one domain, everywhere
    The canonical tags, the sitemap and robots.txt are written in three different
@@ -202,6 +205,47 @@ for (const line of read("assets/js/data.js").match(/^.*«REPLACE».*$/gm) || [])
   const text = line.trim().replace(/^\/?\*+\s*/, "");
   if (text.startsWith("by accident.")) continue;   // the file header explaining the marker
   notes.push(text);
+}
+
+/* ------------------------------------------- the pages match the scaffolder
+   Every page except index.html is generated by build-pages.mjs, and every page
+   is also a finished file you can open and edit. That combination is a trap: an
+   edit made in the page rather than the generator works, ships, and then
+   disappears the first time anyone runs `npm run pages`.
+
+   It had already happened twice — a construction-progress section added
+   straight to project.html, and an aspect filter added straight to units.html —
+   and in both cases the scaffolder would have deleted them silently.
+
+   So the generated pages are compared to the generator, the same way data.js is
+   compared to content.json. If this fails, decide which of the two is right:
+   put the change in build-pages.mjs and run `npm run pages`. */
+
+for (const [file, html] of rendered) {
+  check(read(file) === html,
+    `${file} does not match what tools/build-pages.mjs generates — put the change in the generator and run \`npm run pages\`, or it will be deleted the next time somebody does`);
+}
+
+/* ------------------------------------------------ the deploy finds the API
+   Wrangler resolves Pages Functions from `path.join(process.cwd(), "functions")`
+   — its working directory, never the directory being uploaded — and wrangler 4
+   removed the --functions-directory flag that used to make this explicit.
+
+   So the deploy step must run from website/. Run from the repository root, the
+   upload succeeds, the workflow goes green, and every /api/* route answers with
+   the static 404 page. That is exactly how the admin panel first shipped: a
+   successful deploy of a site with no API in it.
+
+   Asserted here because it is a one-line change in a file nobody edits often,
+   it produces no error anywhere, and the panel is the only thing that notices. */
+
+{
+  const workflow = resolve(ROOT, "../.github/workflows/deploy-website.yml");
+  if (existsSync(workflow)) {
+    const step = /- name: Deploy to Cloudflare Pages\n([\s\S]*?)\n        run:/.exec(readFileSync(workflow, "utf8"));
+    check(step && /working-directory:\s*website/.test(step[1]),
+      "the deploy step in .github/workflows/deploy-website.yml must set `working-directory: website`, or wrangler will not find website/functions and every /api/* route will 404");
+  }
 }
 
 /* ------------------------------------------------------------------ out */

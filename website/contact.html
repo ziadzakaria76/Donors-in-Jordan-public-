@@ -45,6 +45,7 @@
       <a href="units.html" data-i18n="nav.units">الوحدات المتاحة</a>
       <a href="gallery.html" data-i18n="nav.gallery">معرض الصور</a>
       <a href="about.html" data-i18n="nav.about">عن الشركة</a>
+      <a href="faq.html" data-i18n="nav.faq">أسئلة شائعة</a>
       <a href="contact.html" data-i18n="nav.contact">اتصل بنا</a>
     </nav>
     <div class="header__actions">
@@ -142,24 +143,15 @@
         <p class="eyebrow" data-i18n="contact.faqEyebrow">أسئلة شائعة</p>
         <h2 data-i18n="contact.faqTitle">قبل أن تسأل</h2>
       </div>
-      <div class="accordion">
-        <details>
-          <summary data-i18n="contact.q1">هل يمكن لغير الأردنيين تملّك شقة؟</summary>
-          <div class="accordion__body" data-i18n="contact.a1">نعم. يستطيع مواطنو الدول العربية والأجانب التملّك في الأردن بموافقة من مجلس الوزراء، ونتولى نحن تجهيز المعاملة ومتابعتها. المدة المعتادة بين شهرين وأربعة أشهر.</div>
-        </details>
-        <details>
-          <summary data-i18n="contact.q2">ما الذي يشمله السعر المعلن؟</summary>
-          <div class="accordion__body" data-i18n="contact.a2">السعر يشمل الوحدة بمساحتها الصافية وحصتها من المساحات المشتركة، والتشطيبات المذكورة في العقد، وموقف السيارة والمستودع. لا يشمل رسوم التسجيل الحكومية إلا إذا نُصّ على ذلك في خطة الدفع.</div>
-        </details>
-        <details>
-          <summary data-i18n="contact.q3">هل يمكن تعديل التشطيبات أو التوزيع الداخلي؟</summary>
-          <div class="accordion__body" data-i18n="contact.a3">يمكن تعديل التشطيبات ومواد الأرضيات والمطبخ قبل مرحلة معينة من التنفيذ. تعديل الجدران الداخلية غير الإنشائية ممكن أيضاً بموافقة المهندس المشرف وبفارق تكلفة يُحتسب مسبقاً.</div>
-        </details>
-        <details>
-          <summary data-i18n="contact.q4">ما هي الضمانات بعد التسليم؟</summary>
-          <div class="accordion__body" data-i18n="contact.a4">سنتان على التشطيبات والأعمال الكهربائية والميكانيكية، وعشر سنوات على الهيكل الإنشائي، إضافةً إلى فريق صيانة يستجيب خلال ٤٨ ساعة في السنة الأولى.</div>
-        </details>
-      </div>
+      <!-- Rendered from DATA.FAQS by pages.js. These four used to be written
+           out here by hand while content.json held five that no page read — so
+           the admin panel's FAQ editor changed nothing, and a fifth question
+           about buying to let was invisible on the site entirely. -->
+      <div class="accordion" id="faq-list" data-faq-limit="4"></div>
+      <p style="margin-block-start:1.75rem">
+        <a class="link-arrow" href="faq.html"><span data-i18n="faq.all">كل الأسئلة الشائعة</span>
+          <span data-icon="arrow" class="icon icon--dir"></span></a>
+      </p>
     </div>
   </section>
 </main>
@@ -183,6 +175,7 @@
           <li><a href="units.html" data-i18n="nav.units">الوحدات المتاحة</a></li>
           <li><a href="gallery.html" data-i18n="nav.gallery">معرض الصور</a></li>
           <li><a href="about.html" data-i18n="nav.about">عن الشركة</a></li>
+          <li><a href="faq.html" data-i18n="nav.faq">أسئلة شائعة</a></li>
         </ul>
       </div>
       <div>
