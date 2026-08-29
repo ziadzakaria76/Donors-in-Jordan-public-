@@ -1,0 +1,123 @@
+name: GS3 emulator tests
+
+# Runs the GS3 Marketing Ops app on a real Android system image.
+#
+# Adapted from android-emulator.yml, which says in its own header that reusing
+# it means changing `working-directory` and the matrix and nothing else. That
+# held: the KVM step, the emulator options and the summariser are unchanged.
+#
+# WHY IT EXISTS. The JVM suite is large and good, but Robolectric supplies its
+# own SQLite and its own resource table, so two things it reports on are not the
+# things that ship:
+#
+#   - Room's SQL, written at build time and first executed by whatever SQLite
+#     the device carries;
+#   - whether both languages are actually inside the installed APK, which is
+#     decided by packaging, after every source-level check has passed.
+#
+# The second is not hypothetical. Language splitting would have shipped this app
+# without the Arabic it opens in; lint caught it once, and the test here is what
+# notices if the fix is ever removed.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gs3_marketing_ops/**"
+      - ".github/workflows/gs3-emulator.yml"
+  pull_request:
+    paths:
+      - "gs3_marketing_ops/**"
+      - ".github/workflows/gs3-emulator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gs3-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  instrumented:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 26 is the app's minSdk. 35 rather than the pinned targetSdk of 36
+        # because that is the newest image the emulator action reliably has;
+        # the pair still covers the two ends that behave differently.
+        api-level: [26, 35]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # Without this the runner's /dev/kvm is not writable by the build user and
+      # the emulator falls back to software rendering, which does not finish
+      # inside any sensible timeout. The symptom is a hang, not a failure.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Instrumented tests on API ${{ matrix.api-level }}
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: >-
+            -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+            -camera-back none -camera-front none
+          working-directory: gs3_marketing_ops
+          script: |
+            adb logcat -c || true
+            adb logcat > logcat-api${{ matrix.api-level }}.txt &
+            # Taken here, inside the action's script. A step afterwards runs
+            # once the emulator is already dead, gets "device offline", and
+            # writes a zero-byte PNG that uploads successfully and looks like
+            # evidence. That happened on the other app the first time.
+            set +e
+            ./gradlew --no-daemon :app:connectedDebugAndroidTest
+            STATUS=$?
+            set -e
+            adb exec-out screencap -p > screen-api${{ matrix.api-level }}.png || true
+            ls -l screen-api${{ matrix.api-level }}.png || true
+            exit $STATUS
+
+      # Shared with the other app: an absent result file is reported as
+      # UNTESTED, never as a pass.
+      - name: Say what the run found
+        if: always()
+        working-directory: gs3_marketing_ops
+        run: |
+          python3 ../.github/scripts/android_test_summary.py \
+            app/build/outputs/androidTest-results/connected \
+            "${{ matrix.api-level }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the reports, the screenshot and the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gs3-instrumented-api${{ matrix.api-level }}-${{ github.run_number }}
+          path: |
+            gs3_marketing_ops/app/build/reports/androidTests/
+            gs3_marketing_ops/app/build/outputs/androidTest-results/
+            gs3_marketing_ops/screen-api*.png
+            gs3_marketing_ops/logcat-api*.txt
+          if-no-files-found: warn
+          retention-days: 14

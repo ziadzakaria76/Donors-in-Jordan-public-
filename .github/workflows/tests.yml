@@ -59,6 +59,108 @@ jobs:
       - name: Pipeline self-test on fixtures
         run: python jordan_tender_monitor/run.py --self-test
 
+  # The GS3 Marketing Ops Android app: the pure-Kotlin business rules in
+  # :domain -- funnel maths, budget allocation, fee calculation, SLA timing
+  # across time zones, the discount guard -- and now the Android :app module
+  # alongside them.
+  #
+  # This job used to carry a note saying the agent that wrote it could not reach
+  # dl.google.com and therefore could not resolve the Android Gradle Plugin at
+  # all (gs3_marketing_ops/DECISIONS.md, D-1). That host is now allowed, the SDK
+  # installs, and :app is in settings.gradle.kts -- so assembleDebug runs here
+  # as well as locally. The note is deleted rather than left to mislead.
+  #
+  # `check` is deliberately the whole gate rather than just `test`: it carries
+  # the 80% coverage floor, Android Lint with warningsAsErrors, and
+  # verifyStrings, which fails the build on a hardcoded UI string, on a key
+  # present in one language and missing from the other, and on a phrase the
+  # company must not put in writing.
+  marketing-ops:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      # Pinned explicitly rather than trusting whatever the runner image ships.
+      # That image's SDK moves without notice, and a build that quietly compiles
+      # against a different platform than the one in libs.versions.toml is
+      # exactly the drift the version matrix exists to prevent. sdkmanager is a
+      # no-op for packages already installed, so this costs nothing when the
+      # image is already correct.
+      - name: Install the Android SDK packages this build pins
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          "$SDKMANAGER" --list_installed
+
+      - name: Tests, coverage floor, lint and the bilingual guard
+        run: |
+          set -o pipefail
+          ./gradlew check --no-daemon 2>&1 | tee /tmp/marketing-ops-check.log
+        working-directory: gs3_marketing_ops
+
+      # A failure here has to be readable from the API, not only from the web
+      # UI. Raw job logs and uploaded artifacts are both served from a separate
+      # storage host, which an agent behind a restricted egress allowlist cannot
+      # reach -- so a red build would be a red build with no stated reason. The
+      # job summary comes back through the API itself.
+      - name: Put the failure where it can be read
+        if: failure()
+        run: |
+          # Two places, because they have different readers. The job summary is
+          # for a person looking at the run in a browser; the ::error::
+          # annotation is the only one of the two that comes back through the
+          # REST API, which is what an agent behind an egress allowlist has.
+          {
+            echo '## `./gradlew check` failed'
+            echo '```'
+            tail -n 200 /tmp/marketing-ops-check.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Newlines have to be percent-encoded to survive a workflow command.
+          DETAIL=$(grep -E "^e: |FAILURE|What went wrong|Execution failed|Caused by|: Error:|FAILED" \
+                     /tmp/marketing-ops-check.log | head -n 25 | sed 's/%/%25/g; s/\r/%0D/g' \
+                   | awk '{printf "%s%%0A", $0}')
+          echo "::error title=marketing-ops check failed::${DETAIL}"
+
+      - name: Report the actual coverage figure
+        run: ./gradlew coverage --no-daemon
+        working-directory: gs3_marketing_ops
+
+      - name: Build the debug APK
+        run: ./gradlew assembleDebug --no-daemon
+        working-directory: gs3_marketing_ops
+
+      # The app is sideloaded long before it is on Play (DECISIONS.md, C5), so
+      # the APK is the artefact a non-technical owner actually installs.
+      # Publishing it here means a build can be handed over without anyone
+      # needing a working Android toolchain of their own.
+      - name: Keep the debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: gs3-marketing-ops-debug-apk
+          path: gs3_marketing_ops/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      # Lint's own report is far more useful than the console tail when it
+      # fails, and it is the only place the UnusedResources hints can be read.
+      - name: Keep the lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gs3-marketing-ops-lint-report
+          path: gs3_marketing_ops/app/build/reports/lint-results-debug.html
+          if-no-files-found: warn
+
   # The website is the other, unrelated project in this repository. Its content
   # file is meant to be edited by whoever is selling the units, and a mistake
   # there does not throw -- it renders a blank orientation, or a plan tab that

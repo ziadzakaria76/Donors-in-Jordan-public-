@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    العربية هي النص الأصلي، وليست ترجمة.
+
+    هذا هو الملف الذي يقرؤه فريق المبيعات والعملاء فعلياً. كل نص موجّه للعميل
+    — قوالب واتساب، نصوص الإعلانات، بطاقات المشاركة، وإخلاءات المسؤولية — يُكتب
+    هنا أولاً، ثم تُشتقّ منه النسخة الإنجليزية. المصطلحات مأخوذة من كرّاس المشروع
+    وموقع الشركة، لا من مرادفات مبتكرة.
+-->
+<resources>
+
+    <!-- الهوية والتنقّل -->
+    <string name="app_name">تسويق شيرمان ٣</string>
+    <string name="project_name">جنرال شيرمان ٣</string>
+    <string name="company_name">شركة جنرال شيرمان للإسكان</string>
+    <string name="nav_dashboard">الرئيسية</string>
+    <string name="nav_inventory">الشقق</string>
+    <string name="nav_leads">العملاء</string>
+    <string name="nav_campaigns">الحملات</string>
+    <string name="nav_more">المزيد</string>
+
+    <!-- حالات الشقق -->
+    <string name="unit_status_available">متاحة</string>
+    <string name="unit_status_reserved">محجوزة</string>
+    <string name="unit_status_contracted">متعاقد عليها</string>
+    <string name="unit_class_a">محرّك سيولة — دوران سريع</string>
+    <string name="unit_class_b">قيمة مميّزة</string>
+    <string name="unit_class_c">وحدة روف</string>
+    <string name="unit_class_d">وحدة رئيسية — بيع موجّه</string>
+    <string name="unit_internal_area">المساحة الداخلية</string>
+    <string name="unit_external_area">المساحة الخارجية</string>
+    <string name="unit_price_per_sqm">سعر المتر المربّع</string>
+
+    <!-- مسارات المشترين -->
+    <string name="track_local">داخل الأردن</string>
+    <string name="track_expat">أردنيون مغتربون</string>
+
+    <!-- مراحل العميل -->
+    <string name="stage_new_enquiry">استفسار جديد</string>
+    <string name="stage_qualified">مؤهَّل</string>
+    <string name="stage_viewing_scheduled">موعد معاينة أو جولة مباشرة</string>
+    <string name="stage_viewing_done">تمّت المعاينة</string>
+    <string name="stage_offer_sent">أُرسل عرض خطّي</string>
+    <string name="stage_negotiation">تفاوض</string>
+    <string name="stage_contracted">تعاقد</string>
+    <string name="stage_lost">خسارة</string>
+
+    <!-- أسباب الخسارة — حقل إلزامي، وهو أثمن تقرير في التطبيق -->
+    <string name="loss_reason_price">السعر</string>
+    <string name="loss_reason_payment_terms">شروط الدفع</string>
+    <string name="loss_reason_location">الموقع</string>
+    <string name="loss_reason_unit_size">مساحة الشقة</string>
+    <string name="loss_reason_competitor">اختار مشروعاً منافساً</string>
+    <string name="loss_reason_financing_refused">رُفض التمويل</string>
+    <string name="loss_reason_eligibility">مسألة موافقة أو أهلية</string>
+    <string name="loss_reason_timing">التوقيت — تأجيل</string>
+    <string name="loss_reason_unreachable">تعذّر الوصول إليه</string>
+    <string name="loss_reason_other">سبب آخر</string>
+
+    <!-- التزامات الاستجابة -->
+    <string name="sla_first_response">أول ردّ — خلال ١٥ دقيقة ضمن ساعات العمل</string>
+    <string name="sla_out_of_hours">استفسار خارج الدوام — ردّ بشري قبل الساعة ١٠:٠٠ صباح يوم العمل التالي</string>
+    <string name="sla_viewing_follow_up">متابعة بعد المعاينة — خلال ٤٨ ساعة</string>
+    <string name="sla_written_offer">عرض خطّي — خلال ٢٤ ساعة من الطلب</string>
+    <string name="sla_external_update">تحديث لعملاء المسار الخارجي كل ١٠ أيام على الأقل</string>
+    <string name="sla_state_breached">تجاوز المهلة</string>
+    <string name="sla_state_approaching">تقترب المهلة</string>
+
+    <!-- إخلاءات المسؤولية — إلزامية ولا تُحذف -->
+    <string name="disclaimer_fees">تُحتسب رسوم التسجيل وضريبة بيع العقار على القيمة المقدَّرة من دائرة الأراضي والمساحة، وليس بالضرورة على سعر البيع. والنِّسب عرضة للتغيير بموجب التشريعات. الأرقام المعروضة استرشادية لأغراض التخطيط فقط.</string>
+    <string name="disclaimer_instalments">حساب استرشادي فقط؛ شروط التمويل الفعلية يحدّدها البنك.</string>
+    <string name="disclaimer_yield">نطاق تقديري مبني على الافتراضات المذكورة، وليس عائداً مضموناً.</string>
+    <string name="disclaimer_company_contribution">مساهمة من الشركة في رسوم التسجيل بحدّ أقصى، وليست إسقاطاً للرسوم.</string>
+    <string name="disclaimer_rendered_image">صورة تصميمية ثلاثية الأبعاد، لا صورة تنفيذ.</string>
+    <string name="disclaimer_hospital_under_construction">مستشفى الأندلس (قيد الإنشاء)</string>
+
+    <!-- الخصومات والتسعير -->
+    <string name="discount_ceiling_warning">يتجاوز الخصم سقف ٣٫٥٪، ويلزم تبرير خطّي قبل الحفظ.</string>
+    <string name="discount_class_a_blocked">وحدات الفئة (أ) لا تقبل خصماً نقدياً.</string>
+    <string name="discount_concurrent_limit">تسمح السياسة بوحدتين مخفّضتين في وقت واحد كحدّ أقصى.</string>
+    <string name="discount_justification_hint">سبب الخصم</string>
+    <string name="escalation_due">اكتملت ثلاث مبيعات — آن أوان رفع الأسعار ٢٪ كما أُعلن.</string>
+
+    <!-- النسخ الاحتياطي -->
+    <string name="backup_passphrase_warning"><![CDATA[<b>إن ضاعت كلمة المرور فلن يمكن استرجاع النسخة الاحتياطية أبداً.</b> لا توجد جهة تستطيع فتحها نيابةً عنك. احتفظ بها في مكان آمن خارج الهاتف.]]></string>
+    <string name="backup_passphrase_repeat">أعد كتابة كلمة المرور</string>
+    <string name="backup_last_taken">آخر نسخة احتياطية</string>
+    <string name="backup_never_taken">لم تؤخذ أي نسخة احتياطية بعد</string>
+
+    <!-- فحص التذكيرات -->
+    <string name="reminder_health_title">فحص التذكيرات</string>
+    <string name="reminder_health_explanation">يرسل هذا الفحص تذكيراً تجريبياً بعد دقيقة واحدة. إن لم يصل، فإن إعدادات توفير الطاقة في الهاتف توقف التذكيرات دون إشعار — وهي أهم ما يقدّمه التطبيق.</string>
+    <string name="reminder_health_arrived">وصل التذكير التجريبي. التذكيرات تعمل.</string>
+    <string name="reminder_health_missing">لم يصل التذكير التجريبي. يلزم استثناء التطبيق من توفير الطاقة.</string>
+    <string name="reminder_health_open_settings">فتح إعدادات البطارية</string>
+
+    <!-- الإعدادات -->
+    <string name="settings_language">اللغة</string>
+    <string name="settings_numerals">الأرقام</string>
+    <string name="settings_numerals_western">أرقام غربية — 1234</string>
+    <string name="settings_numerals_arabic">أرقام عربية — ١٢٣٤</string>
+    <string name="settings_show_hijri">إظهار التاريخ الهجري</string>
+    <string name="settings_theme">المظهر</string>
+    <string name="settings_business_hours">أيام وساعات العمل</string>
+    <string name="settings_app_lock">قفل التطبيق</string>
+    <string name="settings_title">الإعدادات</string>
+    <string name="settings_language_arabic">العربية</string>
+    <string name="settings_language_english">الإنجليزية</string>
+    <string name="settings_theme_system">حسب إعداد الهاتف</string>
+    <string name="settings_theme_light">فاتح</string>
+    <string name="settings_theme_dark">داكن</string>
+    <string name="settings_preview_title">معاينة</string>
+    <string name="settings_preview_date">التاريخ</string>
+    <string name="settings_preview_price">سعر الشقة</string>
+    <string name="settings_show_hijri_explanation">يُعرض التاريخ الهجري إلى جانب الميلادي، لا بديلاً عنه؛ فالعقود والمواعيد الرسمية بالتاريخ الميلادي.</string>
+
+    <!-- حالات فارغة -->
+    <string name="empty_leads_title">لا يوجد عملاء بعد</string>
+    <string name="empty_leads_body">أضف أول استفسار لتبدأ مهلة الردّ بالعمل.</string>
+    <string name="empty_leads_action">إضافة عميل</string>
+    <string name="empty_dashboard_title">لا شيء يستدعي المتابعة اليوم</string>
+    <string name="empty_dashboard_body">ستظهر هنا مهامّ اليوم والمهل المقتربة على الردّ والمتابعة.</string>
+    <string name="empty_inventory_title">لم تُضَف الشقق بعد</string>
+    <string name="empty_inventory_body">ستظهر هنا شقق المشروع الأربع عشرة بمساحاتها وأسعارها وحالة كلٍّ منها.</string>
+    <string name="empty_campaigns_title">لا توجد حملات بعد</string>
+    <string name="empty_campaigns_body">أنشئ حملة لتتبّع الإنفاق وكلفة العميل المحتمل لكل مسار.</string>
+    <string name="empty_more_title">أدوات إضافية</string>
+    <string name="empty_more_body">الحاسبات وخطّة المحتوى والتقارير والإعدادات.</string>
+
+    <!-- تشخيص الأداء -->
+    <string name="diagnosis_pricing_or_imagery">مشاهدات كثيرة واستفسارات قليلة: المشكلة في السعر أو الصور، لا في الطلب.</string>
+    <string name="diagnosis_response_speed">استفسارات كثيرة ومعاينات قليلة: المشكلة في سرعة الردّ أو في نصّ الإعلان.</string>
+    <string name="diagnosis_product_terms">معاينات كثيرة وتعاقدات قليلة: المشكلة في المنتج أو شروط الدفع أو المنافسة.</string>
+    <string name="diagnosis_targeting">مشاهدات قليلة: المشكلة في الاستهداف أو الميزانية — وخفض السعر لن يغيّر شيئاً.</string>
+
+</resources>

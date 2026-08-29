@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    minSdk is 26, so this adaptive icon is the only icon: there is no older
+    platform here that would need rasterised density variants.
+
+    The `-v26` qualifier stays, despite lint's ObsoleteSdkInt advice to drop it,
+    and that was measured rather than assumed. Renamed to a bare
+    `mipmap-anydpi`, the folder is dropped silently by AGP's resource merger —
+    it never reaches `packaged_res` — and the build then fails at link time with
+    "resource mipmap/ic_launcher not found". The suppression below is against a
+    demonstrated false positive, not a real finding.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="ObsoleteSdkInt">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

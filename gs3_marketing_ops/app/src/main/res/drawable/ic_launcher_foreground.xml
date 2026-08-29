@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A typographic brass mark, standing in until a real logo file arrives
+    (DECISIONS.md → C1). Three stacked bars for the third building in the
+    series, over the plot line it sits on.
+
+    Drawn inside the 72dp safe zone of the 108dp adaptive canvas, so no part of
+    it is clipped by a circular, squircle or rounded-square mask.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Three floors, brass. -->
+    <path
+        android:fillColor="#BE9A55"
+        android:pathData="M36,34 h36 v9 h-36 z" />
+    <path
+        android:fillColor="#9C7A38"
+        android:pathData="M36,49 h36 v9 h-36 z" />
+    <path
+        android:fillColor="#9C7A38"
+        android:pathData="M36,64 h36 v9 h-36 z" />
+
+    <!-- The ground line. -->
+    <path
+        android:fillColor="#EFE3CB"
+        android:pathData="M30,78 h48 v4 h-48 z" />
+
+</vector>

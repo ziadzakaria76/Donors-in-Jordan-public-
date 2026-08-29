@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Nothing is backed up by the platform, and nothing is transferred to a new
+    device.
+
+    This is not caution for its own sake. The database holds client names,
+    phone numbers, agreed prices and discounts; the encrypted backup file the
+    app writes itself is the only sanctioned way that data moves between phones
+    (DECISIONS.md → A3), and it is protected by a passphrase the owner holds.
+    Letting Android's own cloud backup copy the same data elsewhere would route
+    around that decision silently.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="file" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
