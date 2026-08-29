@@ -1,0 +1,5 @@
+# Optional: the JavaScript fallback for client-rendered portals.
+#   pip install -r requirements-browser.txt && playwright install chromium
+# Everything else runs without it, and the test suite skips the one test that
+# needs a real browser.
+playwright>=1.40

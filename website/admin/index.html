@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Content — General Sherman Housing</title>
+<link rel="icon" href="../favicon-32.png" sizes="32x32">
+<link rel="stylesheet" href="../assets/css/fonts.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<!-- The panel is in English throughout, deliberately. It is one person's tool,
+     not a public page, and an interface that mirrors itself into RTL is a
+     second layout to keep working for no reader. The content it edits is
+     bilingual and every text field shows both languages side by side. -->
+
+<header class="bar">
+  <div class="bar__id">
+    <strong>Content</strong>
+    <span class="bar__repo" id="repo">connecting…</span>
+  </div>
+  <div class="bar__save">
+    <span class="dirty" id="dirty" hidden></span>
+    <button type="button" class="btn btn--ghost" id="discard" hidden>Discard</button>
+    <button type="button" class="btn" id="save" disabled>Save</button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<nav class="tabs" id="tabs">
+  <button type="button" data-tab="dashboard" class="is-on">Dashboard</button>
+  <button type="button" data-tab="projects">Projects</button>
+  <button type="button" data-tab="units">Units</button>
+  <button type="button" data-tab="progress">Progress</button>
+  <button type="button" data-tab="faqs">FAQs</button>
+  <button type="button" data-tab="testimonials">Testimonials</button>
+  <button type="button" data-tab="leads">Leads</button>
+</nav>
+
+<main id="main">
+  <p class="loading">Loading the live content…</p>
+</main>
+
+<!-- Save dialog: a commit needs a message, and the panel should not invent one
+     that says less than the person could. -->
+<dialog id="saveDialog">
+  <form method="dialog" class="dialog">
+    <h2>Save to the site</h2>
+    <p class="dialog__sub" id="saveSummary"></p>
+    <label class="field">
+      <span>What changed</span>
+      <input type="text" id="saveMessage" maxlength="72" placeholder="e.g. Reserve unit 7 in General Sherman 3">
+      <small>Becomes the commit message. Leave it blank and it will just say the content was updated.</small>
+    </label>
+    <div class="dialog__actions">
+      <button type="submit" value="cancel" class="btn btn--ghost">Cancel</button>
+      <button type="submit" value="save" class="btn">Commit and deploy</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
