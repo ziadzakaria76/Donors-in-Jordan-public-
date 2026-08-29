@@ -26,8 +26,15 @@ list returned `403` at the network proxy, as did `example.com`. That is a policy
 denial, not a bug to work around.
 
 ### Verified against the live web
-**Nothing.** No scraper in this repository has ever run against a live page
-here. Nobody should read "the tests pass" as "the scrapers work".
+**One fact, not one scraper.** On 2026-08-29 a `--capture ungm` run on GitHub
+Actions reached <https://www.ungm.org/Public/Notice> (HTTP 200, 142061 bytes)
+and read UNGM's numeric country id for Syria off the live `selNoticeCountry`
+dropdown: **2490**, one of 234 options. That value is now in `config.yml`.
+
+Nothing else. No scraper in this repository has parsed a real notice listing,
+and that capture proved nothing about extraction -- the rows it scored were the
+dropdown page's own markup. Nobody should read "the tests pass", or that one
+HTTP 200, as "the scrapers work".
 
 ### Verified offline, against committed fixtures
 - Country matching, including every documented trap (`Assyrian`, `Syriac`,
@@ -54,8 +61,6 @@ here. Nobody should read "the tests pass" as "the scrapers work".
   worse than none. Extraction relies on the class-independent layers; run
   `--capture PORTAL` to see what each page actually contains and what the
   cascade makes of it.
-- **UNGM's numeric country id for Syria.** Not derivable, not guessable. The
-  portal refuses to run until you set it (see below).
 - **UNGM's search POST body.** Shipped as a documented skeleton, to be replaced
   field-for-field from a real network trace.
 - **Every institutional fact** in the code comments: World Bank re-engagement
@@ -83,20 +88,28 @@ PYTHONPATH=src python -m syria_monitor.cli --dry-run     # scrapes, prints, send
 
 ### Then do this, before expecting UNGM to work
 
-UNGM is the richest single Syria source and it does **not** use ISO country
-codes — it uses its own numeric ids, read from a 234-option dropdown. There is
-no table to derive one from and no way to guess it, so the portal refuses to run
-rather than send a guess that would return nothing silently:
+UNGM is the richest single Syria source, and half of what it needs is now done.
+
+**Done:** the numeric country id. UNGM does not use ISO codes, the value cannot
+be derived, and a wrong one returns nothing silently -- so the portal refused to
+run until it was read off the live dropdown. It has been: `country_id: 2490`
+(Syrian Arab Republic), from a `--capture ungm` run on 2026-08-29. Re-run the
+capture and compare if UNGM ever starts returning nothing; UNGM owns these ids
+and can renumber them.
 
 ```bash
 PYTHONPATH=src python -m syria_monitor.cli --capture ungm
 #   ... selNoticeCountry: 234 options
-#   >>> set portals.ungm.country_id: NNNN    (Syrian Arab Republic)
+#   >>> set portals.ungm.country_id: 2490    (Syrian Arab Republic)
 ```
 
-Put that number in `config.yml` under `portals.ungm.country_id`, and while you
-are there, replace `search_body()` in `src/syria_monitor/portals/ungm.py` with
-the real request body from the capture's network trace.
+**Still to do:** the search request body. `search_body()` in
+`src/syria_monitor/portals/ungm.py` is a documented skeleton, not a real
+payload. Open devtools on <https://www.ungm.org/Public/Notice>, run a search,
+and copy the request payload of the POST to `/Public/Notice/Search` in field for
+field. Do not reconstruct it from documentation -- a previous reconstruction is
+what convinced a team the endpoint was dead. Until this is done, the id alone
+does not make UNGM return notices.
 
 ---
 
