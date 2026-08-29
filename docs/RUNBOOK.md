@@ -7,11 +7,20 @@ Legend: ⏱ = elapsed time you wait on someone else, not effort.
 
 ---
 
-## Stage 1 — Get the code onto GitHub  (10 min, needs a computer)
+## Stage 1 — Get the code onto GitHub  (10 min)
 
-The branch exists only as a git bundle until this is done.
+The branch exists only as a git bundle until this is done. **Everything else in
+this runbook depends on it**, including the phone-friendly capture steps, whose
+workflow file has not reached GitHub yet.
 
-1. Move `syria-tender-monitor.bundle` from your phone to a computer with `git`
+**From a phone:** start a new Claude Code session on this repo, attach
+`syria-tender-monitor.bundle`, and ask it to fetch the branch and push it. A
+session created after the GitHub App install has working credentials; the one
+that produced this code does not.
+
+**From a computer instead:**
+
+1. Move `syria-tender-monitor.bundle` to a machine with `git`
    (email, Drive, or cable).
 2. Clone the repo, or use an existing clone:
    ```bash
@@ -44,7 +53,7 @@ green on 3.11 and 3.12, and the `browser-fallback` job green.
 
 ```bash
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q              # expect: 455 passed
+python -m pytest tests/ -q              # expect: 457 passed
 python -m pyflakes src/ tests/          # expect: no output
 
 PYTHONPATH=src python -m syria_monitor.cli --self-test
@@ -65,15 +74,20 @@ are either genuinely down, blocked by your network, or have moved — note which
 
 ---
 
-## Stage 3 — Request the SAM.gov key  (5 min, then ⏱ 1–4 weeks)
+## Stage 3 — Request the SAM.gov key  (5 min, usually immediate)
 
-Do this now, because the wait is the longest thing in this list.
-
-1. Register at https://sam.gov and request a public API key.
-2. When it arrives, put it in `.env`:
+1. Register at https://sam.gov (sign-in is via Login.gov), then
+   **Account Details → API Key → Request API Key**. The key is shown once.
+2. Put it in `.env`:
    ```
    SAM_API_KEY=...
    ```
+
+A **personal public API key** is normally issued immediately. The
+multi-week approval some documentation mentions applies to a **system
+account**, which exists for higher rate limits and machine-to-machine access —
+not needed for one country's notices once a day. Entity registration (UEI,
+CAGE) is a different thing again and is not required here.
 
 **Until then:** SAM.gov reports `skipped -- SAM_API_KEY not set` and the other
 nine portals run normally. Nothing else is blocked by this.
@@ -196,8 +210,9 @@ Already configured: `0 3 * * *` UTC = 06:00 Europe/Amman, daily.
    `SAM_API_KEY` (the only secret this system uses).
 2. Trigger **Run monitor** manually once (Actions tab → Run workflow) and read
    the run summary; the Word/Excel/JSON files upload as artifacts.
-3. Leave the schedule on. The subject line tells you whether a quiet day was
-   quiet or broken.
+3. Leave the schedule on. The summary on each run page states portal health,
+   so a quiet day and a broken scraper are distinguishable at a glance from the
+   Actions run list.
 
 ---
 
