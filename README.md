@@ -1,3 +1,47 @@
+# Donors in Jordan
+
+Three unrelated projects share this repository. They have no code in common,
+and none of them builds, imports or deploys another.
+
+| Project | What it is | Where it lives |
+| --- | --- | --- |
+| **General Sherman Housing** | A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential developer | [`website/`](website/) |
+| **[Jordan Tender Intelligence Monitor](#jordan-tender-intelligence-monitor)** | A Python system that watches 13 donor and IFI procurement portals for Jordan-related consulting work | [`jordan_tender_monitor/`](jordan_tender_monitor/) |
+| **[Syria Tender Intelligence Monitor](#syria-tender-intelligence-monitor)** | A separate Python system, country-agnostic by design, watching 10 portals for Syria-related work | [`syria_tender_monitor/`](syria_tender_monitor/) |
+
+The two tender monitors are **separate codebases that solve the same problem
+twice**, not one system with two configurations. They share no module, no
+dependency file and no test. Read
+[Two monitors, one problem](#two-monitors-one-problem) before changing either
+under the impression that the other will follow.
+
+---
+
+# جنرال شيرمان — General Sherman Housing
+
+Plain HTML, CSS and JavaScript in [`website/`](website/): project showcases, a
+live unit inventory with filters, a per-building availability grid, floor
+plans, a gallery, and lead capture through WhatsApp, phone and forms. No build
+step, no framework, no runtime dependencies.
+
+**Full documentation: [`website/README.md`](website/README.md)** — running it
+locally, deploying, what the content file holds, and what was deliberately left
+blank rather than invented.
+
+```bash
+cd website
+python3 -m http.server 8080
+```
+
+The site is deployed to <https://general-sherman-housing.com> through Cloudflare
+Pages, publishing the contents of `website/`.
+
+Deliberately not documented twice: everything about the site lives in
+`website/README.md`, so there is one description of it and it is the one next
+to the code.
+
+---
+
 # Jordan Tender Intelligence Monitor
 
 Automated multi-agent system that monitors 13 donor and international financial
@@ -6,36 +50,6 @@ scores them for relevance, and writes a Word bid-review pack and an Excel
 working file to disk.
 
 Full documentation: **[`jordan_tender_monitor/README.md`](jordan_tender_monitor/README.md)**
-
-## Status — first live run completed 3 August 2026
-
-The scrapers have now run against live pages. Results by portal:
-
-| Portal | Live result |
-|---|---|
-| **EBRD** | **Working.** 4,004 notices scanned, 119 Jordan |
-| **World Bank** | **Working** after a fix — the API ignores its own country filter |
-| UK Find a Tender | Working. 500 read, no Jordan notices currently open |
-| IsDB | Working. 144 read, no Jordan notices currently open |
-| GIZ | Reachable, but only 23 rows read — extraction needs checking |
-| **UNGM** | **Broken.** 3 rows read; the POST search is not returning a listing |
-| EU TED | Broken. HTTP 400 — the v3 query grammar is wrong |
-| KfW (via GTAI) | Blocked. HTTP 403 bot wall from a data-centre IP |
-| EIB | Blocked. Cloudflare bot wall |
-| Saudi Fund | Unreachable. Connection timeout |
-| ADFD | Reachable, no listing found — needs `--capture` |
-| JICA | HTTP 404 — the URL has moved |
-| SAM.gov | Awaiting an API key |
-
-**Two defects the first run exposed, both now fixed.** The World Bank API
-silently ignores `countryshortname=Jordan`; because that module trusted the
-parameter and skipped client-side filtering, the first report led with a
-Caribbean education project and roughly 140 of 259 entries were not Jordan at
-all. And World Bank titles were read from `project_name`, so six different
-notices rendered as six identical lines.
-
-**Still unverified:** the CSS selectors for the portals that have not yet
-returned a clean listing. Run `python run.py --capture PORTAL` against those.
 
 ## What it does
 
@@ -64,6 +78,27 @@ with the URL to check by hand. It never aborts the run, and a broken run never
 looks like a quiet one — portal health is in the output filename, and an
 optional short **ACTION NEEDED** email fires when a run cannot read its sources
 at all.
+
+## Status — first live run completed 3 August 2026
+
+| Portal | Live result |
+|---|---|
+| **EBRD** | **Working.** 4,004 notices scanned, 119 Jordan |
+| **World Bank** | **Working** after a fix — the API ignores its own country filter |
+| UK Find a Tender | Working. 500 read, no Jordan notices currently open |
+| IsDB | Working. 144 read, no Jordan notices currently open |
+| GIZ | Reachable, but only 23 rows read — extraction needs checking |
+| **UNGM** | **Broken.** 3 rows read; the POST search is not returning a listing |
+| EU TED | Broken. HTTP 400 — the v3 query grammar is wrong |
+| KfW (via GTAI) | Blocked. HTTP 403 bot wall from a data-centre IP |
+| EIB | Blocked. Cloudflare bot wall |
+| Saudi Fund | Unreachable. Connection timeout |
+| ADFD | Reachable, no listing found — needs `--capture` |
+| JICA | HTTP 404 — the URL has moved |
+| SAM.gov | Awaiting an API key |
+
+**Still unverified:** the CSS selectors for the portals that have not yet
+returned a clean listing. Run `python run.py --capture PORTAL` against those.
 
 ## Quick start
 
@@ -156,6 +191,56 @@ or rotate. `.env` is never committed and holds only the optional SAM.gov API
 key. If you later switch delivery back on, read the `Mail.Send` scoping warning
 in the [full README](jordan_tender_monitor/README.md#security) first: as an
 Azure *application* permission it is tenant-wide.
+
+---
+
+# Syria Tender Intelligence Monitor
+
+A second, independent monitor: it watches 10 donor and IFI portals for
+Syria-related consulting opportunities, classifies each notice by where the work
+is actually delivered, screens named parties against sanctions lists, and writes
+a ranked Word bid-review pack, an Excel working file and a JSON record set to
+disk. Nothing is emailed — the report is the files, and you download them.
+
+Full documentation: **[`syria_tender_monitor/README.md`](syria_tender_monitor/README.md)**
+Setup, step by step: **[`syria_tender_monitor/docs/RUNBOOK.md`](syria_tender_monitor/docs/RUNBOOK.md)**
+
+```bash
+cd syria_tender_monitor
+pip install -r requirements-dev.txt
+python -m pytest tests/ -q                            # 456 passed, 1 skipped
+PYTHONPATH=src python -m syria_monitor.cli --self-test # whole pipeline, fixtures, no network
+```
+
+**Portals:** World Bank, EU TED, SAM.gov and UK Find a Tender (REST APIs); UNGM,
+UNDP, SRTF, GIZ, IsDB and KfW via Germany Trade & Invest (HTML).
+
+**Read its README's "What is verified, and what is not" section before trusting
+any output.** No scraper in it has ever run against a live page: every URL, and
+every HTML portal's page structure, is unverified. It ships no CSS selectors on
+purpose and relies on class-independent extraction, and UNGM refuses to run
+until you supply the numeric country id that `--capture ungm` reads off the
+page. That is the honest starting state, not a defect to be surprised by later.
+
+## Two monitors, one problem
+
+They are not a fork of each other and neither is the successor. The differences
+that matter if you are deciding which to touch:
+
+| | Jordan | Syria |
+| --- | --- | --- |
+| Country | Hard-coded throughout | A profile argument; `profiles/syria.yml` holds the country data, so a second country is a second YAML file |
+| Layout | Flat package, run with `python run.py` | `src/` layout, run with `python -m syria_monitor.cli` |
+| Tests | Custom harness, `tests/run_all.py` | pytest, 457 tests |
+| Extras | Email delivery, Windows deployment guide | Delivery-location classification, sanctions screening, a tri-state country gate |
+| Live status | Ran against live portals on 3 August 2026; results above | Never run against a live page |
+
+Merging them is a real option and a real project; nothing here has been done
+towards it. Until someone does it, a fix to a shared-looking bug — a date
+format, a portal's layout change — has to be made twice, by hand, in two
+places.
+
+---
 
 ## License
 

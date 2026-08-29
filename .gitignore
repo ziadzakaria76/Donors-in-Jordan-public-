@@ -37,6 +37,9 @@ venv/
 # Captured live pages -- may embed contact details from real notices
 jordan_tender_monitor/tests/fixtures/live/
 
+# Static site build deps
+node_modules/
+
 # Android
 #
 # The keystore and its password NEVER go in the repository -- a signing key in

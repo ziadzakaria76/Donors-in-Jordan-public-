@@ -1,0 +1,74 @@
+# Cloudflare Pages response headers.
+# Same policy as netlify.toml and vercel.json, in the format Pages reads.
+# Pages serves 404.html for unmatched paths on its own, so there is no
+# _redirects file — and a www -> apex redirect cannot live here either; it is a
+# Redirect Rule in the Cloudflare dashboard (README -> "Deploy it").
+
+# Fonts are immutable: a woff2 subset is never re-cut under the same name, so a
+# year is safe and they are the largest thing a repeat visitor would refetch.
+/assets/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Images are NOT immutable, despite looking like they should be. The filenames
+# carry no content hash — sherman2-lobby-1-480.webp is a stable name for
+# whatever that photograph currently is — and they do get re-rendered in place:
+# twenty-six of them were re-cut in one commit to crop a camera watermark out.
+# Under `immutable` a returning visitor would have kept the watermarked version
+# for a year, with no way to tell them otherwise. A week, revalidated, keeps
+# them cheap without making a correction impossible to deliver.
+/assets/img/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+# Nothing that carries content may be cached hard, and on this site that means
+# the JavaScript as much as the HTML.
+#
+# This used to say CSS and JS were "deliberately left on the default
+# (revalidate every time)" and protect only the HTML, on the reasoning that the
+# pages carry the prices. They do not. Every price, every unit and every phone
+# number lives in assets/js/data.js -- the pages are empty shells that data.js
+# fills in. Leaving that file to a platform default, whatever it happens to be,
+# is leaving the price list to a platform default. It is stated here instead.
+#
+# The filenames carry no content hash, so a hard cache on any of them strands a
+# visitor on old markup, old styles or old prices after a deploy, with no way
+# to tell them otherwise.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/js/*
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/css/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# The admin panel and its API. Never cached, by anyone, ever.
+#
+# The panel reads the live schedule and writes it back, so a cached GET means
+# editing yesterday's copy and committing it over today's. The pages are also
+# behind Cloudflare Access, and a shared cache holding a page served to an
+# authenticated editor is a page served to whoever asks next.
+#
+# noindex is belt and braces: robots.txt disallows /admin/ too, but robots.txt
+# is a request and this is a header.
+/admin/*
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+/api/*
+  Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow
+
+# tools/ is served because the panel imports the validator and the vocabulary
+# straight from it -- one definition of what a valid unit is, shared by the
+# browser, the Function, the CLI and CI. Same no-cache rule as the site's own
+# JavaScript, and for the same reason: these files decide what may be published.
+/tools/*
+  Cache-Control: public, max-age=0, must-revalidate
+
+# frame-ancestors: the site embeds a map, but is never itself meant to be
+# embedded. Framing it elsewhere would let someone wrap the real prices and
+# phone number in their own page. X-Frame-Options repeats it for older browsers.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'self'
+  X-Frame-Options: SAMEORIGIN

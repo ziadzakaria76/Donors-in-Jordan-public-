@@ -156,6 +156,23 @@ DEPRIORITISE_LEXICON: list[str] = [
 MIN_VALUE_USD: float | None = 100_000.0
 KEEP_UNKNOWN_VALUE = True
 
+# A value that cannot be true is a parsing error, not a small tender.
+#
+# The floor above is applied to whatever the parser produced, so a value read
+# off the wrong fragment of a page takes the tender out of the report under
+# "below minimum value" -- the same reason a genuine $50k tender gets, and
+# therefore invisible. "Published: 01 August 2026" parsing to 1.0 is the case
+# that motivated this.
+#
+# utils.dates already discards implausible dates at parse time (PLAUSIBLE_YEARS);
+# this is the same idea applied to the other half of the record.
+MIN_PLAUSIBLE_VALUE_USD = 1_000.0
+MAX_PLAUSIBLE_VALUE_USD = 5_000_000_000.0
+IMPLAUSIBLE_VALUE_NOTE = (
+    "Published value {value} is not credible for a tender - treated as not "
+    "published; the portal's value may have been misread"
+)
+
 # Static FX rates used to normalise stated values into USD, for filtering and
 # ranking only. Never used for anything financial.
 FX_TO_USD: dict[str, float] = {

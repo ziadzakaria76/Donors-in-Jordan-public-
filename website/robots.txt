@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# The admin panel. Behind Cloudflare Access, so a crawler could not read it
+# anyway -- but a login page in the index is a login page people find.
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://general-sherman-housing.com/sitemap.xml

@@ -176,6 +176,69 @@ def test_unknown_value_is_kept_and_flagged():
     check("Value not published" in kept["flags"], "value: and it is flagged")
 
 
+def test_implausible_value_is_flagged_not_dropped():
+    """A misread value must not leave the report as "below minimum value".
+
+    The floor is applied to whatever the parser produced, so a value read off
+    the wrong fragment of a page ("Published: 01 August 2026" -> 1.0) drops the
+    tender for the same stated reason a genuine small tender gets. The two are
+    indistinguishable in the report, so a broken scraper shrinks the pipeline
+    without ever failing.
+    """
+    # Distinct titles: process() deduplicates on title similarity, and four
+    # identically-titled records would collapse into one.
+    tiny = _record(title="Public Financial Management Advisory, Jordan",
+                   value_text="USD 1", url="https://e.org/tiny")
+    huge = _record(title="Water Utility Reform Consultancy, Jordan",
+                   value_text="USD 9000000000000", url="https://e.org/huge")
+    small = _record(title="Short-term Trainer, Jordan",
+                    value_text="USD 50,000", url="https://e.org/small")
+    real = _record(title="Digital Government Transformation, Jordan",
+                   value_text="USD 500,000", url="https://e.org/real")
+
+    result = filters.process([tiny, huge, small, real], TODAY)
+    by_url = {t["url"]: t for t in result["tenders"]}
+
+    check("https://e.org/tiny" in by_url,
+          "implausible value: $1 keeps the tender instead of deleting it")
+    check("https://e.org/huge" in by_url,
+          "implausible value: $9tn keeps the tender too")
+    check("https://e.org/small" not in by_url,
+          "implausible value: a genuine $50k tender is still dropped")
+    check_eq(by_url.get("https://e.org/real", {}).get("estimated_value_usd"), 500_000.0,
+             "implausible value: a credible value is left alone")
+
+    for url in ("https://e.org/tiny", "https://e.org/huge"):
+        tender = by_url.get(url, {})
+        check(tender.get("estimated_value_usd") is None,
+              f"implausible value: {url} is treated as unknown, not trusted")
+        check(any("not credible" in f for f in tender.get("flags") or []),
+              f"implausible value: {url} says so in the report",
+              str(tender.get("flags")))
+        check("Value not published" not in (tender.get("flags") or []),
+              f"implausible value: {url} does not also claim the value was absent")
+
+
+def test_plausible_value_boundaries_are_not_over_eager():
+    """The repair must not swallow values that are merely small or large."""
+    big = _record(title="National Grid Modernisation Programme, Jordan",
+                  value_text="USD 900,000,000", url="https://e.org/big")
+    at_floor = _record(title="Minor Advisory Assignment, Jordan",
+                       value_text=f"USD {int(config.MIN_PLAUSIBLE_VALUE_USD)}",
+                       url="https://e.org/floor")
+
+    kept, dropped = filters.apply_filters([big, at_floor], TODAY)
+    flags = {t["url"]: (t.get("flags") or []) for t in kept}
+
+    check(not any("not credible" in f for f in flags.get("https://e.org/big", [])),
+          "plausible value: a genuine $900m programme is not called implausible")
+    # A value exactly at the plausibility floor is credible; it is the business
+    # floor that removes it, and keeping those two reasons apart is the point.
+    check("below minimum value" in dropped,
+          "plausible value: the floor still removes small tenders on its own terms",
+          str(dropped))
+
+
 def test_unknown_value_scores_mid_band():
     unknown = _record(value_text=None)
     filters.score(unknown, TODAY)
@@ -927,6 +990,8 @@ TESTS = [
     test_stale_undated_notices_age_out_but_dated_ones_do_not,
     test_the_undated_window_can_be_turned_off,
     test_unknown_value_is_kept_and_flagged,
+    test_implausible_value_is_flagged_not_dropped,
+    test_plausible_value_boundaries_are_not_over_eager,
     test_unknown_value_scores_mid_band,
     test_national_only_is_flagged_and_penalised,
     test_arabic_notice_is_kept_and_flagged,
