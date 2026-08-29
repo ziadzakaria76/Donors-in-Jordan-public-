@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Doc2MD — file to Markdown</title>
+    <meta
+      name="description"
+      content="Convert PDF, DOCX and XLSX files to clean, token-efficient Markdown. Runs entirely on your device — nothing is uploaded."
+    />
+    <meta name="theme-color" content="#0b1020" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Doc2MD" />
+    <link rel="icon" type="image/svg+xml" href="icons/favicon.svg" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <script>
+      // Applied before first paint so an installed app never flashes white.
+      // Dark is the default; the toggle stores an explicit choice.
+      try {
+        var stored = localStorage.getItem('doc2md:theme');
+        var dark = stored ? stored === 'dark' : true;
+        document.documentElement.classList.toggle('dark', dark);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#0b1020' : '#f8fafc');
+      } catch (e) {
+        /* private mode: keep the dark default */
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

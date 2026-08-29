@@ -1,6 +1,6 @@
 # Donors in Jordan
 
-Three unrelated projects share this repository. They have no code in common,
+Four unrelated projects share this repository. They have no code in common,
 and none of them builds, imports or deploys another.
 
 | Project | What it is | Where it lives |
@@ -8,6 +8,7 @@ and none of them builds, imports or deploys another.
 | **General Sherman Housing** | A bilingual (Arabic RTL / English LTR) marketing site for a Jordanian residential developer | [`website/`](website/) |
 | **[Jordan Tender Intelligence Monitor](#jordan-tender-intelligence-monitor)** | A Python system that watches 13 donor and IFI procurement portals for Jordan-related consulting work | [`jordan_tender_monitor/`](jordan_tender_monitor/) |
 | **[Syria Tender Intelligence Monitor](#syria-tender-intelligence-monitor)** | A separate Python system, country-agnostic by design, watching 10 portals for Syria-related work | [`syria_tender_monitor/`](syria_tender_monitor/) |
+| **Doc2MD** | A standalone PWA that converts PDF, Word and Excel to token-efficient Markdown, entirely in the browser | [`doc2md/`](doc2md/README.md) |
 
 The two tender monitors are **separate codebases that solve the same problem
 twice**, not one system with two configurations. They share no module, no
@@ -96,6 +97,13 @@ at all.
 | ADFD | Reachable, no listing found — needs `--capture` |
 | JICA | HTTP 404 — the URL has moved |
 | SAM.gov | Awaiting an API key |
+
+**Two defects that first run exposed, both now fixed.** The World Bank API
+silently ignores `countryshortname=Jordan`; because that module trusted the
+parameter and skipped client-side filtering, the first report led with a
+Caribbean education project and roughly 140 of 259 entries were not Jordan at
+all. And World Bank titles were read from `project_name`, so six different
+notices rendered as six identical lines.
 
 **Still unverified:** the CSS selectors for the portals that have not yet
 returned a clean listing. Run `python run.py --capture PORTAL` against those.
