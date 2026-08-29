@@ -703,7 +703,89 @@ The test that asserted "the budget's arithmetic meets it" now asserts the gap
 instead, with the numbers written out, so the next person to touch the default
 finds the discrepancy and this entry rather than a stale claim.
 
+### D-28 — 1,125 JOD of the freed 2,520 stays on the external track (2026-08-29)
+
+**The owner's answer to D-24, D-26 and D-27, which turned out to be one
+question rather than three.** D-24 asked where the freed money goes, D-26 asked
+what to do about a cost-per-lead target that no longer matched its budget, and
+D-27 flagged a funnel model sized for a track that had just lost a third of its
+money. All three resolve the moment you answer: *does the external track still
+have to deliver three units?* The owner's answer is yes.
+
+The arithmetic, at the plan's own 45 JOD per raw external lead:
+
+| External budget | Raw leads | Qualified | Contracts | Share of 11 |
+| --- | --- | --- | --- | --- |
+| 7,200 — as originally designed | 160 | 48 | 3 | 27.3% ✅ |
+| **5,805 — this decision** | **129** | **39** | **3** | **27.3% ✅** |
+| 4,680 — expatriate rows alone | 104 | 31 | 2 | 18.2% ❌ |
+
+So the shortfall was never the whole 2,520. **1,125 JOD** is the least that had
+to stay for the three-unit target and the ≥27% floor to remain fundable, and
+that is what stays. The other 1,395 falls to the local track, which goes from
+10,800 to **12,195**. `totalPaidMedia` is untouched at the approved 18,000.
+
+**Why not simply leave it at 4,680.** `FunnelTargets.stateOf(2, 3)` is a ratio
+of 0.67, below the 0.70 floor — so the dashboard would have shown the external
+track **AT_RISK from its first month and never cleared**, while the track was
+performing exactly to the budget it had been given. That is D-3's failure
+repeated precisely: an alarm nobody can satisfy, which teaches a team to ignore
+alarms. The alternative to funding the target was lowering it, and lowering it
+is a bigger decision than moving 1,125 JOD.
+
+**The five rows are rescaled, not redistributed.** Each market's annual figure
+is its old share of the track applied to 5,805 and rounded to the nearest 5
+JOD. No market's share moves by more than **0.03 of a percentage point**, and a
+test asserts that rather than the individual figures — the split follows the
+geographic distribution of remittances, and a rounding that quietly moved money
+from Kuwait to the Emirates would be a strategy change wearing the costume of
+arithmetic.
+
+| | UAE | USA | KSA | QAT | KWT | Total |
+| --- | --- | --- | --- | --- | --- | --- |
+| was | 1,370 | 1,250 | 1,120 | 600 | 340 | 4,680 |
+| now | 1,700 | 1,550 | 1,390 | 745 | 420 | **5,805** |
+
+**`FunnelModel.EXTERNAL.rawLeads` moves from 160 to 129, and nothing else in it
+moves.** The qualification, viewing and contract rates are the strategy's own
+and are not re-derived for an expatriate-only audience — that would be
+invention. Only the lead volume follows the budget, by division. A test pins
+129 as a floor rather than a preference: at 128 raw leads the third contract
+disappears, because three HALF_UP roundings sit between leads and contracts and
+it does not fade out gradually.
+
+**D-26 needed no decision in the end.** 5,805 over 39 qualified leads is
+**148.846**, within 1% of the 150 that was already there. Worth not leaning on:
+the two agree because both descend from the same 45-JOD assumption, not because
+anything reconciles them.
+
+**The one number here that is a floor, not an estimate.** 45 JOD per raw lead
+was *blended* across expatriate and non-Jordanian markets. A lead from the
+United States or the Emirates plausibly costs more than one from Iraq or
+Palestine, so removing the cheaper half may push the true expatriate figure
+above 45 — and if it is really 55, then 129 leads cost 7,095 and very nearly
+the whole 2,520 has to come back. Nothing here assumes that away.
+`ChannelSpend.costPerRawLead` already measures it, and the first month of real
+spend settles it.
+
+**Room 2 → 3, for a change that alters no schema.** Same tables, same columns;
+Room would not have asked for a version bump. It exists because the *data* is
+wrong on any database already created, for exactly the reason `MIGRATION_1_2`
+had to delete rather than trust the seed: every insert is `IGNORE` (D-19), so
+the five markets would keep their old annual figures for ever. It overwrites
+unconditionally, which is **only acceptable while no screen can edit a market
+budget** — that arrives at Milestone 5, and the next migration of this kind
+must preserve edited rows instead. Both migration tests were proved to fail
+with `MIGRATION_2_3` unwired and to pass with it restored.
+
 ### D-27 — The targets and the funnel model are left exactly as they were, and one of them is now doing more work
+
+**Superseded by D-28 (2026-08-29), which is what this entry asked for.** The
+targets it lists are unchanged and still stand; what changed is that the
+external track is now funded to reach them. `FunnelModel.EXTERNAL.rawLeads` is
+129 rather than the 160 recorded below. The entry is left as written because it
+is the record of the question, and of the fact that the answer was to fund the
+plan rather than to quietly re-cut the numbers.
 
 Not a change — a statement of what was deliberately **not** changed, because the
 arithmetic underneath it moved.
@@ -773,10 +855,8 @@ depends on it (noted in the last column).
 | Ref | Question | Status |
 | --- | --- | --- |
 | B-2 (b), (c) | Does the signed contract carry the delay penalty and the two-year/ten-year warranty? | Unconfirmed. Both stay out of client-facing text until someone reads the contract |
-| D-24 | Does the 2,520 JOD freed by the removed markets stay in the plan on the local track, or come out of it? | **Default applied and needs confirming.** It stays: total paid media is unchanged at 18,000, so local rises 10,800 → 13,320 |
+| D-28 | Is 45 JOD still the right cost per raw lead once the cheaper non-Jordanian markets are gone? | **Open, and the one that could undo D-28's sizing.** 45 was blended; expatriate-only may be dearer. Measured by `ChannelSpend.costPerRawLead` from the first month of real spend |
 | D-25 | Should `ARAB_NON_JORDANIAN` and `NON_ARAB` be removed, or kept and pointed somewhere? | **Default applied and needs confirming.** Removed — there is no honest track left, and `EXPAT` would be a lie |
-| D-26 | The 150 JOD qualified-lead target no longer matches the budget (97.5). Move it or keep it? | **Default applied and needs confirming.** Kept at 150 — loose is the safe direction for an unconfirmed threshold |
-| D-27 | The external funnel's 160 raw leads were for the whole external track. Can expatriates alone supply them on 4,680 JOD? | Not re-estimated. The model and every target are unchanged, deliberately |
 
 ### Closed
 
@@ -784,3 +864,6 @@ depends on it (noted in the last column).
 | --- | --- | --- |
 | D-3 | Is 45 JOD the target per **raw** lead or per **qualified** lead? | **Answered 2026-08-16.** Neither — the owner removed the 45 JOD figure. One target remains: 150 JOD per qualified lead, 200 stop threshold, both editable in Settings. See D-3 above, and D-26 for what happened to the arithmetic behind the 150 |
 | B-1 | Has the Department of Lands and Survey statement been obtained? | **Answered 2026-08-29: no**, and closed as a v1 blocker on the same day by removing the track it gated rather than shipping a permanently locked module. See D-23. It becomes a precondition again only if the track is ever revived |
+| D-24 | Does the 2,520 JOD freed by the removed markets stay in the plan on the local track, or come out of it? | **Answered 2026-08-29.** Neither in full: 1,125 stays on the external track so it can still fund three units, 1,395 falls to local (10,800 → 12,195), and total paid media is untouched. See D-28 |
+| D-26 | The 150 JOD qualified-lead target no longer matches the budget (97.5). Move it or keep it? | **Answered 2026-08-29.** Neither — sizing the external track at 5,805 brings the arithmetic back to 148.846, within 1% of the target already there, so nothing had to move. See D-28 |
+| D-27 | Can expatriates alone supply the external funnel's raw leads on 4,680 JOD? | **Answered 2026-08-29: no**, and the answer was to fund the plan rather than re-cut it. 4,680 buys 104 leads and two units; the track is sized at 5,805 for 129 and three. See D-28 |

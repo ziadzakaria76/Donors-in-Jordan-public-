@@ -53,7 +53,7 @@ abstract class Gs3Database : RoomDatabase() {
     abstract fun complianceDao(): ComplianceDao
 
     companion object {
-        const val VERSION: Int = 2
+        const val VERSION: Int = 3
         const val NAME: String = "gs3_marketing_ops.db"
 
         /**
@@ -87,14 +87,54 @@ abstract class Gs3Database : RoomDatabase() {
         }
 
         /**
+         * Version 2 → 3: the expatriate market budgets are re-sized.
+         *
+         * **No schema change at all** — same tables, same columns. Room would
+         * not have demanded a version bump for this. It is here because the
+         * *data* is wrong on any database already created, and for exactly the
+         * reason `MIGRATION_1_2` had to delete rather than rely on the seed:
+         * every seed insert is `IGNORE` (D-19), so a row whose primary key
+         * exists is left alone and the five markets would keep their old
+         * annual figures for ever.
+         *
+         * D-28 moved 1,125 JOD back onto this track so it can still fund three
+         * units. The five values below are `Gs3Budget.expatriateMarkets`, and
+         * `SeedContentTest` asserts they match rather than leaving two lists to
+         * drift.
+         *
+         * **This overwrites the rows unconditionally, and that is only
+         * acceptable today.** Nothing in the app can edit a market budget yet —
+         * there is no Settings screen for it until Milestone 5 — so there is no
+         * hand-made figure to destroy. Once budgets are editable this migration
+         * would be the exact bug D-19 is written against, and the next one of
+         * its kind must preserve edited rows instead.
+         */
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "UAE" to 1_700_000L,
+                    "USA" to 1_550_000L,
+                    "KSA" to 1_390_000L,
+                    "QAT" to 745_000L,
+                    "KWT" to 420_000L,
+                ).forEach { (market, annualFils) ->
+                    db.execSQL(
+                        "UPDATE `market_budgets` SET `annualFils` = ? WHERE `marketKey` = ?",
+                        arrayOf<Any>(annualFils, market),
+                    )
+                }
+            }
+        }
+
+        /**
          * The list was created empty at version 1 so that adding version 2
          * would be an edit to an established mechanism rather than a decision
          * taken in a hurry, at the point where the tempting alternative is one
-         * destructive line. This is that edit, and it is the whole of it —
+         * destructive line. It has stayed an edit —
          * `Gs3Database.build` already passed `addMigrations(*MIGRATIONS)`, so
-         * no wiring changed to accommodate the first real migration.
+         * no wiring has changed for either migration.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 
         /**
          * The one place the database is built.

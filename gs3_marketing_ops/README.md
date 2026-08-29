@@ -35,8 +35,9 @@ block that stopped the first two attempts was lifted on 2026-08-15 —
 `DECISIONS.md` → D-1 keeps the record of what was true before that.
 
 **No non-Jordanian buyer track.** It was removed from v1 on 2026-08-29 rather
-than shipped behind a gate nobody could open — `DECISIONS.md` → D-23, and D-24
-to D-27 for the consequences still awaiting the owner's confirmation.
+than shipped behind a gate nobody could open — `DECISIONS.md` → D-23. The
+external track was then re-sized to 5,805 JOD so that removing it did not cost
+the plan its third external unit — D-28.
 
 ## Layout
 

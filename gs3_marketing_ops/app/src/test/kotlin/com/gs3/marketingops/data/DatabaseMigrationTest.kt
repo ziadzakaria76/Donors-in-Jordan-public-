@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.test.core.app.ApplicationProvider
 import com.gs3.marketingops.core.data.db.Gs3Database
+import com.gs3.marketingops.domain.budget.Gs3Budget
 import kotlinx.coroutines.test.runTest
 import org.json.JSONObject
 import org.junit.After
@@ -70,7 +71,16 @@ class DatabaseMigrationTest {
                 budgets.map { it.marketKey }.sorted(),
             )
             assertTrue("no NONJO row may survive", budgets.none { it.track == "NONJO" })
-            assertEquals(1_370_000L, budgets.single { it.marketKey == "UAE" }.annualFils)
+
+            // Opening a version 1 file runs both migrations, so the surviving
+            // rows arrive carrying version 3's figures: 1 -> 2 keeps UAE at
+            // 1,370 and 2 -> 3 re-sizes it to 1,700 (D-28). Asserted against
+            // the domain rather than a literal, so the migration and the seed
+            // cannot drift apart.
+            assertEquals(
+                Gs3Budget.expatriateMarkets.associate { it.marketKey to it.annual.fils },
+                budgets.associate { it.marketKey to it.annualFils },
+            )
 
             // Work someone had done survives the migration. A confirmed
             // contract claim is the case that matters: the claims are not
@@ -85,6 +95,44 @@ class DatabaseMigrationTest {
 
         assertTrue("the eligibility_gate table must be gone", "eligibility_gate" !in tableNames())
         assertEquals(Gs3Database.VERSION, versionOf(databaseFile))
+    }
+
+    @Test
+    fun `version two re-sizes the expatriate budgets rather than leaving them stale`() = runTest {
+        // 2 -> 3 carries no schema change, so this is the one that would be
+        // easiest to skip — and skipping it is silent. The seed inserts with
+        // IGNORE (D-19), so a database that already holds UAE at 1,370 keeps
+        // 1,370 for ever while the domain, the reports and the strategy all
+        // say 1,700.
+        createVersionOne()
+        val migrated = Gs3Database.build(context, databaseFile.name)
+        migrated.marketBudgetDao().getAll()
+        migrated.close()
+
+        // Wind the file back to version 2 with version 2's data: the four
+        // NONJO rows gone, the five expatriate rows at their old figures.
+        SQLiteDatabase.openOrCreateDatabase(databaseFile, null).use { db ->
+            listOf("UAE" to 1_370_000L, "USA" to 1_250_000L, "KSA" to 1_120_000L,
+                "QAT" to 600_000L, "KWT" to 340_000L).forEach { (market, fils) ->
+                db.execSQL("UPDATE market_budgets SET annualFils = ? WHERE marketKey = ?", arrayOf<Any>(fils, market))
+            }
+            db.version = 2
+        }
+
+        val database = Gs3Database.build(context, databaseFile.name)
+        try {
+            assertEquals(
+                Gs3Budget.expatriateMarkets.associate { it.marketKey to it.annual.fils },
+                database.marketBudgetDao().getAll().associate { it.marketKey to it.annualFils },
+            )
+            // And the track adds back up to what the domain says it is.
+            assertEquals(
+                Gs3Budget.externalTrackTotal.fils,
+                database.marketBudgetDao().getAll().sumOf { it.annualFils },
+            )
+        } finally {
+            database.close()
+        }
     }
 
     /**

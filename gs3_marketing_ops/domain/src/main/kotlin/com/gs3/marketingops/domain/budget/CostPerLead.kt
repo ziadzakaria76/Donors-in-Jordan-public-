@@ -16,15 +16,19 @@ import java.math.BigDecimal
  * decision forced above 200. Carrying a second target of 45 as well would have
  * meant two numbers that can disagree about whether the same month went well.
  *
- * **150 no longer comes out of the budget's arithmetic, and is kept anyway.**
- * Removing the non-Jordanian track (D-23) took the external budget from 7,200
- * to 4,680, so the same division over the same 48 qualified leads now gives
- * 97.500. The target is left at 150 deliberately — see DECISIONS.md → D-26. It
- * is an approved figure, it is editable in Settings, and moving it down without
- * the owner would tighten an alarm on a funnel model nobody has re-estimated,
- * which is the D-3 failure all over again: an alarm that fires from week one
- * and teaches the team to ignore it. The safe direction for an unconfirmed
- * change to a threshold is the loose one.
+ * **150 still comes out of the budget's arithmetic, and did not have to be
+ * touched.** Removing the non-Jordanian track (D-23) briefly broke that:
+ * the external budget fell to 4,680, and the same division gave 97.500 while
+ * the target stayed at 150. D-28 restored the track to 5,805 so that it can
+ * still fund three units, and 5,805 over the 39 qualified leads it now expects
+ * is **148.846** — within 1% of the target that was already there.
+ *
+ * That is a coincidence worth not leaning on. The two agree because both
+ * descend from the same 45-JOD-per-raw-lead assumption, not because anything
+ * checks them against each other. If real expatriate lead costs come in above
+ * 45 — plausible, since 45 was blended across the cheaper non-Jordanian
+ * markets — this target is the first thing that should move, and both figures
+ * are editable for that reason.
  *
  * Worth keeping the history, because the figure will come up again: what the
  * brief called a target per *qualified* lead was 7,200 ÷ 160 **raw** leads to
