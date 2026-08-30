@@ -21,11 +21,22 @@ on:
     paths:
       - "website/**"
       - ".github/workflows/preview-website.yml"
+  # Every workflow in this repository can be started by hand, and this one is no
+  # exception. GitHub has twice stopped turning pushes here into check runs --
+  # not queued, not failed, never created -- and a workflow that only listens
+  # for events is the one thing with no way to be run when events are the fault.
+  # See test_browser.py, which asserts it.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to preview"
+        required: true
+        type: string
 
 # One preview per pull request. A new push supersedes the one in flight --
 # unlike production, where a cancelled deploy could leave the live site behind.
 concurrency:
-  group: preview-website-${{ github.event.pull_request.number }}
+  group: preview-website-${{ github.event.pull_request.number || inputs.pr }}
   cancel-in-progress: true
 
 permissions:
@@ -37,12 +48,50 @@ jobs:
     # Never for a fork. A pull request from a fork cannot be given the
     # Cloudflare token or the repository's write scope, and a workflow that
     # tried would either fail confusingly or hand a stranger a deploy.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # A hand-started run carries no pull_request payload, so it is let through
+    # here and checked against the API in the first step instead.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
     steps:
+      # One source of truth for which pull request this is, whether the run came
+      # from an event or from somebody pressing the button.
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            NUM="${{ inputs.pr }}"
+            DATA=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/pulls/$NUM")
+            HEAD_REPO=$(printf '%s' "$DATA" | jq -r '.head.repo.full_name // empty')
+            SHA=$(printf '%s' "$DATA" | jq -r '.head.sha // empty')
+            STATE=$(printf '%s' "$DATA" | jq -r '.state // empty')
+            [ -n "$SHA" ] || { echo "::error::No pull request #$NUM in $REPO"; exit 1; }
+            [ "$STATE" = "open" ] || { echo "::error::Pull request #$NUM is $STATE"; exit 1; }
+            # The same fork rule the event path gets from its job condition.
+            [ "$HEAD_REPO" = "$REPO" ] || { echo "::error::#$NUM comes from a fork ($HEAD_REPO)"; exit 1; }
+          else
+            NUM="${{ github.event.pull_request.number }}"
+            SHA="${{ github.event.pull_request.head.sha }}"
+          fi
+          echo "number=$NUM" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Previewing pull request #$NUM at ${SHA:0:7}"
+
+      # The merge ref, not the branch tip: a preview should show what would
+      # actually land on main, which is also what the event path checks out by
+      # default. A pull request with conflicts has no merge ref and fails here,
+      # which is the right moment to find that out.
       - uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ steps.pr.outputs.number }}/merge
 
       - uses: actions/setup-node@v4
         with:
@@ -107,17 +156,16 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           PROD_BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           # Cloudflare derives a branch alias from this, so keep it recognisable
           # but never equal to the production branch -- that would publish a
           # pull request to the live domain.
-          BRANCH="pr-${{ github.event.pull_request.number }}"
+          BRANCH="pr-${{ steps.pr.outputs.number }}"
           if [ "$BRANCH" = "$PROD_BRANCH" ]; then
             echo "::error::Refusing to deploy: the preview branch name equals the production branch."
             exit 1
           fi
-          echo "Previewing $HEAD_REF as branch '$BRANCH' (production is '$PROD_BRANCH')"
+          echo "Publishing as branch '$BRANCH' (production is '$PROD_BRANCH')"
 
           npx --yes wrangler@4 pages deploy . \
             --project-name="${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
@@ -154,9 +202,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           URL: ${{ steps.deploy.outputs.url }}
-          PR: ${{ github.event.pull_request.number }}
+          PR: ${{ steps.pr.outputs.number }}
           REPO: ${{ github.repository }}
-          SHA: ${{ github.event.pull_request.head.sha }}
+          SHA: ${{ steps.pr.outputs.sha }}
         run: |
           MARKER='<!-- website-preview -->'
           BODY=$(printf '%s\n### Preview of this pull request\n\n**%s**\n\nBuilt from `%s` with the same checks, stamping and Functions as production.\nIt refuses indexing, and no domain points at it.\n\n| | |\n|---|---|\n| Units, comparison and filters | %s/units.html |\n| FAQ | %s/faq.html |\n| About | %s/about.html |\n\nUpdated on every push to this branch.\n' \
