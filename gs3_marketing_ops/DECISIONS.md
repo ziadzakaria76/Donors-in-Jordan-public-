@@ -709,6 +709,27 @@ enum": a `NOT IN` list built from `ContractClaim.entries` would silently delete
 any future claim the moment someone rolled the app back, and a migration must
 mean one fixed thing for ever.
 
+**A correction to how this was first reported.** The commit that made this
+change said `MIGRATION_4_5` had been "proved to fail before being relied on",
+in the tradition of D-19 and D-21. It had not. Unwiring the migration did make
+the suite fail — but only because Room could then find no path from version 4
+to 5 and refused to open the database. **The `DELETE` itself was never
+exercised:** no test built a version 4 database that actually contained the two
+rows, so replacing both claim names with one that does not exist left the whole
+suite green. That was confirmed by doing it.
+
+`DatabaseMigrationTest` now starts from a version 4 database holding all three
+claim rows and asserts the two unverified ones are gone and the confirmed one
+is untouched, and that test was checked the right way round: it fails against
+the no-op migration and passes against the real one.
+
+The same audit was run over the other three. `MIGRATION_1_2` and
+`MIGRATION_3_4` are genuinely guarded — gutting either fails the suite.
+`MIGRATION_2_3` is **not, and cannot be**: `MIGRATION_3_4` overwrites the same
+five columns straight afterwards, so its body has no observable effect on any
+end state. It stays because Room needs the 2 → 3 step to reach 5 from 2, and
+its comment now says not to write a test that only appears to cover it.
+
 ---
 
 ## 3. Milestone 0.5 — the discovery interview
