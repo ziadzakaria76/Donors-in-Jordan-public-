@@ -98,9 +98,20 @@ abstract class Gs3Database : RoomDatabase() {
          * annual figures for ever.
          *
          * D-28 moved 1,125 JOD back onto this track so it can still fund three
-         * units. The five values below are `Gs3Budget.expatriateMarkets`, and
-         * `SeedContentTest` asserts they match rather than leaving two lists to
-         * drift.
+         * units, and the five values below are that decision's figures.
+         *
+         * **They are frozen literals, and they no longer match
+         * `Gs3Budget.expatriateMarkets` — deliberately.** D-29 reverted the
+         * scaling, so the domain says 1,370 where this says 1,700. Do not
+         * "correct" one to the other: a migration describes what version 3 *was*,
+         * not what the app currently believes, and a shipped migration that
+         * changes meaning gives two databases different histories for the same
+         * version. `MIGRATION_3_4` is what brings these rows back into line with
+         * the domain.
+         *
+         * Nothing asserts these intermediate values, because there is nothing
+         * to assert them against. `DatabaseMigrationTest` asserts the *end* of
+         * the chain against `Gs3Budget`, which is the property that matters.
          *
          * **This overwrites the rows unconditionally, and that is only
          * acceptable today.** Nothing in the app can edit a market budget yet —
