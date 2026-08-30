@@ -272,12 +272,30 @@ for (const [file, html] of rendered) {
    Asserted here because it is a one-line change in a file nobody edits often,
    it produces no error anywhere, and the panel is the only thing that notices. */
 
+for (const [file, stepName] of [
+  ["deploy-website.yml", "Deploy to Cloudflare Pages"],
+  ["preview-website.yml", "Deploy the preview"],
+]) {
+  const workflow = resolve(ROOT, "../.github/workflows", file);
+  if (!existsSync(workflow)) continue;
+  const text = readFileSync(workflow, "utf8");
+  const step = new RegExp(`- name: ${stepName}\\n([\\s\\S]*?)\\n        run:`).exec(text);
+  check(step && /working-directory:\s*website/.test(step[1]),
+    `the "${stepName}" step in .github/workflows/${file} must set \`working-directory: website\`, or wrangler will not find website/functions and every /api/* route will 404`);
+}
+
+/* A preview that lands on the production branch is not a preview — it is an
+   unreviewed pull request published to the live domain. */
 {
-  const workflow = resolve(ROOT, "../.github/workflows/deploy-website.yml");
-  if (existsSync(workflow)) {
-    const step = /- name: Deploy to Cloudflare Pages\n([\s\S]*?)\n        run:/.exec(readFileSync(workflow, "utf8"));
-    check(step && /working-directory:\s*website/.test(step[1]),
-      "the deploy step in .github/workflows/deploy-website.yml must set `working-directory: website`, or wrangler will not find website/functions and every /api/* route will 404");
+  const preview = resolve(ROOT, "../.github/workflows/preview-website.yml");
+  if (existsSync(preview)) {
+    const text = readFileSync(preview, "utf8");
+    check(/BRANCH="pr-/.test(text) && /Refusing to deploy/.test(text),
+      "preview-website.yml must deploy under a `pr-` branch and refuse to run if that equals the production branch — otherwise a pull request publishes to the live site");
+    check(/Disallow: \/\\n/.test(text) && /X-Robots-Tag: noindex, nofollow/.test(text),
+      "preview-website.yml must make the preview refuse indexing — it is a full copy of a site with live prices on a public URL");
+    check(/head\.repo\.full_name == github\.repository/.test(text),
+      "preview-website.yml must not run for pull requests from forks — it holds the Cloudflare deploy token");
   }
 }
 

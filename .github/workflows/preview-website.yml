@@ -1,0 +1,260 @@
+name: preview website
+
+# Publish every pull request that touches the site to its own URL, so a price
+# change can be looked at before it is public.
+#
+# Until now the only way to see a change was to merge it. CI checked a great
+# deal -- the content gates, the scaffolder, the image manifest, the API smoke
+# test -- but "does this look right" is not a thing a checker answers, and this
+# site carries live prices in front of buyers.
+#
+# A Pages preview is the same build the production deploy makes, published to a
+# separate URL that no domain points at. Same Worker, same Functions, same
+# stamped asset URLs.
+#
+# TWO THINGS ARE DELIBERATELY DIFFERENT ON A PREVIEW, both below: it refuses to
+# be indexed, and it never runs for a pull request from a fork.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "website/**"
+      - ".github/workflows/preview-website.yml"
+  # Every workflow in this repository can be started by hand, and this one is no
+  # exception. GitHub has twice stopped turning pushes here into check runs --
+  # not queued, not failed, never created -- and a workflow that only listens
+  # for events is the one thing with no way to be run when events are the fault.
+  # See test_browser.py, which asserts it.
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to preview"
+        required: true
+        type: string
+
+# One preview per pull request. A new push supersedes the one in flight --
+# unlike production, where a cancelled deploy could leave the live site behind.
+concurrency:
+  group: preview-website-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    # Never for a fork. A pull request from a fork cannot be given the
+    # Cloudflare token or the repository's write scope, and a workflow that
+    # tried would either fail confusingly or hand a stranger a deploy.
+    # A hand-started run carries no pull_request payload, so it is let through
+    # here and checked against the API in the first step instead.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # One source of truth for which pull request this is, whether the run came
+      # from an event or from somebody pressing the button.
+      - name: Resolve the pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            NUM="${{ inputs.pr }}"
+            DATA=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/pulls/$NUM")
+            HEAD_REPO=$(printf '%s' "$DATA" | jq -r '.head.repo.full_name // empty')
+            SHA=$(printf '%s' "$DATA" | jq -r '.head.sha // empty')
+            STATE=$(printf '%s' "$DATA" | jq -r '.state // empty')
+            [ -n "$SHA" ] || { echo "::error::No pull request #$NUM in $REPO"; exit 1; }
+            [ "$STATE" = "open" ] || { echo "::error::Pull request #$NUM is $STATE"; exit 1; }
+            # The same fork rule the event path gets from its job condition.
+            [ "$HEAD_REPO" = "$REPO" ] || { echo "::error::#$NUM comes from a fork ($HEAD_REPO)"; exit 1; }
+          else
+            NUM="${{ github.event.pull_request.number }}"
+            SHA="${{ github.event.pull_request.head.sha }}"
+          fi
+          echo "number=$NUM" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Previewing pull request #$NUM at ${SHA:0:7}"
+
+      # The merge ref, not the branch tip: a preview should show what would
+      # actually land on main, which is also what the event path checks out by
+      # default. A pull request with conflicts has no merge ref and fails here,
+      # which is the right moment to find that out.
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ steps.pr.outputs.number }}/merge
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Check the deploy credentials are present
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT }}
+        run: |
+          missing=""
+          [ -n "$TOKEN" ]   || missing="$missing secret CLOUDFLARE_API_TOKEN;"
+          [ -n "$ACCOUNT" ] || missing="$missing secret CLOUDFLARE_ACCOUNT_ID;"
+          [ -n "$PROJECT" ] || missing="$missing variable CLOUDFLARE_PAGES_PROJECT;"
+          if [ -n "$missing" ]; then
+            echo "::error::Cannot build a preview.$missing They are the same values the production deploy uses."
+            exit 1
+          fi
+
+      # The same gate production runs. A preview of content the checker rejects
+      # is a preview of something that can never ship, which wastes the look.
+      - name: Check the site content
+        run: node tools/check-content.mjs
+        working-directory: website
+
+      - name: Version the asset URLs
+        run: node tools/stamp-assets.mjs
+        working-directory: website
+
+      # A preview is a complete copy of a real estate site, with real prices and
+      # a real phone number, on a public URL. Left alone it is duplicate content
+      # competing with the site it previews, and a buyer who finds it through a
+      # search is reading a build that was never approved.
+      #
+      # The checkout is disposable, so this rewrites rather than adds a mode:
+      # robots.txt refuses everything and a header says the same to crawlers
+      # that ignore it.
+      - name: Refuse indexing
+        working-directory: website
+        run: |
+          printf 'User-agent: *\nDisallow: /\n' > robots.txt
+          # Into the existing /* block, not a second one: a duplicate path rule
+          # is ambiguous across hosts, and "probably cumulative" is not what you
+          # want standing between a preview and Google.
+          sed -i 's|^  X-Content-Type-Options: nosniff|  X-Robots-Tag: noindex, nofollow\n  X-Content-Type-Options: nosniff|' _headers
+          grep -q 'X-Robots-Tag' _headers || { echo "::error::could not add X-Robots-Tag to _headers"; exit 1; }
+          echo "robots.txt refuses all; _headers carries X-Robots-Tag:"
+          tail -8 _headers
+
+      # --branch is what makes this a preview rather than production. Anything
+      # other than the project's production branch lands on its own URL and
+      # leaves the custom domain alone.
+      #
+      # It runs from website/ for the same reason production does: wrangler
+      # finds Functions at process.cwd()/functions, so from the repository root
+      # the admin API would silently not exist.
+      - name: Deploy the preview
+        id: deploy
+        working-directory: website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROD_BRANCH: ${{ vars.CLOUDFLARE_PAGES_PRODUCTION_BRANCH || 'main' }}
+        run: |
+          # Cloudflare derives a branch alias from this, so keep it recognisable
+          # but never equal to the production branch -- that would publish a
+          # pull request to the live domain.
+          BRANCH="pr-${{ steps.pr.outputs.number }}"
+          if [ "$BRANCH" = "$PROD_BRANCH" ]; then
+            echo "::error::Refusing to deploy: the preview branch name equals the production branch."
+            exit 1
+          fi
+          echo "Publishing as branch '$BRANCH' (production is '$PROD_BRANCH')"
+
+          npx --yes wrangler@4 pages deploy . \
+            --project-name="${{ vars.CLOUDFLARE_PAGES_PROJECT }}" \
+            --branch="$BRANCH" \
+            --commit-dirty=true | tee ../preview.log
+
+          # Take the URL from wrangler rather than constructing one: Cloudflare
+          # truncates and rewrites branch aliases, so a guessed URL is a 404
+          # about half the time.
+          URL=$(grep -oE 'https://[a-z0-9-]+\.[a-z0-9-]+\.pages\.dev' ../preview.log | tail -1)
+          [ -n "$URL" ] || { echo "::error::wrangler printed no preview URL"; exit 1; }
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      # The preview is only useful if it answers like the real thing. A 404 here
+      # means the Functions did not compile into this build.
+      - name: Check the preview's API
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          sleep 15
+          code=$(curl -sS -o /tmp/probe.txt -w '%{http_code}' --max-time 30 "$URL/api/session" || echo 000)
+          echo "GET $URL/api/session -> $code"
+          head -c 300 /tmp/probe.txt || true; printf '\n'
+          case "$code" in
+            401|503) echo "Functions are live on the preview." ;;
+            302|303) echo "Access is in front of the preview. Functions are live." ;;
+            404) echo "::error::The preview has no API — the Functions did not ship."; exit 1 ;;
+            *) echo "::warning::Unexpected $code from the preview API." ;;
+          esac
+
+      # Check the preview actually refuses indexing, rather than trusting that
+      # the rewrite above worked. The consequence of getting this wrong is a
+      # second copy of a real estate site competing with the real one in search
+      # results, which is expensive to undo and easy not to notice.
+      - name: Check the preview refuses indexing
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -uo pipefail
+          ROBOTS=$(curl -sS --max-time 30 "$URL/robots.txt" || true)
+          printf 'robots.txt:\n%s\n' "$ROBOTS"
+          printf '%s' "$ROBOTS" | grep -q '^Disallow: /$' \
+            || { echo "::error::the preview's robots.txt does not disallow crawling"; exit 1; }
+
+          TAG=$(curl -sSI --max-time 30 "$URL/units.html" | tr -d '\r' | grep -i '^x-robots-tag:' || true)
+          echo "header: ${TAG:-(none)}"
+          printf '%s' "$TAG" | grep -qi 'noindex' \
+            || { echo "::error::the preview does not send X-Robots-Tag: noindex"; exit 1; }
+          echo "The preview refuses indexing, both ways."
+
+      # One comment per pull request, edited in place. A new one on every push
+      # buries the review under a stack of near-identical links.
+      - name: Post the preview link
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          URL: ${{ steps.deploy.outputs.url }}
+          PR: ${{ steps.pr.outputs.number }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ steps.pr.outputs.sha }}
+        run: |
+          MARKER='<!-- website-preview -->'
+          BODY=$(printf '%s\n### Preview of this pull request\n\n**%s**\n\nBuilt from `%s` with the same checks, stamping and Functions as production.\nIt refuses indexing, and no domain points at it.\n\n| | |\n|---|---|\n| Units, comparison and filters | %s/units.html |\n| FAQ | %s/faq.html |\n| About | %s/about.html |\n\nUpdated on every push to this branch.\n' \
+            "$MARKER" "$URL" "${SHA:0:7}" "$URL" "$URL" "$URL")
+
+          API="https://api.github.com/repos/$REPO"
+          EXISTING=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+            "$API/issues/$PR/comments?per_page=100" \
+            | jq -r --arg m "$MARKER" '[.[] | select(.body | contains($m))] | .[0].id // empty')
+
+          if [ -n "$EXISTING" ]; then
+            curl -sS -X PATCH -H "Authorization: Bearer $GH_TOKEN" \
+              "$API/issues/comments/$EXISTING" \
+              -d "$(jq -n --arg b "$BODY" '{body:$b}')" > /dev/null
+            echo "Updated comment $EXISTING"
+          else
+            curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" \
+              "$API/issues/$PR/comments" \
+              -d "$(jq -n --arg b "$BODY" '{body:$b}')" > /dev/null
+            echo "Posted a new comment"
+          fi
+
+      - name: Summarise
+        if: always()
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          {
+            printf '### Preview\n\n'
+            if [ -n "$URL" ]; then printf '%s\n\n' "$URL"; else printf 'No preview was published.\n\n'; fi
+            printf 'Not indexed, and no domain points at it. Production is untouched:\n'
+            printf 'this deployment used a `pr-` branch, so Cloudflare treats it as a preview.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
