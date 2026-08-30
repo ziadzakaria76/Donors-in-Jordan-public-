@@ -59,12 +59,44 @@ class TedPortal(ApiPortal):
     def raw_payload(self) -> Any:
         return self.fetcher.post(ENDPOINT, json=self._body()).text
 
+    def _rejection(self, response, page: int) -> str:
+        """Report what TED said, not what we assume it meant.
+
+        This used to append "(limit must be <= 100)" to EVERY non-OK response
+        -- a 400 from the query, a 401, a 500, a rate limit -- and PAGE_LIMIT
+        has been 100 all along, so the explanation was not merely unhelpful, it
+        was false. A live run reported
+
+            EU TED: UNAVAILABLE -- RuntimeError: TED HTTP 400
+            (limit must be <= 100)
+
+        which sends the reader to a setting that is already correct, and costs
+        a whole portal until somebody disbelieves the message. The same shape
+        of confident-but-wrong diagnosis is on record in this codebase twice
+        over: a 395-byte response filed as proof an endpoint was dead when the
+        request body was wrong, and an extraction layer reporting notices it
+        had never looked at.
+
+        So: the status, the query that produced it, and TED's own response
+        body. The body is where a v3 rejection names the offending field, and
+        it was being discarded. Truncated because an error page can be a whole
+        HTML document, and redacted because a URL-shaped error can carry an
+        API key -- there is none on this endpoint today, and relying on that
+        staying true is how one gets into a log.
+        """
+        from ..fetch import redact
+        body = (response.text or "").strip()
+        detail = redact(body[:400]) if body else "(empty response body)"
+        return (f"TED HTTP {response.status} on page {page}. "
+                f"Query sent: {self._query()!r}, limit={PAGE_LIMIT}. "
+                f"TED said: {detail}")
+
     def fetch_tenders(self) -> list[dict]:
         records: list[dict] = []
         for page in range(1, int(self.cfg.get("max_pages", 5)) + 1):
             response = self.fetcher.post(ENDPOINT, json=self._body(page))
             if not response.ok:
-                raise RuntimeError(f"TED HTTP {response.status} (limit must be <= {PAGE_LIMIT})")
+                raise RuntimeError(self._rejection(response, page))
             import json as _json
             payload = _json.loads(response.text)
             notices = payload.get("notices") or []

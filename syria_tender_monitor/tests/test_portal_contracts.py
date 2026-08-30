@@ -306,3 +306,44 @@ def test_every_kept_record_has_the_fields_the_report_needs(name, fixture_name, e
         assert tender.syria_link_type in ("inside_syria", "cross_border_hub",
                                           "regional_crisis", "refugee_hosting_only")
         assert tender.language in ("en", "ar")
+
+
+def test_ted_reports_what_the_server_said_not_a_guess(profile, gate):
+    """A rejection must carry TED's own explanation.
+
+    This used to append "(limit must be <= 100)" to every non-OK response,
+    while PAGE_LIMIT had been 100 all along -- so the message was false, and a
+    live run lost the whole portal to it: readers are sent to a setting that is
+    already correct.
+
+    The response body is where a v3 rejection names the offending field, and it
+    was being discarded.
+    """
+    from syria_monitor.portals.ted import TedPortal, PAGE_LIMIT
+
+    class Stub(TedPortal):
+        def __init__(self):
+            self.profile, self.cfg = profile, {}
+
+    class Response:
+        def __init__(self, status, text):
+            self.status, self.text, self.ok = status, text, False
+
+    message = Stub()._rejection(
+        Response(400, '{"message":"Invalid field name: buyer-country"}'), 1)
+
+    assert "Invalid field name" in message, "TED's own words must survive"
+    assert "400" in message
+    assert "limit must be" not in message, "no hardcoded cause"
+    assert PAGE_LIMIT == 100
+
+    # An absent body must read as absent, not as a diagnosis.
+    empty = Stub()._rejection(Response(500, ""), 2)
+    assert "empty response body" in empty
+
+    # A secret-shaped body is redacted before it reaches a log.
+    leaky = Stub()._rejection(Response(401, "search?apiKey=SECRET123 rejected"), 1)
+    assert "SECRET123" not in leaky and "<redacted>" in leaky
+
+    # An error page can be a whole HTML document.
+    assert len(Stub()._rejection(Response(400, "<html>" + "x" * 5000), 1)) < 600
