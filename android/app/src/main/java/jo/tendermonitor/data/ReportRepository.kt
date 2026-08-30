@@ -141,7 +141,15 @@ class ReportRepository(
             )
         }
 
+        // Jordan's artifact is "jordan-tenders-N" and Syria's is
+        // "syria-tender-report-N", so a prefix match on one country silently
+        // fell through to first() for the other. That worked only because these
+        // runs upload a single artifact; a run that uploaded two would have
+        // picked whichever GitHub listed first. Preferring anything that names
+        // a tender keeps the choice deliberate, and first() stays as the last
+        // resort rather than the usual path.
         val artifact = artifacts.firstOrNull { it.name.startsWith("jordan-tenders") }
+            ?: artifacts.firstOrNull { it.name.contains("tender", ignoreCase = true) }
             ?: artifacts.first()
 
         if (artifact.expired) {

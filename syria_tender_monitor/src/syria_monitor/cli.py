@@ -24,7 +24,8 @@ from .fetch import Fetcher, TransportError
 from .models import LINK_TYPES
 from .pipeline import run as run_pipeline, scope_summary
 from .portals import HTML_PORTALS, REGISTRY
-from .report import write_docx, write_json, write_summary, write_xlsx
+from .report import (write_app_json, write_docx, write_json, write_summary,
+                     write_xlsx)
 from .report.common import LINK_LABELS, fmt_date, fmt_value
 
 FIXTURE_DIR = Path(__file__).resolve().parents[2] / "tests" / "fixtures"
@@ -344,6 +345,22 @@ def main(argv=None) -> int:
         written.append(write_xlsx(result, out_dir / f"syria-tenders-{stamp}.xlsx"))
     if "json" in formats:
         written.append(write_json(result, out_dir / f"syria-tenders-{stamp}.json", cfg.profile))
+
+    # ALWAYS WRITTEN, and not one of the optional formats. This is the only way
+    # the Android app can read a run: GitHub's REST API does not expose a job's
+    # step summary, so the markdown on the run page is unreachable from a
+    # client, and the app downloads this from the artifact instead. Making it
+    # depend on an output.formats entry would mean a config edit could take the
+    # phone offline with nothing saying why.
+    #
+    # A SECOND FILE RATHER THAN A CHANGE TO THE FIRST. json_writer's document is
+    # this project's own dump -- everything the run knew, for diagnosing it --
+    # and the app's contract is a different shape with a schema the app
+    # enforces. Reshaping ours to match would lose the diagnostic detail; the
+    # two answer different questions and there is no cost to writing both.
+    written.append(write_app_json(
+        result, out_dir / f"syria-tenders-{stamp}-app.json", cfg.profile,
+        new_only=bool(cfg.get("state.new_only", False))))
 
     # Always written, whatever the formats: it is what carries portal health to
     # somewhere a person sees without opening a document.

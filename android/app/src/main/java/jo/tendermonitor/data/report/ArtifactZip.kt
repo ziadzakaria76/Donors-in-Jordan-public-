@@ -100,9 +100,23 @@ object ArtifactZip {
         return out.toByteArray()
     }
 
-    /** The report file inside a run's artifact, by name. */
+    /**
+     * The report file inside a run's artifact, by name.
+     *
+     * TWO NAMES, BECAUSE THERE ARE TWO MONITORS. Jordan's run writes one JSON
+     * and it is this contract. Syria's writes two: its own diagnostic dump,
+     * which has no `schema` and which this app would refuse to render, and a
+     * second file in this contract whose name ends "-app.json". Matching only
+     * ".json" would pick whichever the zip listed first and show the user a
+     * screen saying the app is out of date.
+     *
+     * The Jordan marker stays first: a test in the Python suite reads the first
+     * `name.contains(...)` out of this file to check the two sides still agree
+     * on it.
+     */
     fun isReportJson(name: String): Boolean =
-        name.endsWith(".json", ignoreCase = true) && name.contains("jordan_tenders")
+        name.endsWith(".json", ignoreCase = true) &&
+            (name.contains("jordan_tenders") || name.endsWith("-app.json", ignoreCase = true))
 
     fun isDocx(name: String): Boolean = name.endsWith(".docx", ignoreCase = true)
 
