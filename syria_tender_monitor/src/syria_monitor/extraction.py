@@ -333,13 +333,50 @@ def _signature(el) -> str:
     return el.name + ">" + ",".join(sorted({c.name for c in el.find_all(recursive=False)}))
 
 
+def _is_navigable(href: Optional[str]) -> bool:
+    """Does this href go anywhere a reader could follow?
+
+    "#" and javascript: are how a page wires a button that is not a link. A
+    report that renders one as the notice's URL sends the reader nowhere and
+    says nothing about it, which is worse than admitting there is no link.
+    """
+    if not href:
+        return False
+    target = href.strip().lower()
+    return bool(target) and not target.startswith(("#", "javascript:"))
+
+
 def _rows_from_group(group: list, base_url: str) -> list[Row]:
+    """Turn a group of sibling nodes into rows.
+
+    THE FIRST ANCHOR IS NOT THE TITLE. It was taken as both title and URL, and
+    on UNGM that is an icon-only "save this notice" button rendered before the
+    notice link -- so every row came back with an empty title and href="#".
+    Empty titles are then dropped by `_finish`, which wiped the entire group and
+    let a group of table *cells* win instead: fifteen notices became four rows
+    whose titles were "30-Sep-2026", "29-Jul-2026" and "UNDP".
+
+    That is the worst shape this failure could take. It is not an empty result
+    anyone would question -- it is a plausible-looking listing of the wrong
+    thing, and the row count is the only hint.
+
+    So: the title comes from the first anchor that actually has text, and the
+    URL from the first anchor that actually goes somewhere. They are usually
+    the same anchor and are looked up separately anyway, because a row whose
+    link is an icon and whose title is plain text is a real arrangement.
+    """
     rows = []
     for node in group:
-        link = node.find("a")
-        href = link.get("href") if link else None
+        anchors = node.find_all("a")
+        titled = next((a for a in anchors if a.get_text(" ", strip=True)), None)
+        linked = next((a for a in anchors if _is_navigable(a.get("href"))), None)
+
         text = node.get_text(" ", strip=True)
-        title = link.get_text(" ", strip=True) if link else text[:120]
+        # Fall back to the node's own text, as before, when no anchor carries
+        # any: a listing whose rows are not links is still a listing.
+        title = titled.get_text(" ", strip=True) if titled else text[:120]
+        href = linked.get("href") if linked else None
+
         rows.append(Row(title=title, url=urljoin(base_url, href) if href else None,
                         text=text[:2000], raw=str(node)[:2000]))
     return rows
