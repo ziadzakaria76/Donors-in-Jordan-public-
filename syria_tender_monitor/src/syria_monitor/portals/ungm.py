@@ -31,11 +31,20 @@ r"""
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date
 
 from ..dates import CLOSING_LABELS, find_labelled_date
 from .base import HtmlPortal
+
+log = logging.getLogger(__name__)
+
+# Pages of THIS COUNTRY's results, not pages of the world, so this is headroom
+# rather than a limit -- but it is still reported when reached, because a cap
+# that is hit silently makes "read everything" and "read the first N" produce
+# the same output with no way to tell them apart.
+MAX_PAGES = 40
 
 # What UNGM prints in the country cell when a notice covers several countries.
 # It is a label, not a country -- see row_to_record().
@@ -141,12 +150,90 @@ class UngmPortal(HtmlPortal):
 
     def fetch_page(self, label: str, url: str) -> tuple[str, int]:
         if label == "search":
-            response = self.fetcher.post(
-                url, json=self.search_body(),
-                headers={"X-Requested-With": "XMLHttpRequest", "Referer": NOTICE_PAGE})
-            return response.text, response.status
+            return self._fetch_search(url)
         response = self.fetcher.get(url)     # the dropdown page, for --capture
         return response.text, response.status
+
+    def _post_search(self, url: str, page: int):
+        return self.fetcher.post(
+            url, json=self.search_body(page),
+            headers={"X-Requested-With": "XMLHttpRequest", "Referer": NOTICE_PAGE})
+
+    def _fetch_search(self, url: str) -> tuple[str, int]:
+        """Page the search endpoint; return every page concatenated.
+
+        ONLY PAGE ONE WAS EVER READ. The capture of 2026-08-30 returned exactly
+        15 rows against a PageSize of 15 -- a result the same size as the page
+        is the standard signal that there is another page, and there was no
+        loop to follow it. Whatever this country has beyond the first fifteen
+        open notices has never reached a report, and nothing said so: a short
+        read and a quiet week produce the same output.
+
+        THE PAGE SIZE IS MEASURED, NOT ASSUMED. Asking for 15 and receiving 10
+        because the server caps it would make every page look short, and "short
+        page" is this loop's signal that the listing has ended -- so an
+        unhonoured PageSize would stop the read after one page and call it
+        complete. Whatever page one returns IS the stride; it is the only
+        number here that cannot be wrong.
+
+        Rows are counted with the extraction cascade rather than a row selector,
+        so the stop condition does not rest on a class name that UNGM is free to
+        rename. A rename would then cost a wrong row count in one place instead
+        of silently ending the read at page one.
+
+        A REPEATED PAGE ENDS THE READ. An endpoint that ignores PageIndex and
+        serves page one forever satisfies "the page was full" every time, so the
+        only thing between that and forty identical fetches is the cap -- and
+        the listing would then be concatenated forty times over, turning one
+        notice into forty rows. The full-page condition cannot tell that apart
+        from a genuine long listing; comparing the fetched text can.
+        """
+        fragments: list[str] = []
+        first_text, status = "", 200
+        stride = 0
+        previous = None
+
+        for index in range(MAX_PAGES):
+            response = self._post_search(url, index)
+            status = response.status
+            if index == 0:
+                first_text = response.text
+            if not response.ok:
+                # Hand the failing response back whole: page_result() and the
+                # diagnostics downstream are what turn a bad status into a
+                # readable reason, and they need the body to do it.
+                return response.text, status
+
+            if response.text == previous:
+                log.warning(
+                    "ungm: page %d was byte-identical to page %d -- the endpoint "
+                    "is not honouring PageIndex; stopping rather than counting "
+                    "the same notices twice", index, index - 1)
+                break
+            previous = response.text
+
+            found = len(self.extract_page(response.text, url, status).rows)
+            if not found:
+                break
+            fragments.append(response.text)
+            if stride == 0:
+                stride = found
+            if found < stride:
+                break
+        else:
+            log.warning(
+                "ungm: read %d notices across the %d-page cap and the last page "
+                "was still full -- there are probably more",
+                stride * MAX_PAGES, MAX_PAGES)
+
+        if not fragments:
+            # Nothing parsed. Return page one unchanged so the cascade can say
+            # why, rather than an empty string that discards the evidence.
+            return first_text, status
+
+        # One document, so the cascade sees every row at once and scores the
+        # whole listing rather than each page separately.
+        return "<html><body>" + "".join(fragments) + "</body></html>", status
 
     def fetch_tenders(self) -> list[dict]:
         # Only the search endpoint is fetched for a run; the dropdown page in
