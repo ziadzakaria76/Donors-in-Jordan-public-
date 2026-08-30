@@ -97,8 +97,9 @@ abstract class Gs3Database : RoomDatabase() {
          * exists is left alone and the five markets would keep their old
          * annual figures for ever.
          *
-         * D-28 moved 1,125 JOD back onto this track so it can still fund three
-         * units, and the five values below are that decision's figures.
+         * A decision on 2026-08-29 moved 1,125 JOD back onto this track so it
+         * could still fund three units, and the five values below are that
+         * decision's figures. It was reverted the next day.
          *
          * **They are frozen literals, and they no longer match
          * `Gs3Budget.expatriateMarkets` — deliberately.** The 2026-08-30 revert undid the
@@ -141,8 +142,9 @@ abstract class Gs3Database : RoomDatabase() {
          * Version 3 → 4: the expatriate market budgets go back to the brief's
          * own figures.
          *
-         * D-28 scaled them up so the external track could fund three units at
-         * an assumed 45 JOD per raw lead. The owner removed that assumption on
+         * They were scaled up on 2026-08-29 so the external track could fund
+         * three units at an assumed 45 JOD per raw lead. The owner removed that
+         * assumption on
          * 2026-08-30, and the scaling went with it — a figure derived
          * from an assumption does not outlive it.
          *

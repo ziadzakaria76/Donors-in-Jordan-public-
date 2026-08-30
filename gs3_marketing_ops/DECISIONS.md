@@ -594,7 +594,7 @@ Gone, in full:
 | `Track.NONJO` | the third track |
 | `CampaignSpec.canActivate` | the gate seen from the campaign side. With no gated track it had nothing left to refuse |
 | `eligibility_gate` table, `EligibilityGateEntity`, the three gate DAO methods | the persisted answer |
-| Four `market_budgets` rows | IRQ, GULF, PSE, TEST — see D-24 |
+| Four `market_budgets` rows | IRQ, GULF, PSE, TEST |
 | Two `NationalityCategory` values | `ARAB_NON_JORDANIAN`, `NON_ARAB` — removed, not remapped; see below |
 | Eight `strings.xml` keys, in **both** locales | every `gate_*`, plus `track_nonjo` and `disclaimer_non_jordanian`. 106 keys down to 98, both files in step |
 
@@ -662,91 +662,6 @@ through `Gs3Database.build`. **Both halves were proved to fail before being
 relied on:** removing the `DELETE` fails it, removing the `DROP TABLE` fails it,
 and restoring each makes it pass. `fallbackToDestructiveMigration` is still
 absent and the test that proves it is untouched.
-
-### D-28 — 1,125 JOD of the freed 2,520 stays on the external track (2026-08-29)
-
-**Reverted on 2026-08-30, and left here as the record of it.** The owner
-removed the 45 JOD per raw lead, and this decision was built entirely on it:
-the 5,805 figure, the 129 raw leads and the claim that 1,125 was "the least
-that had to stay" are all that assumption doing arithmetic. A figure derived
-from an assumption does not outlive it, so the sizing went back — external to
-4,680, local to 13,320, the funnel to 160 raw leads, which is where they stand
-today. Nothing below is current; it is kept because a reverted decision that
-leaves no trace invites the same reasoning a second time.
-
-**The owner's answer to D-24, D-26 and D-27, which turned out to be one
-question rather than three.** D-24 asked where the freed money goes, D-26 asked
-what to do about a cost-per-lead target that no longer matched its budget, and
-D-27 flagged a funnel model sized for a track that had just lost a third of its
-money. All three resolve the moment you answer: *does the external track still
-have to deliver three units?* The owner's answer is yes.
-
-The arithmetic, at the plan's own 45 JOD per raw external lead:
-
-| External budget | Raw leads | Qualified | Contracts | Share of 11 |
-| --- | --- | --- | --- | --- |
-| 7,200 — as originally designed | 160 | 48 | 3 | 27.3% ✅ |
-| **5,805 — this decision** | **129** | **39** | **3** | **27.3% ✅** |
-| 4,680 — expatriate rows alone | 104 | 31 | 2 | 18.2% ❌ |
-
-So the shortfall was never the whole 2,520. **1,125 JOD** is the least that had
-to stay for the three-unit target and the ≥27% floor to remain fundable, and
-that is what stays. The other 1,395 falls to the local track, which goes from
-10,800 to **12,195**. `totalPaidMedia` is untouched at the approved 18,000.
-
-**Why not simply leave it at 4,680.** `FunnelTargets.stateOf(2, 3)` is a ratio
-of 0.67, below the 0.70 floor — so the dashboard would have shown the external
-track **AT_RISK from its first month and never cleared**, while the track was
-performing exactly to the budget it had been given. That is D-3's failure
-repeated precisely: an alarm nobody can satisfy, which teaches a team to ignore
-alarms. The alternative to funding the target was lowering it, and lowering it
-is a bigger decision than moving 1,125 JOD.
-
-**The five rows are rescaled, not redistributed.** Each market's annual figure
-is its old share of the track applied to 5,805 and rounded to the nearest 5
-JOD. No market's share moves by more than **0.03 of a percentage point**, and a
-test asserts that rather than the individual figures — the split follows the
-geographic distribution of remittances, and a rounding that quietly moved money
-from Kuwait to the Emirates would be a strategy change wearing the costume of
-arithmetic.
-
-| | UAE | USA | KSA | QAT | KWT | Total |
-| --- | --- | --- | --- | --- | --- | --- |
-| was | 1,370 | 1,250 | 1,120 | 600 | 340 | 4,680 |
-| now | 1,700 | 1,550 | 1,390 | 745 | 420 | **5,805** |
-
-**`FunnelModel.EXTERNAL.rawLeads` moves from 160 to 129, and nothing else in it
-moves.** The qualification, viewing and contract rates are the strategy's own
-and are not re-derived for an expatriate-only audience — that would be
-invention. Only the lead volume follows the budget, by division. A test pins
-129 as a floor rather than a preference: at 128 raw leads the third contract
-disappears, because three HALF_UP roundings sit between leads and contracts and
-it does not fade out gradually.
-
-**D-26 needed no decision in the end.** 5,805 over 39 qualified leads is
-**148.846**, within 1% of the 150 that was already there. Worth not leaning on:
-the two agree because both descend from the same 45-JOD assumption, not because
-anything reconciles them.
-
-**The one number here that is a floor, not an estimate.** 45 JOD per raw lead
-was *blended* across expatriate and non-Jordanian markets. A lead from the
-United States or the Emirates plausibly costs more than one from Iraq or
-Palestine, so removing the cheaper half may push the true expatriate figure
-above 45 — and if it is really 55, then 129 leads cost 7,095 and very nearly
-the whole 2,520 has to come back. Nothing here assumes that away.
-`ChannelSpend.costPerRawLead` already measures it, and the first month of real
-spend settles it.
-
-**Room 2 → 3, for a change that alters no schema.** Same tables, same columns;
-Room would not have asked for a version bump. It exists because the *data* is
-wrong on any database already created, for exactly the reason `MIGRATION_1_2`
-had to delete rather than trust the seed: every insert is `IGNORE` (D-19), so
-the five markets would keep their old annual figures for ever. It overwrites
-unconditionally, which is **only acceptable while no screen can edit a market
-budget** — that arrives at Milestone 5, and the next migration of this kind
-must preserve edited rows instead. Both migration tests were proved to fail
-with `MIGRATION_2_3` unwired and to pass with it restored.
-
 
 ### D-30 — The two unverified B-2 contract claims are removed, and the guard with them (2026-08-30)
 
@@ -855,5 +770,5 @@ figures nobody has yet measured, and D-30 names the one that is now unguarded.
 
 | Ref | Question | Answer |
 | --- | --- | --- |
-| D-3 | Is 45 JOD the target per **raw** lead or per **qualified** lead? | **Answered 2026-08-16.** Neither — the owner removed the 45 JOD *target*. Finished on 2026-08-30, when the owner removed the 45 JOD *assumption* too: see D-29. One target remains, 150 JOD per qualified lead with a 200 stop threshold, both editable in Settings |
+| D-3 | Is 45 JOD the target per **raw** lead or per **qualified** lead? | **Answered 2026-08-16.** Neither — the owner removed the 45 JOD *target*. Finished on 2026-08-30, when the owner removed the 45 JOD *assumption* too. One target remains, 150 JOD per qualified lead with a 200 stop threshold, both editable in Settings |
 | B-1 | Has the Department of Lands and Survey statement been obtained? | **Answered 2026-08-29: no**, and closed as a v1 blocker on the same day by removing the track it gated rather than shipping a permanently locked module. See D-23. It becomes a precondition again only if the track is ever revived |

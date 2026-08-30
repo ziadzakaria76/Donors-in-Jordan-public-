@@ -38,7 +38,7 @@ block that stopped the first two attempts was lifted on 2026-08-15 —
 than shipped behind a gate nobody could open — `DECISIONS.md` → D-23.
 
 **And no assumed cost per lead.** The owner removed the 45 JOD per raw lead on
-2026-08-30, so nothing converts a budget into a lead count — D-29. Cost per raw
+2026-08-30, so nothing converts a budget into a lead count. Cost per raw
 lead is still measured; it is no longer assumed.
 
 ## Layout
@@ -83,5 +83,5 @@ left the stop-rule alarm on permanently.
 
 The owner answered it twice. On 2026-08-16 the 45 JOD **target** was removed,
 leaving one target of 150 JOD per qualified lead. On 2026-08-30 the 45 JOD
-**assumption** was removed too (D-29), so no budget in this app is converted
+**assumption** was removed too, so no budget in this app is converted
 into a lead count or derived from one.

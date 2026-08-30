@@ -45,9 +45,10 @@ data class MarketAllocation(
  * existing arithmetic below, which takes local as whatever the external track
  * does not.
  *
- * The five rows are the brief's original figures, untouched. D-28 briefly
- * scaled them up to 5,805 so the track could fund three units at an assumed
- * 45 JOD per raw lead; the owner removed that assumption on 2026-08-30 and the
+ * The five rows are the brief's original figures, untouched. They were briefly
+ * scaled up to 5,805 on 2026-08-29 so the track could fund three units at an
+ * assumed 45 JOD per raw lead; the owner removed that assumption on 2026-08-30
+ * and the
  * scaling with it. **Nothing here is derived from a cost per lead any more.**
  * These are approved figures, and how many leads they buy is a question
  * the app deliberately does not answer.
