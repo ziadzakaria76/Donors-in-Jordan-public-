@@ -26,8 +26,8 @@ that cannot be activated, a persistent Dashboard banner — are all gone, becaus
 the module they guarded is gone. **This is not the gate being opened.** Nothing
 in v1 markets to, processes, or promises anything to a non-Jordanian buyer, and
 there is no longer a locked door to unlock: see **D-23** below for what was
-deleted and **D-24**, **D-25** and **D-26** for the three consequences that had
-to be decided along the way.
+deleted and **D-24** and **D-26** for the consequences that had to be decided
+along the way.
 
 B-1 therefore stops being a blocker for v1 and becomes a precondition for ever
 putting the track back. Whoever revives it needs the Department of Lands and
@@ -593,7 +593,7 @@ Gone, in full:
 | `CampaignSpec.canActivate` | the gate seen from the campaign side. With no gated track it had nothing left to refuse |
 | `eligibility_gate` table, `EligibilityGateEntity`, the three gate DAO methods | the persisted answer |
 | Four `market_budgets` rows | IRQ, GULF, PSE, TEST — see D-24 |
-| Two `NationalityCategory` values | `ARAB_NON_JORDANIAN`, `NON_ARAB` — see D-25 |
+| Two `NationalityCategory` values | `ARAB_NON_JORDANIAN`, `NON_ARAB` — removed, not remapped; see below |
 | Eight `strings.xml` keys, in **both** locales | every `gate_*`, plus `track_nonjo` and `disclaimer_non_jordanian`. 106 keys down to 98, both files in step |
 
 **Kept, deliberately.** The four B-2 contract claims: they are terms of the
@@ -604,6 +604,32 @@ moved to `compliance/data/ContractClaims.kt` and nothing about it changed.
 `LossReason.ELIGIBILITY_OR_APPROVAL` is kept too: a bank refusal and a company
 approval are both eligibility problems, and deleting the reason would erase the
 history of every lead already lost for one.
+
+**The two nationality categories are removed, not remapped.**
+`ARAB_NON_JORDANIAN` and `NON_ARAB` both mapped to `Track.NONJO`. With the track
+gone they have no honest track left, and the tempting alternative — point them
+at `EXPAT` — would have filed a non-Jordanian buyer as a Jordanian expatriate in
+the single field the entire process is chosen from. It would have looked healthy
+on every screen and been a lie in the database. So `NationalityCategory` is
+`JORDANIAN_RESIDENT` (LOCAL) and `JORDANIAN_EXPATRIATE` (EXPAT), and `Track` is
+`LOCAL` and `EXPAT`.
+
+`Track.isExternal` stays meaningful and stays as it was: `!= LOCAL`. It still
+carries the 45-day staleness window and the 10-day update promise, which were
+never non-Jordanian-specific — an expatriate lead four time zones away needs
+both for the same reason it always did.
+
+Two tests assert the *shape* rather than a value: `Track.entries` is exactly
+`[LOCAL, EXPAT]` and `NationalityCategory.entries` is exactly the two Jordanian
+ones. Reintroducing either enum value fails the build and sends whoever did it
+here, instead of a track with no gate behind it reappearing quietly.
+
+*(This was D-25, a separate numbered decision, until 2026-08-30. It was never
+really a separate choice — once the track went there was no honest track left to
+map to — so it is folded in here where it belongs. **The number D-25 is retired,
+not reused:** renumbering the entries after it would silently break every
+reference in the commits, the pull requests and the code comments that already
+cite them.)*
 
 **The objection stays, rewritten.** `non_jordanian_eligibility` is the scripted
 answer to "I am not Jordanian — may I own?". Dropping a marketing track does not
@@ -659,27 +685,6 @@ was not done.**
 is where the subtraction puts it, not because anyone decided local media should
 grow by a quarter. Withdrawing it from the plan instead is a one-line change to
 `totalPaidMedia`, and is the owner's call.
-
-### D-25 — `ARAB_NON_JORDANIAN` and `NON_ARAB` are removed, not remapped
-
-**Needs the owner's confirmation.**
-
-Both mapped to `Track.NONJO`. With the track gone they have no honest track left,
-and the tempting alternative — point them at `EXPAT` — would have filed a
-non-Jordanian buyer as a Jordanian expatriate in the single field the entire
-process is chosen from. It would have looked healthy on every screen and been a
-lie in the database. So `NationalityCategory` is `JORDANIAN_RESIDENT` (LOCAL)
-and `JORDANIAN_EXPATRIATE` (EXPAT), and `Track` is `LOCAL` and `EXPAT`.
-
-`Track.isExternal` stays meaningful and stays as it was: `!= LOCAL`. It still
-carries the 45-day staleness window and the 10-day update promise, which were
-never non-Jordanian-specific — an expatriate lead four time zones away needs
-both for the same reason it always did.
-
-Two tests assert the *shape* rather than a value: `Track.entries` is exactly
-`[LOCAL, EXPAT]` and `NationalityCategory.entries` is exactly the two Jordanian
-ones. Reintroducing either enum value fails the build and sends whoever did it
-here, instead of a track with no gate behind it reappearing quietly.
 
 ### D-26 — The 150 JOD qualified-lead target is left alone, and no longer matches the budget
 
@@ -932,7 +937,6 @@ depends on it (noted in the last column).
 | D-24 | Does the whole 2,520 JOD freed by the removed markets belong on the local track? | **Open again.** D-28 moved 1,125 of it back to external; D-29 reverted that with the assumption it rested on, so all 2,520 sits on local (10,800 → 13,320) |
 | D-26 | The 150 JOD qualified-lead target does not match the budget (4,680 ÷ 48 = 97.5). Move it or keep it? | **Open again, default applied.** Kept at 150 — loose is the safe direction for a threshold on a funnel nobody has re-estimated |
 | D-27 | Can expatriates alone supply the external funnel's 160 raw leads on 4,680 JOD rather than 7,200? | **Open again, and unanswerable by design.** Answering it needs a cost per lead, which is the figure D-29 removed |
-| D-25 | Should `ARAB_NON_JORDANIAN` and `NON_ARAB` be removed, or kept and pointed somewhere? | **Default applied and needs confirming.** Removed — there is no honest track left, and `EXPAT` would be a lie |
 
 ### Closed
 
