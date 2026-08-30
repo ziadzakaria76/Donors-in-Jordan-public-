@@ -270,8 +270,15 @@ def _print_result(result, cfg) -> None:
     if result.screening_error:
         print(f"  SCREENING ERROR: {result.screening_error}")
     for entry in result.screening_status:
+        # Where the names came from, not only how many. A list published at
+        # several addresses that reports a count alone cannot be checked: the
+        # UK list spent months reporting "0 names" from a URL that had been
+        # retired, and reading a stale mirror would look identical to reading
+        # the live one.
         suffix = f" -- {entry['error']}" if entry.get("error") else ""
-        print(f"  {entry['list']}: fetched {entry['fetched']}, {entry['names']} names{suffix}")
+        origin = f" from {entry['source_url']}" if entry.get("source_url") else ""
+        print(f"  {entry['list']}: fetched {entry['fetched']}, "
+              f"{entry['names']} names{origin}{suffix}")
     print("-" * 78)
     for rank, tender in enumerate(result.tenders[:cfg.get("output.top_n", 10)], start=1):
         flag = "NEW " if tender.is_new else "    "
