@@ -56,7 +56,7 @@ internal fun Gs3NavHost(
         popExitTransition = { fadeOut(animationSpec = FadeSpec) },
     ) {
         composable(Gs3Destination.Dashboard.route) { DashboardScreen() }
-        composable(Gs3Destination.Inventory.route) { InventoryScreen() }
+        composable(Gs3Destination.Inventory.route) { InventoryScreen(settings = settings) }
         composable(Gs3Destination.Leads.route) { LeadsScreen() }
         composable(Gs3Destination.Campaigns.route) { CampaignsScreen() }
 

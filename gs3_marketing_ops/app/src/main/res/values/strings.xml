@@ -33,6 +33,16 @@
     <string name="unit_internal_area">Internal area</string>
     <string name="unit_external_area">External area</string>
     <string name="unit_price_per_sqm">Price per m²</string>
+    <string name="unit_number">Apartment %1$s</string>
+    <string name="unit_area_value">%1$s m²</string>
+    <string name="unit_no_external_area">No terrace or roof</string>
+
+    <!-- Inventory summary, computed from the schedule and never typed in -->
+    <string name="inventory_summary_heading">The whole schedule</string>
+    <string name="inventory_summary_units">Apartments</string>
+    <string name="inventory_summary_internal_area">Internal area</string>
+    <string name="inventory_summary_value">Gross development value</string>
+    <string name="inventory_summary_price_per_sqm">Weighted price per m²</string>
 
     <!-- Buyer tracks -->
     <string name="track_local">In Jordan</string>
