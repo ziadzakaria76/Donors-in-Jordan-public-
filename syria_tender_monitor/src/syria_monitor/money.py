@@ -33,7 +33,21 @@ _MAG = r"(?:k|mn?|mio\.?|bn|thousand|tausend|mille|million[es]?|millionen|billio
 _CANDIDATE = re.compile(
     r"(?P<pre>US\$|SY£|[$€£]|ل\.س|\b(?:%s)\b)?\s*"
     r"(?P<num>%s)\s*"
-    r"(?P<mag>%s)?\s*"
+    # The magnitude must END where it matches. Without this, `mn?` matches the
+    # M of any following word, and "M" means a million: the live run of
+    # 2026-08-30 read UNGM's reference-then-country text
+    #
+    #     ... UNICEF-2026-000946 Multiple destinations
+    #
+    # as "946 M" and reported the notice at US$ 946,000,000. Three of those
+    # reached the top of the report, ranked first, second and third BECAUSE of
+    # the invented figure -- value feeds the score. "Multiple", "Ministry",
+    # "Metric" and "Mr" all did it.
+    #
+    # A lookahead rather than \b, because "mio." ends in a dot and \b after it
+    # would not hold. Arabic letters are included: مليون must not match as the
+    # opening of a longer word either.
+    r"(?:(?P<mag>%s)(?![A-Za-z\u0600-\u06FF]))?\s*"
     r"(?P<post>US\$|SY£|[$€£]|ل\.س|\b(?:%s)\b)?" % ("|".join(_CODES), _NUMBER, _MAG, "|".join(_CODES)),
     re.IGNORECASE,
 )

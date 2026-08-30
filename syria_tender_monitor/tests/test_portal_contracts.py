@@ -534,3 +534,42 @@ def test_it_says_so_when_the_page_carries_no_asset_links_at_all(tmp_path):
     except ScreeningUnavailable as exc:
         assert "no assets.publishing.service.gov.uk links at all" in str(exc)
         assert "bytes" in str(exc), "the size distinguishes an empty page from a full one"
+
+
+def test_a_magnitude_must_end_where_it_matches():
+    """"Multiple" is not a million.
+
+    The run of 2026-08-30 reported three UNGM notices at US$ 947,000,000,
+    946,000,000 and 830,000,000, and they took the top three places in the
+    report BECAUSE of it -- value feeds the score. The figures came from UNGM's
+    own row text, where a reference number is followed by the country cell:
+
+        ... UNICEF-2026-000946 Multiple destinations   ->  946 M
+
+    `mn?` matched the M of "Multiple" with nothing requiring the token to end,
+    and M means a million. "Ministry", "Metric" and "Mr" did it too.
+
+    This is the second bug today caused by that same label; the first read it
+    as a country.
+    """
+    from syria_monitor.money import parse_value
+
+    for text in ("Request for proposal UNICEF-2026-000946 Multiple destinations",
+                 "RFP-830 Multiple destinations",
+                 "Ref 500 Ministry of Health",
+                 "Lot 12 Metric tonnes of flour"):
+        assert parse_value(text).amount is None, f"invented a value from {text!r}"
+
+
+def test_real_magnitudes_still_parse():
+    """The guard must not cost the values it exists to protect."""
+    from syria_monitor.money import parse_value
+
+    assert parse_value("Contract value USD 2.5 million").amount == 2_500_000
+    assert parse_value("Budget: $3 M").amount == 3_000_000
+    assert parse_value("Estimated 750 k").amount == 750_000
+    assert parse_value("Total 1.2 bn USD").amount == 1_200_000_000
+    # European thousands separators: 1.500.000 is 1.5 million, not 1.5.
+    assert parse_value("EUR 1.500.000").amount == 1_500_000
+    # Arabic, where the lookahead also must not reject a legitimate suffix.
+    assert parse_value("قيمة العقد 5 مليون دولار").amount == 5_000_000
