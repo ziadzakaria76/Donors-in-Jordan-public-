@@ -3,6 +3,8 @@ logic, and must fail honestly when a source is unreachable."""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from syria_monitor.fetch import Fetcher, TransportError
@@ -156,6 +158,44 @@ def test_ungm_deadline_uses_the_countdown_guard(profile, gate):
     assert record["closing_date"] == date(2026, 9, 30).isoformat()
 
 
+def test_ungm_multiple_destinations_is_not_read_as_another_country(profile, gate):
+    """The live run of 2026-08-30 kept 7 of 15 UNGM rows. The 8 it dropped were
+    the ones labelled "Multiple destinations" -- a label, not a country, and the
+    reason their row text never says Syria.
+
+    They are kept on the strength of the request that produced them: the search
+    was filtered to Countries=[country_id], and a column that cannot express a
+    country is not the source contradicting that.
+    """
+    from syria_monitor.extraction import Row
+
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": 2490})
+    row = Row(title="Provision of equipment for Jobar TVET Centre",
+              text="Deadline: 30-Sep-2026 UNDP UNDP-SYR-00659 Multiple destinations")
+    record = portal.row_to_record(row, "https://www.ungm.org/Public/Notice/Search")
+
+    assert record.get("country") == "Syria", (
+        "a multi-destination row carries the country the search asked for")
+    keep, _link, _delivery = gate.check(record)
+    assert keep, "and the gate therefore keeps it"
+
+
+def test_ungm_a_row_naming_another_country_is_still_not_claimed(profile, gate):
+    """The other half of the tri-state, and the half that keeps it honest.
+
+    Where the column CAN express a country and names one that is not ours, it is
+    the source disagreeing with our request and it is believed. Only the blank
+    answer stops being read as a "no".
+    """
+    from syria_monitor.extraction import Row
+
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": 2490})
+    row = Row(title="Supply of office furniture",
+              text="Deadline: 30-Sep-2026 UNDP UNDP-LBN-00123 Lebanon")
+    record = portal.row_to_record(row, "https://www.ungm.org/Public/Notice/Search")
+    assert not record.get("country"), "no country is claimed for it"
+
+
 def test_sam_gov_is_skipped_without_a_key_rather_than_failing(profile, gate):
     outcome = REGISTRY["samgov"]({}, profile, StubFetcher(), gate).collect()
     assert outcome.skipped_reason and "SAM_API_KEY" in outcome.skipped_reason
@@ -268,3 +308,104 @@ def test_capture_reads_the_country_id_out_of_the_dropdown(profile, gate, capsys)
     assert "set portals.ungm.country_id: 2401" in printed
     assert "Syrian Arab Republic" in printed
     assert "2500" not in printed, "only the matching country should be suggested"
+
+
+SEARCH_URL = "https://www.ungm.org/Public/Notice/Search"
+
+
+def _ungm_page(n_rows, start=0):
+    """Markup shaped like UNGM's search fragment."""
+    return "".join(
+        '<div class="dataRow notice-table tableRow">'
+        '<a class="save-notice-button" href="#">Unsave this procurement opportunity.</a>'
+        f'<a href="/Public/Notice/{start + i}">Rehabilitation works, lot {start + i}</a>'
+        '<span>Deadline: 30-Sep-2026</span><span>Syrian Arab Republic</span>'
+        '</div>'
+        for i in range(n_rows)
+    )
+
+
+class PagingFetcher(StubFetcher):
+    """Serves a fixed number of notices, PageSize at a time."""
+
+    def __init__(self, total, page_size=15):
+        super().__init__()
+        self.total, self.page_size, self.requested = total, page_size, []
+
+    def post(self, url, json=None, headers=None, **kw):
+        index = json["PageIndex"]
+        self.requested.append(index)
+        start = index * self.page_size
+        count = max(0, min(self.page_size, self.total - start))
+        return SimpleNamespace(text=_ungm_page(count, start), status=200, ok=True)
+
+
+def test_ungm_reads_every_page_not_just_the_first(profile, gate):
+    """The capture of 2026-08-30 returned exactly 15 rows against a PageSize of
+    15 -- the standard signal that another page exists -- and nothing followed
+    it. Everything past the first fifteen open notices was invisible, and a
+    short read looked identical to a quiet week.
+    """
+    fetcher = PagingFetcher(total=38)
+    portal = build("ungm", fetcher, profile, gate,
+                   cfg={"country_id": 2490, "page_size": 15})
+
+    html, status = portal.fetch_page("search", SEARCH_URL)
+    assert status == 200
+    assert fetcher.requested == [0, 1, 2], (
+        f"three pages for 38 notices, asked for {fetcher.requested}")
+    assert len(portal.extract_page(html, SEARCH_URL).rows) == 38, "all 38, not 15"
+
+
+def test_ungm_stops_on_the_page_size_the_server_actually_returns(profile, gate):
+    """The stride is measured from page one, never taken from the request.
+
+    Asking for 15 and being served 10 would make every page look short, and
+    "short page" is this loop's end-of-listing signal -- so an unhonoured
+    PageSize would stop the read after one page and call it complete.
+    """
+    fetcher = PagingFetcher(total=25, page_size=10)      # server caps at 10
+    portal = build("ungm", fetcher, profile, gate,
+                   cfg={"country_id": 2490, "page_size": 15})   # we asked for 15
+
+    html, _status = portal.fetch_page("search", SEARCH_URL)
+    assert fetcher.requested == [0, 1, 2], (
+        f"kept paging on the served size, asked for {fetcher.requested}")
+    assert len(portal.extract_page(html, SEARCH_URL).rows) == 25
+
+
+def test_ungm_hands_back_a_failing_response_whole(profile, gate):
+    """A bad status must reach the diagnostics with its body intact."""
+    class Failing(StubFetcher):
+        def post(self, url, json=None, headers=None, **kw):
+            return SimpleNamespace(text="upstream is down", status=503, ok=False)
+
+    portal = build("ungm", Failing(), profile, gate, cfg={"country_id": 2490})
+    html, status = portal.fetch_page("search", SEARCH_URL)
+    assert status == 503 and html == "upstream is down"
+
+
+def test_ungm_stops_when_the_endpoint_ignores_the_page_index(profile, gate):
+    """An endpoint serving page one forever satisfies "the page was full" every
+    time, so only the cap would stop it -- after concatenating the same listing
+    forty times and turning one notice into forty rows.
+
+    Found by this suite: a stub that ignores PageIndex made the fixtures 8x
+    slower, which is the same bug wearing a stopwatch.
+    """
+    class Stuck(StubFetcher):
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        def post(self, url, json=None, headers=None, **kw):
+            self.calls += 1
+            return SimpleNamespace(text=_ungm_page(15), status=200, ok=True)
+
+    fetcher = Stuck()
+    portal = build("ungm", fetcher, profile, gate,
+                   cfg={"country_id": 2490, "page_size": 15})
+    html, _status = portal.fetch_page("search", SEARCH_URL)
+
+    assert fetcher.calls == 2, f"one page, then one repeat, then stop: {fetcher.calls}"
+    assert len(portal.extract_page(html, SEARCH_URL).rows) == 15, "counted once"

@@ -286,3 +286,38 @@ def test_the_repeated_class_layer_does_not_count_a_nested_class_twice():
     result = repeated_class_layer(BeautifulSoup(html, "html.parser"), "https://x.test")
     titles = [r.title for r in result.rows]
     assert len(titles) == len(set(titles)), f"duplicated rows: {titles}"
+
+
+def test_a_save_button_with_text_does_not_become_the_title():
+    """The live shape, which the first correction's fixture did not model.
+
+    UNGM's save-notice control is an anchor with href="#" AND an accessible
+    label. Preferring "the first anchor with text" therefore picked it, and the
+    run of 2026-08-30 reported every notice as "Unsave this procurement
+    opportunity." -- a plausible-looking listing of the wrong thing, which is
+    the failure mode this module is most concerned with.
+
+    The fixture that vetted the previous fix rendered the button as
+    `<a href="#"><svg></svg></a>`, with no text, which is the single shape
+    where the bug cannot reproduce.
+    """
+    rows = "".join(
+        '<div class="dataRow notice-table">'
+        '<a class="save-notice-button" href="#">'
+        'Unsave this procurement opportunity. Subscribe to UNGM Pro to be able to save.'
+        '</a>'
+        f'<a class="ungm-title" href="/Public/Notice/{200 + i}">Supply of medical equipment, lot {i}</a>'
+        f'<span>0{i}-Sep-2026</span><span>Syrian Arab Republic</span>'
+        '</div>'
+        for i in range(1, 8)
+    )
+    result = extract(f"<html><body><div>{rows}</div></body></html>",
+                     base_url="https://www.ungm.org")
+
+    assert len(result.rows) == 7, f"all seven rows, got {len(result.rows)}"
+    assert all(r.title.startswith("Supply of medical equipment") for r in result.rows), \
+        f"the notice link is the title, not the save button: {[r.title for r in result.rows]}"
+    assert not any("Unsave" in r.title for r in result.rows), \
+        "the save button's label must never reach a title"
+    assert all(r.url and "/Public/Notice/" in r.url for r in result.rows), \
+        "the URL is the notice link, never the button's href='#'"
