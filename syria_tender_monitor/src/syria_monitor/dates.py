@@ -74,16 +74,34 @@ _DOTTED = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
 # narrower than before AND admits the two-digit years that were being missed:
 # UNDP writes "Deadline 01-Sep-26", which this scanner never saw, so every UNDP
 # notice reached the report with no closing date at all.
-# MONTHS holds full names only -- parse_date reads "01-Sep-2026" through
-# dateutil's fuzzy fallback, not through that dict -- so the three-letter
-# abbreviations the portals actually write are listed alongside it. UNGM writes
-# "30-Aug-2026", UNDP "01-Sep-26" and TED "15 Jan 2027"; none of those months
-# appear in MONTHS.
-_MONTH_ABBREVIATIONS = ("jan", "feb", "mar", "apr", "may", "jun",
-                        "jul", "aug", "sep", "sept", "oct", "nov", "dec")
-_MONTH_ALT = "|".join(re.escape(name) for name in
-                      sorted(set(MONTHS) | set(_MONTH_ABBREVIATIONS),
-                             key=len, reverse=True))
+# MONTHS IS NOT A LIST OF MONTH NAMES. It is the lookup parse_date needs for
+# the languages dateutil cannot read, so it holds "januar" and "janvier" and no
+# "january" at all -- English goes through dateutil's fuzzy fallback instead.
+# Building this alternation from MONTHS alone therefore stopped "15 January
+# 2026" being a date, which is the commonest date format there is, and the
+# first version of this did exactly that. It went unnoticed because the test
+# used "September 1, 2026", and September is spelled the same in English,
+# German and Dutch, so it is in MONTHS by accident of spelling.
+#
+# A PREFIX OF A MONTH IS A MONTH. Sources abbreviate at whatever length suits
+# them -- Jan, Sept, janv, févr, juil, Okt, Mär -- so rather than list the
+# abbreviations and keep discovering missing ones, every prefix of three or
+# more characters counts. That is still far narrower than the [^\W\d_]{3,} this
+# replaced, which read "10 Sub 10" as a date and let a navigation menu score as
+# a listing.
+_MONTH_NAMES = set(MONTHS) | {
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+}
+
+_MONTH_FORMS = {name[:length]
+                for name in _MONTH_NAMES
+                for length in range(3, len(name) + 1)}
+
+# Longest first, so "janvier" is preferred over "jan" and the match does not
+# stop three characters in.
+_MONTH_ALT = "|".join(re.escape(form) for form in
+                      sorted(_MONTH_FORMS, key=len, reverse=True))
 
 _DATE_SHAPED = re.compile(
     r"\d{4}-\d{2}-\d{2}(?!\d)"

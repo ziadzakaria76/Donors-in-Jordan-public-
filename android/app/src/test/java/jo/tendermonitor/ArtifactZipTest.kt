@@ -120,4 +120,31 @@ class ArtifactZipTest {
         assertTrue(ArtifactZip.isReportJson("jordan_tenders_x.json"))
         assertFalse(ArtifactZip.isReportJson("portals.json"))
     }
+
+    /**
+     * Syria's run writes TWO json files and only one of them is this contract.
+     *
+     * Its diagnostic dump carries no `schema`, so the app parses that as 0 and
+     * refuses to render -- which is correct behaviour reached for the wrong
+     * reason, and reads to the user as "the app is out of date" on a run that
+     * was perfectly good. Picking by ".json" alone would choose whichever the
+     * zip happened to list first.
+     */
+    @Test
+    fun `only the app's own report json is treated as the report`() {
+        // Jordan writes one file, and it is the contract.
+        assertTrue(ArtifactZip.isReportJson("jordan_tenders_20260830_0457_117.json"))
+
+        // Syria writes both. Only the second is readable by this app.
+        assertFalse(
+            "the diagnostic dump has no schema and must not be picked",
+            ArtifactZip.isReportJson("syria-tenders-2026-08-30.json"),
+        )
+        assertTrue(ArtifactZip.isReportJson("syria-tenders-2026-08-30-app.json"))
+
+        // Neither is a report, and one of them is a trap: the summary is
+        // markdown that GitHub renders on the run page, not a document.
+        assertFalse(ArtifactZip.isReportJson("syria-tenders-2026-08-30-summary.md"))
+        assertFalse(ArtifactZip.isReportJson("probe_eib.json"))
+    }
 }

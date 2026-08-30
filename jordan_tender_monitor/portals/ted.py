@@ -20,9 +20,13 @@ being absent costs nothing, and it is what _is_jordan() prefers when present.
 
 from __future__ import annotations
 
+import logging
+
 from .. import portal_config
 from ..utils import text as textutil
 from . import base
+
+log = logging.getLogger(__name__)
 
 KEY = "ted"
 # From portals.json -- see the note in worldbank.py.
@@ -218,5 +222,29 @@ def fetch_tenders() -> list[dict]:
     # everything is exactly the no-op that let Malawi into the World Bank
     # report. Word-boundary matching keeps Jordanstown out.
     kept = confirmed + base.jordan_only(unconfirmed)
+    # DOES TED ALREADY CARRY WHAT EIB'S OWN SITE WILL NOT GIVE US?
+    #
+    # eib.org answers a Cloudflare challenge to every data-centre address,
+    # GitHub's runners included -- two probes on 2026-08-30 read 91,699 bytes
+    # and found no listing under any of the six layers, and the bank publishes
+    # no procurement feed. The EIB portal has therefore never returned a row.
+    #
+    # But the EIB is an EU institution, so its above-threshold procurement is
+    # published on TED, which this module reads successfully. If an
+    # EIB-financed Jordan tender reaches TED it is already inside `items`,
+    # because the query is FT~"Jordan" OR buyer-country=JOR and such a notice
+    # matches on both counts.
+    #
+    # So the question is answerable from data already fetched, and it is
+    # counted rather than argued about. A number above zero means the blocked
+    # portal is partly redundant; zero means TED is not a substitute for it and
+    # the coverage gap is real. Either way the next run says which, and keeps
+    # saying it if TED's coverage changes.
+    eib = sum(1 for item in items
+              if isinstance(item, dict)
+              and "european investment bank" in (_text(item.get("buyer-name")) or "").lower())
+    log.info("ted: %d of %d notices name the European Investment Bank as buyer "
+             "(eib.org itself is bot-walled and returns nothing)", eib, len(items))
+
     base.note_scanned(len(items))
     return kept

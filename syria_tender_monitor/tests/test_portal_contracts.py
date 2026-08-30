@@ -574,3 +574,153 @@ def test_a_document_that_is_not_xml_still_parses_as_csv():
     csv_text = "Name,Regime\nAhmad Example,Syria\nExample Trading LLC,Syria\n"
     names = parse_names(csv_text, {"format": "csv", "name_column": None})
     assert "ahmad example" in names and "example trading llc" in names
+
+
+# --------------------------------------------------------------- the app's view
+#
+# The Android app is a separate codebase in another language, and the only thing
+# joining them is a JSON document. Nothing in Python fails when a field it needs
+# stops being written -- the failure appears as a blank line on a phone, days
+# later, with no error anywhere. So the contract is asserted against the app's
+# OWN SOURCE rather than against a copy of it kept here, which would drift.
+
+def _app_report_kt() -> str:
+    from pathlib import Path
+    kt = (Path(__file__).resolve().parents[2] / "android" / "app" / "src" / "main"
+          / "java" / "jo" / "tendermonitor" / "data" / "report" / "Report.kt")
+    return kt.read_text(encoding="utf-8")
+
+
+def _declared_fields(kotlin: str, data_class: str) -> set[str]:
+    """The JSON keys one @Serializable data class expects."""
+    import re
+    body = re.search(rf"data class {data_class}\((.*?)\n\)", kotlin, re.S).group(1)
+    named = set(re.findall(r'@SerialName\("([^"]+)"\)', body))
+    plain = set()
+    for line in body.splitlines():
+        m = re.match(r"\s*val (\w+):", line)
+        if m and "@SerialName" not in line:
+            plain.add(m.group(1))
+    return named | plain
+
+
+def _sample_run():
+    from datetime import date
+    from syria_monitor.models import Tender
+    from syria_monitor.portals.base import PortalOutcome
+    from syria_monitor.gate import GateStats
+    from syria_monitor.pipeline import RunResult
+
+    tender = Tender(id="x1", title="Rehabilitation of clinics, Aleppo", portal="ungm",
+                    url="https://www.ungm.org/1", score=79.5, sector="Health",
+                    notice_type="Invitation to bid", language="en",
+                    posted_date=date(2026, 8, 12), closing_date=date(2026, 9, 8),
+                    contact="UNDP", description="Works",
+                    delivery_country="Syrian Arab Republic")
+    read = PortalOutcome(name="ungm", label="UNGM", url="https://www.ungm.org",
+                         tenders=[tender], available=True, layer="selectors",
+                         quality=0.91)
+    read.stats = GateStats(); read.stats.seen = 87
+    broken = PortalOutcome(name="ted", label="EU TED", url="https://ted.example",
+                           available=False, error="HTTP 400")
+    broken.stats = GateStats()
+    skipped = PortalOutcome(name="samgov", label="SAM.gov", url="https://sam.example",
+                            skipped_reason="SAM_API_KEY not set")
+    skipped.stats = GateStats()
+
+    result = RunResult(started="2026-08-30T05:00:00")
+    result.tenders = [tender]
+    result.portals = [read, broken, skipped]
+    result.duplicates_collapsed = 11
+    result.expired_dropped = 3
+    return result
+
+
+def _write_sample(tmp_path):
+    import json
+    from datetime import date
+    from syria_monitor.report.app_json_writer import write_app_json
+    out = write_app_json(_sample_run(), tmp_path / "app.json",
+                         {"name": "Syria", "key": "syria"}, today=date(2026, 8, 30))
+    return json.loads(out.read_text(encoding="utf-8"))
+
+
+def test_the_app_can_read_every_field_it_declares(tmp_path):
+    """Asserted against Report.kt itself, so adding a field there fails here.
+
+    A field the app expects and this never writes does not raise: kotlinx fills
+    the default and the phone shows an empty line, which looks like a quiet day
+    rather than a broken contract.
+    """
+    kotlin = _app_report_kt()
+    document = _write_sample(tmp_path)
+
+    for data_class, got in (("Report", document),
+                            ("RunSummary", document["run"]),
+                            ("Opportunity", document["tenders"][0]),
+                            ("PortalStatus", document["portals"][0])):
+        missing = sorted(f for f in _declared_fields(kotlin, data_class) if f not in got)
+        assert not missing, f"{data_class} expects fields we never write: {missing}"
+
+
+def test_the_schema_constant_matches_the_app(tmp_path):
+    """The app refuses a schema it was not written for -- deliberately, since
+    half-parsed fields are worse than a sentence saying the app is out of date.
+    A mismatch here is a blank screen on every phone."""
+    import re
+    from syria_monitor.report.app_json_writer import REPORT_SCHEMA
+
+    supported = int(re.search(r"SUPPORTED_SCHEMA\s*=\s*(\d+)", _app_report_kt()).group(1))
+    assert REPORT_SCHEMA == supported, (
+        f"we write schema {REPORT_SCHEMA}, the app renders only {supported}")
+    assert _write_sample(tmp_path)["schema"] == supported
+
+
+def test_scanned_is_null_when_a_portal_never_filtered(tmp_path):
+    """Null is not zero, and the difference is the whole point of the field.
+
+    "Read nothing" and "read five hundred and none were relevant" are the two
+    diagnoses it separates. A portal that was skipped or unavailable never
+    reached its filter, so it must report null rather than the 0 its stats hold.
+    """
+    portals = {p["key"]: p for p in _write_sample(tmp_path)["portals"]}
+    assert portals["ungm"]["scanned"] == 87
+    assert portals["ted"]["scanned"] is None, "unavailable: never filtered"
+    assert portals["samgov"]["scanned"] is None, "skipped: never filtered"
+
+
+def test_portal_status_uses_the_apps_vocabulary(tmp_path):
+    """The app tests `status == "unavailable"` to colour a portal broken, so a
+    word it does not know renders as healthy. A skipped portal is Jordan's
+    "unconfigured" -- SAM.gov without its key is exactly that -- rather than a
+    fifth status the app cannot show."""
+    portals = {p["key"]: p for p in _write_sample(tmp_path)["portals"]}
+    assert portals["ungm"]["status"] == "ok"
+    assert portals["ted"]["status"] == "unavailable"
+    assert portals["samgov"]["status"] == "unconfigured"
+
+
+def test_the_run_summary_counts_only_portals_that_could_have_worked(tmp_path):
+    """A skipped portal is not a broken one: counting SAM.gov as broken because
+    it has no key would put a permanent red line in every report."""
+    run = _write_sample(tmp_path)["run"]
+    assert run["portals_total"] == 2, "the skipped portal is not considered"
+    assert run["portals_ok"] == 1 and run["portals_broken"] == 1
+    assert run["status"] == "partial", "some broken, not all"
+    assert run["merged_duplicates"] == 11
+    assert run["dropped"] == {"expired": 3}
+
+
+def test_days_left_is_computed_and_null_when_there_is_no_deadline(tmp_path):
+    from datetime import date
+    from syria_monitor.report.app_json_writer import write_app_json
+
+    document = _write_sample(tmp_path)
+    assert document["tenders"][0]["days_left"] == 9, "08-Sep is nine days after 30-Aug"
+
+    run = _sample_run()
+    run.tenders[0].closing_date = None
+    out = write_app_json(run, tmp_path / "b.json", {"name": "Syria"},
+                         today=date(2026, 8, 30))
+    import json
+    assert json.loads(out.read_text())["tenders"][0]["days_left"] is None
