@@ -69,15 +69,23 @@ data class FunnelModel(
          * converts far better because someone who books one from Dubai is
          * further through the decision than a local walk-in.
          *
-         * **The 160 raw leads were modelled for the whole external track, when
-         * that meant expatriates *and* non-Jordanians.** With the non-Jordanian
-         * track removed (D-23) the model is unchanged and the three-unit target
-         * is unchanged, so expatriate marketing alone now has to supply all 160.
-         * Whether it can has not been re-estimated — the numbers were left
-         * alone deliberately rather than adjusted by guesswork. See D-24.
+         * **The four rates are untouched; only the lead volume follows the
+         * budget.** 160 raw leads was what 7,200 JOD bought at the plan's own
+         * 45 JOD each, when the external track meant expatriates *and*
+         * non-Jordanians. That track is gone (D-23) and its budget is now
+         * 5,805, which buys 129 — and 129 still yields three contracts, which
+         * is why 5,805 is the figure D-28 settled on rather than any rounder
+         * number. Drop below 129 and the third unit goes with it.
+         *
+         * Nothing here is a re-estimate. The qualification, viewing and
+         * contract rates are the strategy's, unchanged; re-deriving them for an
+         * expatriate-only audience would be invention, and is deliberately not
+         * done. What is assumed is that an expatriate raw lead still costs
+         * about 45 JOD — a *blended* figure that included cheaper
+         * non-Jordanian markets, so it may prove optimistic. See D-28.
          */
         val EXTERNAL = FunnelModel(
-            rawLeads = 160,
+            rawLeads = 129,
             qualifiedRate = BigDecimal("0.30"),
             viewingRate = BigDecimal("0.35"),
             offerRate = BigDecimal.ONE, // the external track goes from live tour to contract

@@ -19,12 +19,27 @@ class FunnelTest {
     }
 
     @Test
-    fun `the external funnel projects three units from a hundred and sixty leads`() {
+    fun `the external funnel projects three units from a hundred and twenty-nine leads`() {
+        // 129, not the 160 the strategy printed. 160 was what 7,200 JOD bought
+        // at 45 a lead when the external track still included non-Jordanian
+        // markets; the track is 5,805 now (D-28), which buys 129. The four
+        // rates are untouched.
         val projection = FunnelModel.EXTERNAL.project()
-        assertEquals(160, projection.rawLeads)
-        assertEquals(48, projection.qualified)
-        assertEquals(17, projection.viewings)
+        assertEquals(129, projection.rawLeads)
+        assertEquals(39, projection.qualified)
+        assertEquals(14, projection.viewings)
         assertEquals(3, projection.contracts)
+    }
+
+    @Test
+    fun `129 is the floor -- one lead fewer and the third unit is lost`() {
+        // The reason the external track was sized at 5,805 rather than any
+        // rounder number. Three separate HALF_UP roundings sit between raw
+        // leads and contracts, so the third contract does not fade out
+        // gradually: it disappears between 128 leads and 129. Anyone tempted
+        // to trim this budget should see what it costs.
+        assertEquals(3, FunnelModel.EXTERNAL.project().contracts)
+        assertEquals(2, FunnelModel.EXTERNAL.copy(rawLeads = 128).project().contracts)
     }
 
     @Test
