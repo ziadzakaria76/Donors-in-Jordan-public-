@@ -396,6 +396,12 @@ def structural_layer(soup: BeautifulSoup, base_url: str = "") -> LayerResult:
     exists to rescue. Sizes 50, 500 and 2000 are all in the test suite.
     """
     best = LayerResult("structural", [], note="no repeated sibling block found")
+    # Every candidate considered, so a losing group can be seen losing. Which
+    # group wins is the whole behaviour of this layer, and until now the only
+    # output was the winner -- leaving "why did it read 6 of 15 rows" to be
+    # answered by guessing at markup nobody can fetch.
+    seen: list[tuple[int, int, float, str]] = []
+
     for container in soup.find_all(True):
         children = [c for c in container.find_all(recursive=False)
                     if c.name not in ("script", "style")]
@@ -404,12 +410,24 @@ def structural_layer(soup: BeautifulSoup, base_url: str = "") -> LayerResult:
         groups: dict[str, list] = {}
         for child in children:
             groups.setdefault(_signature(child), []).append(child)
-        for group in groups.values():
+        for signature, group in groups.items():
             if len(group) < 3:
                 continue
             candidate = _finish("structural", _rows_from_group(group, base_url))
+            # Group size AND surviving rows: they differ exactly when _finish
+            # drops rows for having no title, which is a failure mode that
+            # otherwise leaves no trace.
+            seen.append((len(group), len(candidate.rows), candidate.quality, signature))
             if (candidate.quality, len(candidate.rows)) > (best.quality, len(best.rows)):
                 best = candidate
+
+    if seen:
+        # Biggest first: the question is always "why did the large group lose".
+        seen.sort(key=lambda c: (-c[0], -c[2]))
+        parts = [f"{size}->{kept} q={quality:.2f} {signature}"
+                 for size, kept, quality, signature in seen[:6]]
+        best.note = ("candidates (group->rows kept, quality, shape): "
+                     + "; ".join(parts))
     return best
 
 
