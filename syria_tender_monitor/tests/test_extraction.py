@@ -139,3 +139,63 @@ def test_a_wall_returns_no_rows_rather_than_junk():
 def test_arabic_survives_extraction():
     result = extract(fixture("arabic_rtl.html"), base_url="https://donor.example")
     assert any("حلب" in row.title for row in result.rows)
+
+
+def test_an_icon_anchor_before_the_title_does_not_eat_the_row():
+    """UNGM renders a save-this-notice icon anchor before the notice link.
+
+    Observed live on 2026-08-30: the markup held 15 notice rows and the cascade
+    reported 6. Taking node.find("a") -- the FIRST anchor -- meant the title
+    came from an icon with no text and the URL from its href="#". Empty titles
+    are dropped, which wiped the whole group and let a group of table *cells*
+    win instead: fifteen notices became four rows titled "30-Sep-2026",
+    "29-Jul-2026" and "UNDP".
+
+    That is the failure worth a regression test. An empty result invites
+    questions; a plausible-looking listing of the wrong thing does not.
+    """
+    from bs4 import BeautifulSoup
+    from syria_monitor.extraction import structural_layer
+
+    def row(index):
+        return (
+            '<div class="tableRow"><div class="dataRow">'
+            '<div class="tableCell">'
+            '<a class="save-notice-button" href="#"><svg></svg></a></div>'
+            f'<div class="tableCell"><a href="/Public/Notice/{309000 + index}">'
+            f'Rehabilitation of water network, site {index}</a></div>'
+            '<div class="tableCell">30-Sep-2026</div>'
+            '<div class="tableCell">29-Jul-2026</div>'
+            '<div class="tableCell">UNDP</div>'
+            '<div class="tableCell">Syrian Arab Republic</div>'
+            '</div></div>')
+
+    html = "<div class='notice-table'>" + "".join(row(i) for i in range(15)) + "</div>"
+    result = structural_layer(BeautifulSoup(html, "html.parser"), "https://www.ungm.org")
+
+    assert len(result.rows) == 15, "every row in the markup, not a subset"
+    assert all("Rehabilitation" in r.title for r in result.rows), \
+        "titles come from the anchor that has text, not the icon"
+    assert all((r.url or "").startswith("https://www.ungm.org/Public/Notice/")
+               for r in result.rows), "the notice link, never the icon's href"
+
+
+def test_a_row_whose_only_anchor_goes_nowhere_gets_no_url():
+    """`#` and javascript: are buttons, not links.
+
+    Rendering one as a notice's URL sends the reader nowhere and says nothing
+    about it. The report writer promises a clickable link or a stated reason
+    for its absence, and a dead href satisfies neither.
+    """
+    from bs4 import BeautifulSoup
+    from syria_monitor.extraction import _rows_from_group
+
+    html = "<div>" + "".join(
+        '<div class="r"><a href="#"><svg></svg></a>'
+        '<span>Water supply works, Aleppo — closes 30-Sep-2026</span></div>'
+        for _ in range(4)) + "</div>"
+    nodes = BeautifulSoup(html, "html.parser").select("div.r")
+    rows = _rows_from_group(nodes, "https://example.test")
+
+    assert rows[0].url is None, "a dead href is worse than no href"
+    assert "Water supply works" in rows[0].title, "title falls back to the node's text"
