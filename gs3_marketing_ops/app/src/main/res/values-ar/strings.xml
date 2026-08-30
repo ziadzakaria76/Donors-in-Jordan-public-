@@ -30,6 +30,16 @@
     <string name="unit_internal_area">المساحة الداخلية</string>
     <string name="unit_external_area">المساحة الخارجية</string>
     <string name="unit_price_per_sqm">سعر المتر المربّع</string>
+    <string name="unit_number">شقة رقم %1$s</string>
+    <string name="unit_area_value">%1$s م²</string>
+    <string name="unit_no_external_area">بلا تراس أو روف</string>
+
+    <!-- ملخّص الشقق، محسوب من الجدول ولا يُكتب يدوياً -->
+    <string name="inventory_summary_heading">الجدول كاملاً</string>
+    <string name="inventory_summary_units">عدد الشقق</string>
+    <string name="inventory_summary_internal_area">المساحة الداخلية</string>
+    <string name="inventory_summary_value">القيمة الإجمالية للمشروع</string>
+    <string name="inventory_summary_price_per_sqm">معدّل سعر المتر المربّع</string>
 
     <!-- مسارات المشترين -->
     <string name="track_local">داخل الأردن</string>
