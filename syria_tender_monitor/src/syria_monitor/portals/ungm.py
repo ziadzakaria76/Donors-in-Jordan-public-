@@ -64,6 +64,37 @@ class UngmPortal(HtmlPortal):
     url = NOTICE_PAGE
     anchor_pattern = r"/Public/Notice/\d+"
 
+    # DERIVED FROM THE LIVE DOM, and the reason they are here rather than left
+    # to the class-independent layers is a regression they caused.
+    #
+    # Reading one page, the cascade picked div.dataRow.notice-table.tableRow and
+    # scored it 0.91. Reading six, the same page shape scored 0.70 and LOST to
+    # div.deadline.resultInfo1.tableCell at 0.83 -- a group of 87 deadline
+    # CELLS, one per row. Extraction then reported 87 rows and the run kept
+    # none of them, because a cell holding a date carries no country for the
+    # gate to read:
+    #
+    #     UNGM: ok -- 0 kept of 87 fetched      (was 7 kept of 15)
+    #
+    # Quality is a heuristic over rows the layer already built; it cannot know
+    # that one candidate is the notice and the other is a column of it. Both
+    # are 87 well-formed rows. Naming the row settles it and costs nothing --
+    # if the class ever disappears the selector matches nothing, the layer
+    # yields no rows, and the cascade carries on to the layers below.
+    #
+    # Confirmed in the capture of 2026-08-30 (Actions run 33287077057):
+    #   div.dataRow x87, div.notice-table x87   -- one per notice
+    #   span.ungm-title.ungm-title--small x87   -- the title is a SPAN
+    #
+    # That last line is why the anchor rule alone could not fix the titles: no
+    # anchor in the row is both navigable and texted, so the lookup falls back
+    # and a.save-notice-button (href="#", x174) wins on its label. The title was
+    # never in an anchor to begin with.
+    selectors = {
+        "row": "div.dataRow.notice-table",
+        "title": "span.ungm-title",
+    }
+
     def unavailable_reason(self):
         if not self.cfg.get("country_id"):
             return ("portals.ungm.country_id is not set. UNGM uses its own numeric "

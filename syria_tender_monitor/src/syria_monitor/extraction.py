@@ -225,7 +225,21 @@ def selector_layer(soup: BeautifulSoup, selectors: Optional[dict], base_url: str
     rows = []
     for node in soup.select(selectors["row"]):
         title_node = node.select_one(selectors["title"]) if selectors.get("title") else node
-        link_node = node.select_one(selectors.get("link", "a")) or node.find("a")
+        # The link must go somewhere. This took `node.find("a")` unconditionally,
+        # so a row whose first anchor is a button wired href="#" -- UNGM renders
+        # two such save controls per row -- produced a URL that resolves to the
+        # listing page with a fragment. The other layers already refuse those;
+        # this one emitted them, and a dead link in a report satisfies neither
+        # the reader nor the Word writer's promise of a link or a stated reason.
+        configured = selectors.get("link")
+        candidates = node.select(configured) if configured else node.find_all("a")
+        link_node = next((a for a in candidates if _is_navigable(a.get("href"))), None)
+        # The row may BE the link rather than contain one. UNDP's listing is 572
+        # <a class="vacanciesTableLink"> elements with the cells inside them, so
+        # searching within the row finds no anchor at all and every notice would
+        # come back without a URL.
+        if link_node is None and node.name == "a" and _is_navigable(node.get("href")):
+            link_node = node
         href = link_node.get("href") if link_node else None
         cells = {}
         for key in ("deadline", "published", "value", "buyer", "type"):

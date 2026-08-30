@@ -38,9 +38,25 @@ SOURCES = {
         "format": "csv_semicolon",
         "name_column": None,
     },
-    "uk_ofsi": {
-        "label": "UK OFSI consolidated",
-        "url": "https://assets.publishing.service.gov.uk/media/consolidated-list.csv",
+    # THE LIST THIS USED TO READ NO LONGER EXISTS. OFSI's Consolidated List of
+    # Asset Freeze Targets closed on 28 January 2026; the UK Sanctions List is
+    # now the single source for UK designations. Every run since has reported
+    #
+    #     UK OFSI consolidated: fetched None, 0 names -- HTTP 404, 5201 bytes
+    #
+    # and carried on screening against two lists of three. That is not a
+    # transient outage waiting to heal: the old URL will never answer again.
+    #
+    # RESOLVED FROM THE PUBLICATION PAGE, NOT HARDCODED. GOV.UK serves the file
+    # itself from a content-addressed path -- .../media/<hash>/UK_Sanctions_List.csv
+    # -- and that hash changes every time the list is republished, which is
+    # weekly. Pinning one is pinning an expiry date, and a sanctions list that
+    # 404s quietly is the failure this whole module exists to avoid. The
+    # publication page is the stable address; the download link is read off it.
+    "uk_sanctions": {
+        "label": "UK Sanctions List",
+        "landing": "https://www.gov.uk/government/publications/the-uk-sanctions-list",
+        "link_pattern": r"https://assets\.publishing\.service\.gov\.uk/[A-Za-z0-9._/%~-]+?\.csv",
         "format": "csv",
         "name_column": None,
     },
@@ -124,14 +140,40 @@ class Screener:
             "names": sorted(sanctions.names),
         }), encoding="utf-8")
 
+    def resolve_url(self, source: dict) -> str:
+        """The address to download from, read off the publication page if needed.
+
+        A source that names a `landing` page is one whose own download URL is
+        not stable -- GOV.UK content-addresses its attachments, so the link
+        changes on every republication. Following the page each time costs one
+        extra request and removes a scheduled failure.
+        """
+        landing = source.get("landing")
+        if not landing:
+            return source["url"]
+        response = self.fetcher.get(landing)
+        if not response.ok:
+            raise ScreeningUnavailable(
+                f"{source['label']}: publication page {landing} returned "
+                f"HTTP {response.status}")
+        matches = re.findall(source["link_pattern"], response.text or "")
+        if not matches:
+            raise ScreeningUnavailable(
+                f"{source['label']}: no download link matching "
+                f"{source['link_pattern']!r} on {landing} -- the page layout or "
+                f"the file format offered has changed; open it and look")
+        return matches[0]
+
     def refresh(self, key: str) -> SanctionsList:
         source = SOURCES[key]
         if self.fetcher is None:
             raise ScreeningUnavailable(f"{source['label']}: no fetcher configured")
-        response = self.fetcher.get(source["url"])
+        url = self.resolve_url(source)
+        response = self.fetcher.get(url)
         if not response.ok or not response.text.strip():
             raise ScreeningUnavailable(
-                f"{source['label']}: HTTP {response.status}, {len(response.text)} bytes")
+                f"{source['label']}: HTTP {response.status}, {len(response.text)} bytes "
+                f"from {url}")
         names = parse_names(response.text, source)
         if not names:
             raise ScreeningUnavailable(f"{source['label']}: downloaded but parsed 0 names")

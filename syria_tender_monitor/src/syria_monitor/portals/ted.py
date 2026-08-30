@@ -45,10 +45,34 @@ FIELDS = ["publication-number", "notice-title", "publication-date",
           "total-value", "buyer-name", "links", "description-lot",
           "place-of-performance-country-lot"]
 
-# TED titles follow a "Country - Subject - Detail" convention. Parsing the first
-# segment is allowed to throw work away, so the rule is strict: a real country
-# name, no digits, nothing sentence-length.
+# TED titles name their country in the first segment, in one of two shapes, and
+# only one of them was being read.
+#
+#   "Austria - License management software development services - ..."
+#   "Belgium-Brussels: External monitoring and evaluation of EU instruments"
+#
+# The second is the commoner form and it never matched, because the pattern
+# required whitespace after the separator: in "Belgium-Brussels" the hyphen is
+# followed by a letter. So every Country-City notice reached the gate carrying
+# no country at all and was judged on its text -- which, for a full-text search
+# on "syria", is a search that returns EU-wide notices mentioning Syria and a
+# check that cannot reject any of them. One arrived in the report of
+# 2026-08-30, ranked third:
+#
+#   Beļģija-Brisele: Ārējā uzraudzība un izvērtēšana ... | ted | inside_syria
+#
+# A Brussels-run monitoring contract, in Latvian, filed as inside Syria.
+#
+# The two shapes are kept as SEPARATE patterns rather than one loosened one,
+# because loosening the first is what makes it dangerous. Dropping the trailing
+# \s would let "Supply of equipment - Lot 3" yield "Supply of equipment" as a
+# country, and this prefix is used to REJECT -- a wrong reading here silently
+# discards real work. So the Country-City form requires a country token with no
+# spaces in it, joined by a hyphen to a city and closed by a colon. A
+# multi-word country ("United Kingdom-London:") fails that and falls through to
+# the text check, which loses nothing: no claim is better than a wrong one.
 TITLE_COUNTRY_RE = re.compile(r"^\s*([^\d\-–—:]{3,28}?)\s*[-–—:]\s")
+TITLE_COUNTRY_CITY_RE = re.compile(r"^\s*([^\W\d_][^\s\d\-–—:]{2,27})-[^\d:]{2,40}:\s")
 
 
 def flatten(value: Any) -> str:
@@ -193,10 +217,28 @@ class TedPortal(ApiPortal):
 
     @staticmethod
     def country_from_title(title: str) -> str | None:
-        m = TITLE_COUNTRY_RE.match(title or "")
+        title = title or ""
+        m = TITLE_COUNTRY_CITY_RE.match(title) or TITLE_COUNTRY_RE.match(title)
         if not m:
             return None
         candidate = m.group(1).strip()
         if len(candidate.split()) > 3 or any(ch.isdigit() for ch in candidate):
             return None
+        # A country is a proper noun, so every word of it is capitalised. This
+        # rejects the sentence fragments the " - " form otherwise picks up:
+        # "Supply of equipment - Lot 3" yielded "Supply of equipment" and, since
+        # this prefix is used to REJECT, claiming that as a country discards a
+        # real tender on a formatting accident.
+        #
+        # A script with no capitals cannot be checked this way, so it makes no
+        # claim rather than an unchecked one. Exempting it instead read the
+        # Arabic "توريد معدات - الحصة 3" -- "supply of equipment, lot 3" -- as a
+        # country and would have dropped the tender. Nothing is lost by
+        # abstaining: a genuinely Syrian Arabic title still says so in its text,
+        # and the text check matches the profile's Arabic stems.
+        if not any(ch.isupper() or ch.islower() for ch in candidate):
+            return None
+        for word in candidate.split():
+            if word[:1].islower():
+                return None
         return candidate

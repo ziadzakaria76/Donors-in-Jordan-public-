@@ -409,3 +409,99 @@ def test_ungm_stops_when_the_endpoint_ignores_the_page_index(profile, gate):
 
     assert fetcher.calls == 2, f"one page, then one repeat, then stop: {fetcher.calls}"
     assert len(portal.extract_page(html, SEARCH_URL).rows) == 15, "counted once"
+
+
+def _live_ungm_row(i, country):
+    """The live row anatomy, per the capture of 2026-08-30 (run 33287077057).
+
+    Two save controls wired href="#", the title in a SPAN rather than an
+    anchor, and a deadline cell carrying its own class -- the class that beat
+    the notice row once there were 87 of them.
+    """
+    return (
+        '<div class="dataRow notice-table tableRow">'
+        '<a class="save-notice-button" href="#">Unsave this procurement opportunity. '
+        'Subscribe to UNGM Pro to be able to save.</a>'
+        '<a class="save-notice-button" href="#">Save</a>'
+        f'<div class="resultTitle tableCell"><span class="ungm-title ungm-title--small">'
+        f'Provision of equipment for lot {i}</span></div>'
+        f'<div class="deadline resultInfo1 tableCell">3{i % 10}-Aug-2026 08:00 (GMT -4.00) 0.41366</div>'
+        '<div class="resultInfo1 tableCell">12-Aug-2026</div>'
+        '<div class="resultInfo1 tableCell">UNDP</div>'
+        f'<div class="resultInfo1 tableCell">UNDP-SYR-006{i:02d}</div>'
+        f'<div class="resultInfo1 tableCell">{country}</div>'
+        '</div>')
+
+
+def test_ungm_reads_the_notice_row_not_a_column_of_it(profile, gate):
+    """87 deadline cells are 87 well-formed rows, and they are not the notices.
+
+    Live, div.deadline.resultInfo1.tableCell scored 0.83 and beat the real
+    div.dataRow.notice-table.tableRow at 0.70, so the run reported
+    "0 kept of 87 fetched" -- extraction succeeding on the wrong 87. Quality is
+    a heuristic over rows already built; it cannot tell a notice from a column
+    of one. The row selector can.
+    """
+    rows = "".join(_live_ungm_row(i, "Syrian Arab Republic" if i % 2 else
+                                  "Multiple destinations") for i in range(1, 88))
+
+    class F(StubFetcher):
+        def __init__(s): s.sent = 0
+        def post(s, url, json=None, headers=None, **k):
+            s.sent += 1
+            body = rows if json["PageIndex"] == 0 else ""
+            return SimpleNamespace(text=body, status=200, ok=True)
+        def get(s, url, **k):
+            return SimpleNamespace(text="", status=200, ok=True)
+
+    portal = build("ungm", F(), profile, gate, cfg={"country_id": 2490, "page_size": 15})
+    outcome = portal.collect()
+
+    assert outcome.layer == "selectors", (
+        f"the pinned row selector must decide this page, not {outcome.layer}")
+    assert outcome.stats.seen == 87, f"87 notices, got {outcome.stats.seen}"
+    assert len(outcome.tenders) == 87, (
+        f"every row carries a country or the multi-destination label; "
+        f"kept {len(outcome.tenders)}")
+    titles = [t.title for t in outcome.tenders]
+    assert all(t.startswith("Provision of equipment") for t in titles), \
+        f"titles come from span.ungm-title: {titles[:2]}"
+    assert not any("Unsave" in t for t in titles), "never the save button's label"
+    assert not any((t.url or "").endswith("#") for t in outcome.tenders), \
+        "href='#' is not a link"
+
+
+def test_undp_rows_are_the_anchors_that_carry_the_notice(profile, gate):
+    """572 notices in the markup, six read.
+
+    Every UNDP row carries its country and region in its own class list, so
+    grouping by class signature shatters one listing into dozens of per-country
+    fragments -- the largest 49, none reaching the 0.45 threshold -- and a
+    six-row structural group wins instead. Naming the row answers it.
+
+    The row is ALSO the link: the cells sit inside <a class="vacanciesTableLink">,
+    so searching within the row finds no anchor and every notice would come back
+    with no URL.
+    """
+    from syria_monitor.extraction import extract
+
+    rows = "".join(
+        f'<a class="country_{i % 8} region_RAS vacanciesTableLink vacanciesTable__row" '
+        f'href="/view_notice.cfm?notice_id={1000 + i}">'
+        f'<div class="vacanciesTable__cell">Rehabilitation of clinics, lot {i}</div>'
+        f'<div class="vacanciesTable__cell">Deadline: 30-Sep-2026</div>'
+        f'<div class="vacanciesTable__cell">Syrian Arab Republic</div></a>'
+        for i in range(120))
+    html = f"<html><body><div>{rows}</div></body></html>"
+
+    loose = extract(html, base_url="https://procurement-notices.undp.org")
+    assert len(loose.rows) < 120, (
+        "precondition: without the selector the class groups fragment "
+        f"(got {len(loose.rows)} via {loose.layer})")
+
+    result = extract(html, base_url="https://procurement-notices.undp.org",
+                     selectors={"row": "a.vacanciesTableLink"})
+    assert result.layer == "selectors"
+    assert len(result.rows) == 120, f"every notice, got {len(result.rows)}"
+    assert all(r.url and "notice_id=" in r.url for r in result.rows), \
+        "the row is the anchor; its own href is the notice URL"
