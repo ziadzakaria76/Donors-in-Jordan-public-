@@ -22,7 +22,7 @@ enum class LeadSource {
  *
  * `ARAB_NON_JORDANIAN` and `NON_ARAB` used to sit here, both mapping to
  * `Track.NONJO`. They are removed rather than remapped — see DECISIONS.md →
- * D-25. With the non-Jordanian track gone there is no honest track left for
+ * D-23. With the non-Jordanian track gone there is no honest track left for
  * them, and pointing them at `EXPAT` would have recorded a non-Jordanian buyer
  * as a Jordanian expatriate: a lie in the one field the whole process is
  * chosen from.

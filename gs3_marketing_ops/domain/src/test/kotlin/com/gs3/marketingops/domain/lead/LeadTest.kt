@@ -41,7 +41,7 @@ class LeadTest {
 
     @Test
     fun `the two non-Jordanian categories are gone, not remapped onto expatriate`() {
-        // D-25. The failure this guards against is not the enum coming back —
+        // D-23. The failure this guards against is not the enum coming back —
         // it is the enum coming back pointed at EXPAT, which would file a
         // non-Jordanian buyer as a Jordanian expatriate and look perfectly
         // healthy on every screen. Every category must map to the track its own
