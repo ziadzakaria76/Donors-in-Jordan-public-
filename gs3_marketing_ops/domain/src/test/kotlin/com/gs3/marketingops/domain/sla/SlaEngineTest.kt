@@ -80,6 +80,28 @@ class SlaEngineTest {
     }
 
     @Test
+    fun `working time that runs out on a Thursday resumes on Saturday, not Friday`() {
+        // `addWorkingTime` is the only route into the weekend roll-forward, and
+        // nothing reached it: the Friday tests above go through
+        // `nextReplyDeadline`, which has its own out-of-hours rule. A QA pass
+        // proved the gap by making the roll skip seven days instead of one and
+        // watching every test still pass.
+        //
+        // Thursday 2026-08-13 at 17:55 with fifteen minutes to run: five
+        // minutes are left before the office shuts at 18:00, and the other ten
+        // belong to the next working morning. Friday is the weekend here (B1,
+        // D-5), so that morning is Saturday.
+        assertEquals(DayOfWeek.THURSDAY, LocalDate.parse("2026-08-13").dayOfWeek)
+        assertEquals(DayOfWeek.FRIDAY, LocalDate.parse("2026-08-14").dayOfWeek)
+
+        val resumed = hours.addWorkingTime(
+            ammanInstant("2026-08-13", "17:55"),
+            Duration.ofMinutes(15),
+        )
+        assertEquals(ammanInstant("2026-08-15", "09:10"), resumed)
+    }
+
+    @Test
     fun `viewing follow-up and written offer run on elapsed time`() {
         val viewed = ammanInstant("2026-08-10", "16:00")
         assertEquals(ammanInstant("2026-08-12", "16:00"), SlaEngine.viewingFollowUpDeadline(viewed).dueAt)
