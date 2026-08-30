@@ -443,99 +443,6 @@ def test_ted_makes_no_country_claim_it_cannot_check():
     assert TedPortal.country_from_title("Rehabilitation of water networks in Aleppo") is None
 
 
-def test_uk_sanctions_list_is_resolved_from_its_publication_page():
-    """OFSI's consolidated list closed on 28 January 2026 and the old URL 404s
-    for good. Its replacement is served from a content-addressed path whose hash
-    changes on every republication, so the download link is read off the stable
-    publication page rather than pinned.
-    """
-    import re
-    from syria_monitor.screening import SOURCES
-
-    source = SOURCES["uk_sanctions"]
-    assert "gov.uk/government/publications/the-uk-sanctions-list" in source["landing"]
-    assert "url" not in source, "a pinned URL is what expired last time"
-
-    page = ('<a class="govuk-link" href="https://assets.publishing.service.gov.uk'
-            '/media/68b1f0aa9c7d/UK_Sanctions_List.csv">CSV</a>'
-            '<a href="https://assets.publishing.service.gov.uk'
-            '/media/68b1f0aa9c7d/UK_Sanctions_List.xml">XML</a>')
-    found = re.findall(source["link_pattern"], page)
-    assert found == ["https://assets.publishing.service.gov.uk"
-                     "/media/68b1f0aa9c7d/UK_Sanctions_List.csv"], found
-
-
-def test_a_sanctions_list_that_cannot_be_resolved_says_so(tmp_path):
-    """Silence here is the dangerous failure: screening carries on against the
-    lists that did load, and a run reporting two of three reads as normal."""
-    from types import SimpleNamespace
-    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
-
-    class NoLink:
-        def get(self, url, **kw):
-            return SimpleNamespace(text="<html>no downloads here</html>", status=200, ok=True)
-
-    screener = Screener(cache_dir=tmp_path, fetcher=NoLink())
-    try:
-        screener.resolve_url(SOURCES["uk_sanctions"])
-    except ScreeningUnavailable as exc:
-        assert "no download link" in str(exc) and "the-uk-sanctions-list" in str(exc)
-    else:
-        raise AssertionError("an unresolvable list must raise, not return nothing")
-
-
-def test_an_unresolvable_sanctions_list_names_what_the_page_does_offer(tmp_path):
-    """Naming only what is missing is not enough to act on.
-
-    The first version of this message said "the page layout or the file format
-    offered has changed; open it and look". It ran against the live page,
-    resolved nothing, and pointed the reader at a page that several of the
-    environments this runs in cannot open -- gov.uk answers 403 to CONNECT
-    behind an egress allowlist. So the next pattern would have been guessed,
-    and guessing it once already produced a fix that shipped and did not work.
-    """
-    from types import SimpleNamespace
-    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
-
-    page = ('<a href="https://assets.publishing.service.gov.uk/media/abc/'
-            'UK_Sanctions_List.ods">ODS</a>'
-            '<a href="https://assets.publishing.service.gov.uk/media/abc/'
-            'UK_Sanctions_List.xml">XML</a>')
-
-    class OnlyOtherFormats:
-        def get(self, url, **kw):
-            return SimpleNamespace(text=page, status=200, ok=True)
-
-    screener = Screener(cache_dir=tmp_path, fetcher=OnlyOtherFormats())
-    try:
-        screener.resolve_url(SOURCES["uk_sanctions"])
-    except ScreeningUnavailable as exc:
-        message = str(exc)
-        assert "UK_Sanctions_List.ods" in message, message
-        assert "UK_Sanctions_List.xml" in message, message
-    else:
-        raise AssertionError("must raise rather than resolve to nothing")
-
-
-def test_it_says_so_when_the_page_carries_no_asset_links_at_all(tmp_path):
-    """A JavaScript-rendered page and a renamed file are different problems and
-    need different fixes, so the message must tell them apart."""
-    from types import SimpleNamespace
-    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
-
-    class Empty:
-        def get(self, url, **kw):
-            return SimpleNamespace(text="<html><body>loading</body></html>",
-                                   status=200, ok=True)
-
-    screener = Screener(cache_dir=tmp_path, fetcher=Empty())
-    try:
-        screener.resolve_url(SOURCES["uk_sanctions"])
-    except ScreeningUnavailable as exc:
-        assert "no assets.publishing.service.gov.uk links at all" in str(exc)
-        assert "bytes" in str(exc), "the size distinguishes an empty page from a full one"
-
-
 def test_a_magnitude_must_end_where_it_matches():
     """"Multiple" is not a million.
 
@@ -573,3 +480,97 @@ def test_real_magnitudes_still_parse():
     assert parse_value("EUR 1.500.000").amount == 1_500_000
     # Arabic, where the lookahead also must not reject a legitimate suffix.
     assert parse_value("قيمة العقد 5 مليون دولار").amount == 5_000_000
+
+
+def test_the_uk_list_is_not_pointed_at_the_retired_consolidated_list():
+    """The obvious replacement is the wrong one.
+
+    data.gov.uk/dataset/financialsanctions IS the OFSI Consolidated List -- the
+    list that closed on 28 January 2026. Pointing there would swap a loud 404
+    for a list frozen since January that looks like it is working, which is
+    strictly worse than the failure it replaces.
+
+    The GOV.UK publication page is also out: resolving the link off it was
+    shipped and run, and the page carries one asset link, a schema rather than
+    the data, because the attachment list is client-rendered.
+    """
+    from syria_monitor.screening import SOURCES
+
+    urls = " ".join(SOURCES["uk_sanctions"]["urls"])
+    assert "data.gov.uk" not in urls, "that dataset is the retired list"
+    assert "assets.publishing.service.gov.uk" not in urls, "content-addressed; rehashed weekly"
+    assert all(u.startswith("https://sanctionslist.fcdo.gov.uk/") for u in
+               SOURCES["uk_sanctions"]["urls"]), urls
+
+
+def test_a_list_published_at_several_addresses_falls_through_to_a_working_one(tmp_path):
+    from types import SimpleNamespace
+    from syria_monitor.screening import Screener, SOURCES
+
+    csv_url, xml_url = SOURCES["uk_sanctions"]["urls"]
+    xml = ('<?xml version="1.0"?><Designations>'
+           '<Designation><Names><Name1>Ahmad Example</Name1></Names></Designation>'
+           '<Designation><Names><Name1>Example Trading LLC</Name1></Names></Designation>'
+           '</Designations>')
+
+    class CsvGone:
+        def __init__(self): self.asked = []
+        def get(self, url, **kw):
+            self.asked.append(url)
+            if url == csv_url:
+                return SimpleNamespace(text="Not Found", status=404, ok=False)
+            return SimpleNamespace(text=xml, status=200, ok=True)
+
+    fetcher = CsvGone()
+    result = Screener(cache_dir=tmp_path, fetcher=fetcher).refresh("uk_sanctions")
+
+    assert fetcher.asked == [csv_url, xml_url], "tries each address in turn"
+    assert result.source_url == xml_url, "records WHICH address served it"
+    # Normalised, as the CSV path normalises -- screening compares normalised
+    # forms, so raw names would load, report a plausible count, and match nothing.
+    assert result.names == {"ahmad example", "example trading llc"}
+
+
+def test_every_address_failing_names_every_address(tmp_path):
+    """"0 names" cannot distinguish a moved file from an empty one from a
+    parser that did not understand the format. This module has produced all
+    three today."""
+    from types import SimpleNamespace
+    from syria_monitor.screening import Screener, ScreeningUnavailable
+
+    class AllGone:
+        def get(self, url, **kw):
+            return SimpleNamespace(text="Not Found", status=404, ok=False)
+
+    try:
+        Screener(cache_dir=tmp_path, fetcher=AllGone()).refresh("uk_sanctions")
+    except ScreeningUnavailable as exc:
+        message = str(exc)
+        assert "UK-Sanctions-List.csv" in message and "UK-Sanctions-List.xml" in message
+        assert "404" in message
+    else:
+        raise AssertionError("must raise rather than return an empty list")
+
+
+def test_xml_name_tags_do_not_swallow_their_own_metadata():
+    """A tag merely CONTAINING "name" also catches NameType, and padding the
+    list with words like "Primary name" turns every run into a false flag."""
+    from syria_monitor.screening import parse_xml_names
+
+    xml = ('<Designations><Designation><Names><Name>'
+           '<NameType>Primary name</NameType>'
+           '<Name1>Ahmad Example</Name1>'
+           '<NameStatus>Active</NameStatus>'
+           '</Name></Names></Designation></Designations>')
+    names = parse_xml_names(xml)
+    assert "ahmad example" in names
+    assert "primary name" not in names and "active" not in names, names
+
+
+def test_a_document_that_is_not_xml_still_parses_as_csv():
+    """The document decides how it is read, not the configuration."""
+    from syria_monitor.screening import parse_names
+
+    csv_text = "Name,Regime\nAhmad Example,Syria\nExample Trading LLC,Syria\n"
+    names = parse_names(csv_text, {"format": "csv", "name_column": None})
+    assert "ahmad example" in names and "example trading llc" in names

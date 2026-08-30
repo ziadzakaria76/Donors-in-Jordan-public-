@@ -39,25 +39,45 @@ SOURCES = {
         "name_column": None,
     },
     # THE LIST THIS USED TO READ NO LONGER EXISTS. OFSI's Consolidated List of
-    # Asset Freeze Targets closed on 28 January 2026; the UK Sanctions List is
-    # now the single source for UK designations. Every run since has reported
+    # Asset Freeze Targets closed on 28 January 2026; from that date the UK
+    # Sanctions List is the single source for UK designations. Every run before
+    # this reported
     #
     #     UK OFSI consolidated: fetched None, 0 names -- HTTP 404, 5201 bytes
     #
-    # and carried on screening against two lists of three. That is not a
-    # transient outage waiting to heal: the old URL will never answer again.
+    # and carried on screening against two lists of three.
     #
-    # RESOLVED FROM THE PUBLICATION PAGE, NOT HARDCODED. GOV.UK serves the file
-    # itself from a content-addressed path -- .../media/<hash>/UK_Sanctions_List.csv
-    # -- and that hash changes every time the list is republished, which is
-    # weekly. Pinning one is pinning an expiry date, and a sanctions list that
-    # 404s quietly is the failure this whole module exists to avoid. The
-    # publication page is the stable address; the download link is read off it.
+    # NOT data.gov.uk/dataset/financialsanctions, which is the obvious
+    # replacement and the wrong one: that dataset IS the consolidated list, so
+    # pointing at it would swap a loud 404 for a list frozen since January that
+    # looks like it is working. That is strictly worse than the failure.
+    #
+    # NOT the GOV.UK publication page either. Resolving the download link off
+    # that page was tried and shipped, and the run of 2026-08-30 reported what
+    # the page actually carries:
+    #
+    #     What the page offers: .../SanctionsListSchema-4.33.3.xsd
+    #
+    # One asset link, and a schema rather than the data -- the attachment list
+    # is client-rendered, so no pattern can match links that are not in the HTML.
+    #
+    # These are FCDO's own published addresses, and they are stable paths rather
+    # than the content-addressed ones GOV.UK rehashes on every republication.
+    # CSV first because the parser below reads it directly; XML is what FCDO
+    # documents most prominently and is the fallback.
+    #
+    # NEITHER IS VERIFIED FROM HERE. sanctionslist.fcdo.gov.uk answers 403 to
+    # CONNECT behind this environment's egress allowlist, as do gov.uk,
+    # data.gov.uk and the artifact store. So the run is the verification: it
+    # reports which URL served and how many names came back, and a name count
+    # that is implausible is as visible as a failure.
     "uk_sanctions": {
         "label": "UK Sanctions List",
-        "landing": "https://www.gov.uk/government/publications/the-uk-sanctions-list",
-        "link_pattern": r"https://assets\.publishing\.service\.gov\.uk/[A-Za-z0-9._/%~-]+?\.csv",
-        "format": "csv",
+        "urls": (
+            "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.csv",
+            "https://sanctionslist.fcdo.gov.uk/docs/UK-Sanctions-List.xml",
+        ),
+        "format": "auto",
         "name_column": None,
     },
 }
@@ -85,6 +105,9 @@ class SanctionsList:
     fetched: Optional[date]
     names: set[str] = field(default_factory=set)
     error: Optional[str] = None
+    # Which of the published addresses actually served this list. Reported, so
+    # a run says where its names came from rather than leaving it to be assumed.
+    source_url: Optional[str] = None
 
     @property
     def usable(self) -> bool:
@@ -131,76 +154,55 @@ class Screener:
             return None
         fetched = datetime.fromisoformat(blob["fetched"]).date() if blob.get("fetched") else None
         return SanctionsList(key=key, label=blob.get("label", key), fetched=fetched,
-                             names=set(blob.get("names") or []))
+                             names=set(blob.get("names") or []),
+                             source_url=blob.get("source_url"))
 
     def save_cached(self, sanctions: SanctionsList) -> None:
         self._cache_path(sanctions.key).write_text(json.dumps({
             "label": sanctions.label,
             "fetched": sanctions.fetched.isoformat() if sanctions.fetched else None,
+            "source_url": sanctions.source_url,
             "names": sorted(sanctions.names),
         }), encoding="utf-8")
 
-    def resolve_url(self, source: dict) -> str:
-        """The address to download from, read off the publication page if needed.
-
-        A source that names a `landing` page is one whose own download URL is
-        not stable -- GOV.UK content-addresses its attachments, so the link
-        changes on every republication. Following the page each time costs one
-        extra request and removes a scheduled failure.
-        """
-        landing = source.get("landing")
-        if not landing:
-            return source["url"]
-        response = self.fetcher.get(landing)
-        if not response.ok:
-            raise ScreeningUnavailable(
-                f"{source['label']}: publication page {landing} returned "
-                f"HTTP {response.status}")
-        page = response.text or ""
-        matches = re.findall(source["link_pattern"], page)
-        if not matches:
-            # SAY WHAT THE PAGE DOES OFFER, not only what is missing.
-            #
-            # The first version of this said "the page layout or the file format
-            # offered has changed; open it and look". It ran, it resolved
-            # nothing, and it sent the reader to a page that several of the
-            # environments this runs in cannot open -- gov.uk answers 403 to
-            # CONNECT behind an egress allowlist. So the message named the
-            # problem and withheld the one thing that would fix it, leaving the
-            # next pattern to be guessed. Guessing it once already produced a
-            # fix that shipped and did not work.
-            offered = re.findall(r"https://assets\.publishing\.service\.gov\.uk"
-                                 r"/[^\s\"'<>]+\.[A-Za-z0-9]{2,5}", page)
-            seen, unique = set(), []
-            for link in offered:
-                if link not in seen:
-                    seen.add(link)
-                    unique.append(link)
-            found = ("; ".join(unique[:8]) if unique
-                     else f"no assets.publishing.service.gov.uk links at all "
-                          f"in {len(page)} bytes")
-            raise ScreeningUnavailable(
-                f"{source['label']}: no download link matching "
-                f"{source['link_pattern']!r} on {landing}. "
-                f"What the page offers: {found}")
-        return matches[0]
-
     def refresh(self, key: str) -> SanctionsList:
+        """Download and parse a list, trying each published address in turn.
+
+        WHICH ADDRESS SERVED IS RECORDED, not inferred. A source with several
+        candidates that reports only "0 names" leaves the reader unable to tell
+        a moved file from an empty one from a parser that did not understand
+        the format, and this module has now produced all three.
+        """
         source = SOURCES[key]
         if self.fetcher is None:
             raise ScreeningUnavailable(f"{source['label']}: no fetcher configured")
-        url = self.resolve_url(source)
-        response = self.fetcher.get(url)
-        if not response.ok or not response.text.strip():
-            raise ScreeningUnavailable(
-                f"{source['label']}: HTTP {response.status}, {len(response.text)} bytes "
-                f"from {url}")
-        names = parse_names(response.text, source)
-        if not names:
-            raise ScreeningUnavailable(f"{source['label']}: downloaded but parsed 0 names")
-        sanctions = SanctionsList(key=key, label=source["label"], fetched=date.today(), names=names)
-        self.save_cached(sanctions)
-        return sanctions
+
+        urls = source.get("urls") or (source["url"],)
+        attempts: list[str] = []
+        for url in urls:
+            try:
+                response = self.fetcher.get(url)
+            except Exception as exc:                      # transport, not HTTP
+                attempts.append(f"{url}: {type(exc).__name__}: {exc}")
+                continue
+            body = response.text or ""
+            if not response.ok or not body.strip():
+                attempts.append(f"{url}: HTTP {response.status}, {len(body)} bytes")
+                continue
+            names = parse_names(body, source)
+            if not names:
+                attempts.append(f"{url}: HTTP {response.status}, {len(body)} bytes, "
+                                f"parsed 0 names")
+                continue
+            sanctions = SanctionsList(key=key, label=source["label"],
+                                      fetched=date.today(), names=names,
+                                      source_url=url)
+            self.save_cached(sanctions)
+            return sanctions
+
+        raise ScreeningUnavailable(
+            f"{source['label']}: no address returned a usable list. "
+            + " | ".join(attempts))
 
     def load(self, keys: Optional[Iterable[str]] = None) -> dict[str, SanctionsList]:
         for key in (keys or SOURCES):
@@ -246,7 +248,8 @@ class Screener:
 
     def list_status(self) -> list[dict]:
         return [{"list": s.label, "fetched": s.fetched.isoformat() if s.fetched else None,
-                 "names": len(s.names), "error": s.error} for s in self.lists.values()]
+                 "names": len(s.names), "error": s.error,
+                 "source_url": s.source_url} for s in self.lists.values()]
 
 
 def _is_match(party_norm: str, party_tokens: set[str], entry: str) -> bool:
@@ -265,7 +268,56 @@ def _is_match(party_norm: str, party_tokens: set[str], entry: str) -> bool:
     return False
 
 
+# Element names the UK Sanctions List XML uses for the designated party. Kept
+# narrow on purpose: a tag merely CONTAINING "name" also catches NameType and
+# similar metadata, which would pad the list with words like "Primary name" and
+# turn every screening run into a source of false flags.
+_XML_NAME_TAGS = re.compile(r"(?i)^(name\d*|wholename|fullname|lastname|firstname|"
+                            r"nameofentity|organisationname)$")
+
+
+def parse_xml_names(text: str) -> set[str]:
+    """Designated names out of a sanctions XML document.
+
+    THE SCHEMA IS NOT VERIFIED HERE. sanctionslist.fcdo.gov.uk cannot be reached
+    from the environment this was written in, so the tag set below is what
+    FCDO's published schema name and the usual shape of these documents imply,
+    not what was read off the file. The run reports the count, and a count that
+    is implausible for a national sanctions list says so at a glance -- which is
+    the same check the two working lists already get.
+    """
+    from xml.etree import ElementTree
+
+    try:
+        root = ElementTree.fromstring(text)
+    except ElementTree.ParseError:
+        return set()
+
+    names: set[str] = set()
+    for element in root.iter():
+        tag = element.tag.rsplit("}", 1)[-1]          # strip any namespace
+        if not _XML_NAME_TAGS.match(tag):
+            continue
+        value = (element.text or "").strip()
+        # A designated name is a name: not a sentence, not a single letter.
+        if not 2 <= len(value) <= 200:
+            continue
+        # NORMALISED, as the CSV path normalises. Screening compares normalised
+        # forms, so a set of raw names would be a list that loads, reports a
+        # plausible count, and matches nothing -- the failure this module keeps
+        # producing in new shapes.
+        norm = normalise(value)
+        if norm:
+            names.add(norm)
+    return names
+
+
 def parse_names(text: str, source: dict) -> set[str]:
+    # A source may publish more than one format at more than one address, so the
+    # document decides how it is read rather than the configuration guessing.
+    stripped = text.lstrip()
+    if stripped.startswith("<?xml") or stripped.startswith("<"):
+        return parse_xml_names(text)
     delimiter = ";" if source.get("format") == "csv_semicolon" else ","
     names: set[str] = set()
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
