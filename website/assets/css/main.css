@@ -541,7 +541,8 @@ table.data tbody tr:hover { background: #FCFAF6; }
   position: fixed; inset-block-end: 1.25rem; inset-inline-end: 1.25rem; z-index: 90;
   display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.85rem 1.15rem;
   background: #1FA855; color: #fff; border-radius: 100px; font-size: var(--fs-sm); font-weight: 600;
-  box-shadow: 0 8px 26px rgba(15, 21, 24, 0.28); transition: transform 0.25s var(--ease), background 0.2s;
+  box-shadow: 0 8px 26px rgba(15, 21, 24, 0.28);
+  transition: transform 0.25s var(--ease), background 0.2s, inset-block-end 0.25s var(--ease);
 }
 .wa-fab:hover { transform: translateY(-3px); background: #18944A; }
 .wa-fab .icon { inline-size: 22px; block-size: 22px; flex: none; }
@@ -738,6 +739,21 @@ table.data tbody tr:hover { background: #FCFAF6; }
   color: #fff;
 }
 .compare-tray__actions { display: flex; gap: .5rem; margin-inline-start: auto; }
+
+/* The tray is fixed to the bottom, so it sits over whatever is there — and
+   what is there is the WhatsApp button and the last band of the footer.
+   Selecting a unit to compare made the WhatsApp button unclickable (100% of it
+   covered on a phone) and left 66px of footer that could not be scrolled to.
+   That is the site's primary contact channel, disabled at the exact moment a
+   buyer is deepest in the decision.
+   compare.js publishes the tray's measured height — it wraps to two rows on a
+   phone, so it is not a constant — and the page makes room for it. */
+
+body.has-compare-tray { padding-block-end: var(--compare-tray-h, 0px); }
+
+body.has-compare-tray .wa-fab {
+  inset-block-end: calc(1.25rem + var(--compare-tray-h, 0px));
+}
 
 .modal__panel--wide { inline-size: min(920px, 100%); }
 

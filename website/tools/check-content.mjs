@@ -226,6 +226,39 @@ for (const [file, html] of rendered) {
     `${file} does not match what tools/build-pages.mjs generates — put the change in the generator and run \`npm run pages\`, or it will be deleted the next time somebody does`);
 }
 
+/* ------------------------------------------ every renderer has somewhere to go
+   pages.js renders into elements it looks up by id. If the markup for one is on
+   no page, the renderer is dead code and — worse — whatever writes that content
+   is writing into a void.
+
+   That has happened twice. The FAQ renderer had no page until this month, so
+   content.json held five questions nobody could read and the admin panel's FAQ
+   editor changed nothing. Then the testimonials section was removed from
+   index.html while its renderer stayed, so the panel invited an editor to
+   publish a real person's words and would have shown them nowhere.
+
+   Both failures are silent: the renderer returns early, the page looks fine,
+   and only the person who supplied the content finds out, later.
+
+   A deliberately removed section is fine — name it in REMOVED below, so the
+   decision is written down rather than indistinguishable from an accident. */
+
+{
+  const REMOVED = {
+    "home-stats": "the stats band went with the invented figures; about.html now shows the three real buildings instead (README -> Restoring the stats and testimonials)",
+    "contact-map": "no office address is published, so there is no office to map (README -> Restoring the office address)",
+    "project-filters": "three projects do not need filtering; the grid shows all of them",
+  };
+  const allPages = readdirSync(ROOT).filter((f) => f.endsWith(".html")).map((f) => read(f)).join("\n");
+  const targets = [...read("assets/js/pages.js").matchAll(/\$\("#([\w-]+)"\)/g)].map((m) => m[1]);
+
+  for (const id of new Set(targets)) {
+    if (REMOVED[id]) { notes.push(`section "${id}" is deliberately absent: ${REMOVED[id]}`); continue; }
+    check(allPages.includes(`id="${id}"`),
+      `assets/js/pages.js renders into #${id}, which no page contains — the renderer is dead, and anything writing that content is writing into a void. Restore the markup, or list it in REMOVED in this file with the reason.`);
+  }
+}
+
 /* ------------------------------------------------ the deploy finds the API
    Wrangler resolves Pages Functions from `path.join(process.cwd(), "functions")`
    — its working directory, never the directory being uploaded — and wrangler 4
