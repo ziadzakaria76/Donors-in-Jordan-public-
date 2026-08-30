@@ -58,27 +58,70 @@ class UngmPortal(HtmlPortal):
         return None
 
     def search_body(self, page: int = 0) -> dict:
-        """UNGM search POST body.
+        """UNGM search POST body, taken from a real request the UI made.
 
-        SKELETON -- replace field-for-field from a --capture network trace.
+        NO LONGER A SKELETON. Recorded on 2026-08-30 by driving the live
+        listing in Chromium and watching what it asked for -- Actions run
+        33282804658, five POSTs to this endpoint, HTTP 200, ~95 KB each. The
+        field names, the field order and the literal values below are that
+        request, not a reconstruction of it.
+
+        That distinction has already cost this project once. The previous
+        skeleton was wrong in six places, and a wrong body does not error: it
+        returns a short response that reads exactly like "there is nothing for
+        this country". The note that went into a sibling module -- POST
+        /Public/Notice/Search "returned 395 bytes", filed as proof the endpoint
+        was dead -- was proof of a wrong request body.
+
+        What the skeleton got wrong, since knowing which guesses failed is
+        worth more than the corrected list:
+
+          SortField     "DeadlineUTC" -> "Deadline". The likeliest culprit of
+                        the three: an unrecognised sort field is exactly the
+                        sort of input a search API rejects wholesale.
+          PageSize      100 -> 15. The UI asks for 15. Whether UNGM caps or
+                        refuses larger pages is UNTESTED -- 15 is simply the
+                        only value observed to work.
+          PublishedTo   "" -> today. The UI bounds the upper end rather than
+                        leaving it open.
+          five fields   isPicker, IsSustainable, NoticeDisplayType,
+                        NoticeSearchTotalLabelId and TypeOfCompetitions were
+                        absent entirely.
+
+        `isPicker` really is lower-cased where its neighbours are not. That is
+        UNGM's spelling, it is what the server was sent, and correcting it to
+        `IsPicker` would be reintroducing a guess.
+
+        TWO PARAMETERISED VALUES, and only two: the page, and the country. The
+        capture was of an unfiltered listing, so the UI sent `"Countries": []`.
+        It therefore proves the field name and that it takes an array -- it
+        does NOT prove that [2490] narrows the result to Syria. The first
+        `--capture ungm` against this body is what settles that, by whether the
+        rows it returns say Syria.
         """
+        today = date.today().strftime("%d-%b-%Y")
         return {
             "PageIndex": page,
-            "PageSize": int(self.cfg.get("page_size", 100)),
+            "PageSize": int(self.cfg.get("page_size", 15)),
             "Title": "",
             "Description": "",
             "Reference": "",
             "PublishedFrom": "",
-            "PublishedTo": "",
-            "DeadlineFrom": date.today().strftime("%d-%b-%Y"),
+            "PublishedTo": today,
+            "DeadlineFrom": today,
             "DeadlineTo": "",
             "Countries": [int(self.cfg["country_id"])],
-            "NoticeTypes": [],
-            "UNSPSCs": [],
             "Agencies": [],
-            "IsActive": True,
-            "SortField": "DeadlineUTC",
+            "UNSPSCs": [],
+            "NoticeTypes": [],
+            "SortField": "Deadline",
             "SortAscending": True,
+            "isPicker": False,
+            "IsSustainable": False,
+            "IsActive": True,
+            "NoticeDisplayType": None,
+            "NoticeSearchTotalLabelId": "noticeSearchTotal",
+            "TypeOfCompetitions": [],
         }
 
     def pages(self):
