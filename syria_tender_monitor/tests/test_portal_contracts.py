@@ -482,3 +482,55 @@ def test_a_sanctions_list_that_cannot_be_resolved_says_so(tmp_path):
         assert "no download link" in str(exc) and "the-uk-sanctions-list" in str(exc)
     else:
         raise AssertionError("an unresolvable list must raise, not return nothing")
+
+
+def test_an_unresolvable_sanctions_list_names_what_the_page_does_offer(tmp_path):
+    """Naming only what is missing is not enough to act on.
+
+    The first version of this message said "the page layout or the file format
+    offered has changed; open it and look". It ran against the live page,
+    resolved nothing, and pointed the reader at a page that several of the
+    environments this runs in cannot open -- gov.uk answers 403 to CONNECT
+    behind an egress allowlist. So the next pattern would have been guessed,
+    and guessing it once already produced a fix that shipped and did not work.
+    """
+    from types import SimpleNamespace
+    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
+
+    page = ('<a href="https://assets.publishing.service.gov.uk/media/abc/'
+            'UK_Sanctions_List.ods">ODS</a>'
+            '<a href="https://assets.publishing.service.gov.uk/media/abc/'
+            'UK_Sanctions_List.xml">XML</a>')
+
+    class OnlyOtherFormats:
+        def get(self, url, **kw):
+            return SimpleNamespace(text=page, status=200, ok=True)
+
+    screener = Screener(cache_dir=tmp_path, fetcher=OnlyOtherFormats())
+    try:
+        screener.resolve_url(SOURCES["uk_sanctions"])
+    except ScreeningUnavailable as exc:
+        message = str(exc)
+        assert "UK_Sanctions_List.ods" in message, message
+        assert "UK_Sanctions_List.xml" in message, message
+    else:
+        raise AssertionError("must raise rather than resolve to nothing")
+
+
+def test_it_says_so_when_the_page_carries_no_asset_links_at_all(tmp_path):
+    """A JavaScript-rendered page and a renamed file are different problems and
+    need different fixes, so the message must tell them apart."""
+    from types import SimpleNamespace
+    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
+
+    class Empty:
+        def get(self, url, **kw):
+            return SimpleNamespace(text="<html><body>loading</body></html>",
+                                   status=200, ok=True)
+
+    screener = Screener(cache_dir=tmp_path, fetcher=Empty())
+    try:
+        screener.resolve_url(SOURCES["uk_sanctions"])
+    except ScreeningUnavailable as exc:
+        assert "no assets.publishing.service.gov.uk links at all" in str(exc)
+        assert "bytes" in str(exc), "the size distinguishes an empty page from a full one"
