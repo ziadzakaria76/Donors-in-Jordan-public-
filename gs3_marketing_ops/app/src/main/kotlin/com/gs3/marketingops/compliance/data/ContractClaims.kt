@@ -18,10 +18,11 @@ import java.time.Instant
  *
  * **There were four.** The delay penalty and the two-year/ten-year warranty
  * were the two nobody had verified, and on 2026-08-30 the owner removed them
- * along with the guard that kept them out of client-facing text — see
- * DECISIONS.md → D-30, which records what that guard was doing and what is
- * no longer checked. Anything added here in future starts unconfirmed and
- * should stay out of client text until someone has read the contract.
+ * along with the guard that kept them out of client-facing text. Nothing now
+ * stops a template or an objection promising either, so the signed contract is
+ * the only thing behind such a sentence. Anything added here in future starts
+ * unconfirmed and should stay out of client text until someone has read the
+ * contract.
  *
  * **These rows are not about non-Jordanian buyers**, which is why they survived
  * the removal of that track (DECISIONS.md → D-23) while the eligibility gate

@@ -58,8 +58,7 @@ object Gs3Seed {
      * contract carries the finishing-specifications annex and the quarterly
      * photographic progress report, and did not confirm the delay penalty or
      * the two-year and ten-year warranty. On 2026-08-30 the owner removed those
-     * two unconfirmed claims outright (D-30), so what is left is the confirmed
-     * half.
+     * two unconfirmed claims outright, so what is left is the confirmed half.
      *
      * That means **every row this seeds is confirmed**, and the design that
      * exists to carry a partial answer is not carrying one at the moment. It
@@ -181,9 +180,9 @@ object Gs3Seed {
      * the words.
      *
      * There was a second rule — no unverified B-2 contract claim, so no delay
-     * penalty and no warranty. D-30 removed both claims and the test that
-     * enforced it. The answers below still avoid them, but that is now a
-     * property of the text rather than something the build checks.
+     * penalty and no warranty. Both claims and the test that enforced it were
+     * removed on 2026-08-30. The answers below still avoid them, but that is
+     * now a property of the text rather than something the build checks.
      *
      * What they *do* lean on is what the company already publishes on its own
      * website: the two street frontages, the named finishing specifications, the
@@ -251,8 +250,9 @@ object Gs3Seed {
             objectionAr = "متى التسليم، وماذا لو تأخّر؟",
             objectionEn = "When is delivery, and what if it is late?",
             // Deliberately still promises no delay penalty, though nothing
-            // stops it any more: D-30 removed that claim and the guard that
-            // banned the phrase. The text is unchanged because the reason for
+            // stops it any more: the claim and the guard that banned the
+            // phrase were removed on 2026-08-30. The text is unchanged
+            // because the reason for
             // it is unchanged -- nobody has read the signed contract and
             // confirmed a penalty is in it, and this answer is given to a buyer
             // weighing a six-figure purchase. What is offered instead is the
