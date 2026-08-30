@@ -192,7 +192,7 @@ abstract class Gs3Database : RoomDatabase() {
          *
          * `DELAY_PENALTY_IN_BUYERS_FAVOUR` and `TWO_YEAR_AND_TEN_YEAR_WARRANTY`
          * were the half of B-2 nobody had verified against the signed contract.
-         * The owner removed them on 2026-08-30 (D-30). The seed no longer emits
+         * The owner removed them on 2026-08-30. The seed no longer emits
          * them, and — as with every data change in this file — the seed alone
          * cannot clear them from a database that already has them, because
          * every insert is `IGNORE` (D-19) and none of them is a delete.

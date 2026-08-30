@@ -102,8 +102,9 @@ class SeedOnDeviceTest {
             ),
             confirmed,
         )
-        // Two rows, both confirmed. D-30 removed the unverified two rather
-        // than shipping them unconfirmed, so there is no partial answer left
+        // Two rows, both confirmed. The unverified two were removed on
+        // 2026-08-30 rather than shipped unconfirmed, so there is no partial
+        // answer left
         // for the row-per-claim design to carry -- but the shape survives, and
         // the next claim added starts unconfirmed.
         assertEquals(2, claims.size)
@@ -133,7 +134,7 @@ class SeedOnDeviceTest {
         seeder.seed()
 
         val dao = database.complianceDao()
-        // Every seeded claim is confirmed since D-30, so the edit to protect is
+        // Every seeded claim is confirmed now, so the edit to protect is
         // the clause reference rather than the tick. It is the same guarantee:
         // an insert carrying an existing primary key must change nothing.
         val target = dao.getClaims().first()

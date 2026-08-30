@@ -60,7 +60,7 @@ class SeedContentTest {
             seeded.fold(Jod.ZERO) { running, row -> running + row.annual },
         )
         // 4,680, not 7,200: the four non-Jordanian market rows are gone with
-        // the track (D-23), and the brief scaling to 5,805 went with the
+        // the track (D-23), and the 2026-08-29 scaling to 5,805 went with the
         // cost-per-raw-lead assumption it rested on.
         assertEquals(Jod.ofDinars(4_680), Gs3Budget.externalTrackTotal)
         assertEquals(5, seeded.size)
@@ -86,9 +86,9 @@ class SeedContentTest {
         assertEquals(2, claims.size)
         assertEquals(ContractClaim.entries.map { it.name }.toSet(), claims.map { it.claim }.toSet())
 
-        // Every remaining claim is confirmed. D-30 removed the unverified two
-        // rather than leaving them unconfirmed, so the partial answer this
-        // design exists to carry is not being carried at the moment.
+        // Every remaining claim is confirmed: the unverified two were removed
+        // on 2026-08-30 rather than left unconfirmed, so the partial answer
+        // this design exists to carry is not being carried at the moment.
         assertEquals(
             setOf(
                 ContractClaim.FINISHING_SPECIFICATIONS_ANNEX,
@@ -173,10 +173,10 @@ class SeedContentTest {
      * **This list used to have a second family, and no longer does.** The
      * unconfirmed B-2 claims — a delay penalty and a two-year/ten-year warranty
      * — were banned here because nobody had read the signed contract to confirm
-     * them. The owner removed both claims and this guard on 2026-08-30
-     * (DECISIONS.md → D-30). Nothing now stops a future template or objection
-     * promising either, so the contract text is the only thing standing between
-     * a buyer and a promise the company may not be able to keep.
+     * them. The owner removed both claims and this guard on 2026-08-30. Nothing
+     * now stops a future template or objection promising either, so the
+     * contract text is the only thing standing between a buyer and a promise
+     * the company may not be able to keep.
      *
      * What remains is the standing **forbidden phrases**: a fee exemption the
      * company cannot grant, an approval that belongs to the authorities, a
