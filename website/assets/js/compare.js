@@ -86,7 +86,13 @@
   let tray = null;
 
   function renderTray() {
-    if (!picked.size) { tray?.remove(); tray = null; return; }
+    if (!picked.size) {
+      tray?.remove();
+      tray = null;
+      document.body.classList.remove("has-compare-tray");
+      document.documentElement.style.removeProperty("--compare-tray-h");
+      return;
+    }
 
     if (!tray) {
       tray = document.createElement("div");
@@ -113,6 +119,15 @@
           </button>
         </div>
       </div>`;
+
+    /* Tell the page how much room the tray needs. It wraps to two rows on a
+       phone, so this is measured rather than assumed — and without it the tray
+       covers the WhatsApp button and the last band of the footer. */
+    requestAnimationFrame(() => {
+      if (!tray) return;
+      document.documentElement.style.setProperty("--compare-tray-h", `${Math.ceil(tray.offsetHeight)}px`);
+      document.body.classList.add("has-compare-tray");
+    });
   }
 
   /* -------------------------------------------------------------- the table

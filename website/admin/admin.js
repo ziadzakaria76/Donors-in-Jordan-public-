@@ -217,10 +217,10 @@ TABS.dashboard = (root) => {
   /* Unfinished, not false — the same list `npm run check` prints. */
   const gaps = [];
   if (!state.content.company.founded) gaps.push("The founding year is not set, so no page states one.");
-  if (!state.content.company.address?.ar) gaps.push("There is no office address, so the footer address line and the office map stay hidden.");
+  if (!state.content.company.address?.ar) gaps.push("There is no office address, so the footer address line is hidden. The office map needs its markup restoring as well — see the README, \"Restoring the office address\".");
   if (!state.content.company.formFields?.access_key) gaps.push("Enquiry capture is off — forms still hand over to WhatsApp, but nothing is recorded.");
   if (!(state.content.testimonials || []).some((t) => t.published !== false)) gaps.push("No testimonial is published, so that section stays hidden.");
-  if (!(state.content.company.stats || []).length) gaps.push("No track-record figures, so the stats band stays hidden.");
+  if (!(state.content.company.stats || []).length) gaps.push("No track-record figures. The stats band was removed rather than blanked, so supplying them here is not enough to bring it back — the About page shows the three buildings instead, which is the stronger claim.");
 
   if (gaps.length) {
     root.append(el("div", { class: "card" },
