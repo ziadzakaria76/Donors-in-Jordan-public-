@@ -552,3 +552,61 @@ def test_the_row_printout_still_reads_ungm():
                                         "div.dataRow.notice-table"))
     assert "Rows in the markup: 3" in body
     assert "Multiple destinations" in body and "Syrian Arab Republic" in body
+
+
+def test_ungm_deadlines_are_read_from_the_deadline_cell(profile, gate):  # noqa: E301
+    """Every line of the report said "closes not published".
+
+    UNGM prints its column labels in the table header, not in the rows, so
+    there is no "Deadline:" for find_labelled_date to anchor to and it returned
+    None for all 87 notices. The cell itself did not parse either -- it reads
+    "30-Aug-2026 08:00 (GMT -4.00) 0.413660439452546", and the trailing
+    countdown fraction is not part of any date.
+
+    Not cosmetic: with no closing date, `drop_expired: true` has nothing to
+    test, so a closed tender is reported as open.
+    """
+    from datetime import date
+
+    def row(i, deadline):
+        return ('<div class="dataRow notice-table tableRow">'
+                '<a class="save-notice-button" href="#">Unsave this procurement opportunity.</a>'
+                f'<div class="resultTitle tableCell"><span class="ungm-title">Rehab {i}</span></div>'
+                f'<div class="deadline resultInfo1 tableCell">{deadline}</div>'
+                '<div class="resultInfo1 tableCell">Syrian Arab Republic</div></div>')
+
+    rows = "".join([
+        row(0, "30-Sep-2026 08:00 (GMT -4.00) 0.413660439452546"),   # the live shape
+        row(1, "05-Oct-2026 14:30 (GMT +2.00) 1.2"),
+        row(2, "2026-11-02"),
+        row(3, "n/a"),                                               # unreadable
+    ])
+
+    class Fetcher(StubFetcher):
+        def post(self, url, json=None, headers=None, **kw):
+            body = rows if json["PageIndex"] == 0 else ""
+            return SimpleNamespace(text=body, status=200, ok=True)
+        def get(self, url, **kw):
+            return SimpleNamespace(text="", status=200, ok=True)
+
+    portal = build("ungm", Fetcher(), profile, gate,
+                   cfg={"country_id": 2490, "page_size": 15})
+    closing = [t.closing_date for t in portal.collect().tenders]
+
+    assert closing[0] == date(2026, 9, 30), f"the live cell shape: {closing[0]}"
+    assert closing[1] == date(2026, 10, 5)
+    assert closing[2] == date(2026, 11, 2)
+    assert closing[3] is None, (
+        "a cell that cannot be read must not reach the report as a date")
+
+
+def test_an_unreadable_deadline_cell_is_not_passed_through_raw(profile, gate):
+    """A date-shaped string nothing downstream can parse is worse than None:
+    it looks like an answer to every reader of the field."""
+    from syria_monitor.extraction import Row
+
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": 2490})
+    row = Row(title="Supply of equipment", text="Supply of equipment",
+              cells={"deadline": "see tender documents"})
+    record = portal.row_to_record(row, "https://www.ungm.org/Public/Notice/Search")
+    assert record.get("closing_date") is None, record.get("closing_date")

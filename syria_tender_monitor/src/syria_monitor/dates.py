@@ -63,12 +63,34 @@ MONTHS = {
 
 _DMY_NAMED = re.compile(r"(\d{1,2})\s*\.?\s*([^\W\d_]{3,}(?:\s+[^\W\d_]{3,})?)\s*\.?\s*(\d{4})", re.UNICODE)
 _DOTTED = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
+# THE MONTH HAS TO BE A MONTH. This used [^\W\d_]{3,} -- any word of three or
+# more letters -- which reads "10 Sub 10" as a date shape, and a navigation menu
+# of "Section 10 / Sub 10" items then looks half-dated. A four-digit year was
+# hiding that: loosening the year to two digits, which UNDP needs, took the nav
+# fixture's quality from 0.35 to 0.57 and accepted a menu as a listing.
+#
+# So the month token is drawn from the same MONTHS vocabulary parse_date uses,
+# longest first so "januar" cannot be truncated to "jan". That is strictly
+# narrower than before AND admits the two-digit years that were being missed:
+# UNDP writes "Deadline 01-Sep-26", which this scanner never saw, so every UNDP
+# notice reached the report with no closing date at all.
+# MONTHS holds full names only -- parse_date reads "01-Sep-2026" through
+# dateutil's fuzzy fallback, not through that dict -- so the three-letter
+# abbreviations the portals actually write are listed alongside it. UNGM writes
+# "30-Aug-2026", UNDP "01-Sep-26" and TED "15 Jan 2027"; none of those months
+# appear in MONTHS.
+_MONTH_ABBREVIATIONS = ("jan", "feb", "mar", "apr", "may", "jun",
+                        "jul", "aug", "sep", "sept", "oct", "nov", "dec")
+_MONTH_ALT = "|".join(re.escape(name) for name in
+                      sorted(set(MONTHS) | set(_MONTH_ABBREVIATIONS),
+                             key=len, reverse=True))
+
 _DATE_SHAPED = re.compile(
     r"\d{4}-\d{2}-\d{2}(?!\d)"
     r"|\d{1,2}[./-]\d{1,2}[./-]\d{2,4}"
-    r"|\d{1,2}[\s-][^\W\d_]{3,}[\s-]\d{4}"
-    r"|[^\W\d_]{3,}\s+\d{1,2},?\s+\d{4}",
-    re.UNICODE,
+    r"|\d{1,2}[\s-](?:%s)[\s-]\d{2,4}"
+    r"|(?:%s)\s+\d{1,2},?\s+\d{4}" % (_MONTH_ALT, _MONTH_ALT),
+    re.UNICODE | re.IGNORECASE,
 )
 
 CLOSING_LABELS = ("deadline", "closing date", "closing", "closes", "submission deadline",

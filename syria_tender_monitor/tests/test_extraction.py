@@ -321,3 +321,42 @@ def test_a_save_button_with_text_does_not_become_the_title():
         "the save button's label must never reach a title"
     assert all(r.url and "/Public/Notice/" in r.url for r in result.rows), \
         "the URL is the notice link, never the button's href='#'"
+
+
+def test_a_month_has_to_be_a_month():
+    """The scanner accepted any word of three or more letters as a month.
+
+    "10 Sub 10" is then a date shape, so a navigation menu of "Section 10 /
+    Sub 10" items looks half-dated. A four-digit year was masking it: loosening
+    the year to two digits -- which UNDP needs -- took the nav fixture from
+    quality 0.35 to 0.57 and accepted a menu as a listing. Caught by that
+    fixture, which is what it is for.
+    """
+    from syria_monitor.dates import _DATE_SHAPED
+
+    for junk in ("Section 10 Sub 10", "10 Sub 10", "3 Lot 12", "1 of 11"):
+        assert not _DATE_SHAPED.search(junk), f"read {junk!r} as a date"
+
+
+def test_two_digit_years_are_seen_by_the_scanner():
+    """UNDP writes "Deadline 01-Sep-26". The scanner required four digits, so
+    it never saw the date, find_labelled_date returned None, and every UNDP
+    notice reached the report with no closing date -- while parse_date could
+    read the very same string."""
+    from syria_monitor.dates import _DATE_SHAPED, find_labelled_date, parse_date
+    from datetime import date
+
+    assert _DATE_SHAPED.search("01-Sep-26 09:20 AM (New York time)")
+    assert parse_date("01-Sep-26") == date(2026, 9, 1)
+    assert find_labelled_date(
+        "Deadline 01-Sep-26 09:20 AM (New York time) Posted 29-Aug-26"
+    ) == date(2026, 9, 1)
+
+
+def test_the_shapes_that_already_worked_still_work():
+    """The month vocabulary must not cost the formats the portals already use."""
+    from syria_monitor.dates import _DATE_SHAPED
+
+    for good in ("30-Aug-2026", "01-Sep-2026", "2026-11-02", "31.12.2026",
+                 "September 1, 2026", "15 Januar 2027"):
+        assert _DATE_SHAPED.search(good), f"stopped seeing {good!r}"
