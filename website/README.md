@@ -94,10 +94,12 @@ repository root as well. Both are gone: `main` holds the one copy, in
 `website/`. Pointing production at anything else re-creates the problem this
 layout exists to prevent — two copies of one site, diverging quietly.
 
-Consider setting **preview deployments to None** (Settings → Builds &
-deployments). Otherwise every branch is built and published at a public preview
-URL, including work in progress and branches with no `website/` directory at
-all.
+If you connect the project to Git, set **preview deployments to None**
+(Settings → Builds & deployments). That setting is about Cloudflare building
+*every* branch by itself — work in progress, and branches with no `website/`
+directory at all. It is not the same thing as the previews described above,
+which are published deliberately by a workflow, only for pull requests that
+touch the site, and only under a `pr-` branch.
 
 A Direct Upload project cannot be converted to a Git-connected one. That is a
 reason to prefer the workflow above: `wrangler pages deploy` publishes to a
@@ -109,6 +111,45 @@ and `www.general-sherman-housing.com`. Cloudflare writes the DNS itself, since i
 is also the registrar, and issues the certificate.
 
 </details>
+
+### Preview deployments
+
+Every pull request that touches `website/` is published to its own URL by
+[`.github/workflows/preview-website.yml`](../.github/workflows/preview-website.yml),
+and the link is posted as a comment on the pull request — one comment, edited
+in place on each push.
+
+It exists because until now the only way to look at a change was to merge it.
+CI checks a great deal, but "does this read right in Arabic, on a phone" is not
+a question a checker answers, and this site puts live prices in front of buyers.
+
+The preview is the same build production gets: the same content checks, the
+same content-hashed asset URLs, the same Functions. Three things differ, all
+deliberate:
+
+- **It refuses to be indexed.** `robots.txt` disallows everything and `_headers`
+  carries `X-Robots-Tag: noindex, nofollow`. A preview is a complete copy of a
+  real estate site with real prices on a public URL; left alone it competes with
+  the site it previews, and a buyer arriving from a search would be reading a
+  build nobody approved.
+- **It never runs for a fork.** The job holds the Cloudflare deploy token.
+- **It deploys under a `pr-<number>` branch,** never the production branch, and
+  refuses to run if the two are ever equal. That is what keeps a pull request
+  off the live domain — `wrangler pages deploy --branch` is the only thing
+  separating a preview from production.
+
+`npm run check` asserts all three, plus that the deploy step runs from
+`website/` — the same footgun that once shipped a site with no API.
+
+The admin panel on a preview will not work, and that is correct: the Access
+policy is bound to the custom domain, so a preview request carries no
+assertion and `/api/*` answers 401. It fails closed rather than exposing a
+write endpoint on a URL nobody is guarding. If you ever set `GITHUB_TOKEN` for
+the Preview environment in Cloudflare as well as Production, that stays true —
+the Function verifies the assertion rather than trusting a header.
+
+Previews are not cleaned up automatically. Cloudflare keeps them; delete old
+ones from the dashboard if the list gets long.
 
 ### Caching, and why images are not cached forever
 
