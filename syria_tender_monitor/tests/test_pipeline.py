@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 
 import pytest
@@ -15,6 +16,9 @@ from syria_monitor.report import render_summary, write_docx, write_json, write_s
 from syria_monitor.scoring import score_batch
 from syria_monitor.state import SeenStore
 
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
 TODAY = date(2026, 8, 23)
 
 
@@ -359,3 +363,80 @@ def test_the_full_list_table_carries_a_link_column(linked_result, tmp_path):
     document, _ = _docx_xml(write_docx(linked_result, tmp_path / "links.docx"))
     assert "Link" in document
     assert ">open<" in document      # the cell's link text
+
+
+# ------------------------------------------------------------------- new-only
+#
+# The app's "scope" control sends "only what is new since the last run", which
+# the workflow turns into --new-only. Two things have to be true at once, and
+# the second is the one that would rot quietly:
+#
+#   * the documents carry only the unseen tenders, and say new_only in the
+#     payload the app reads;
+#   * the seen-database still records EVERY tender the run collected. Recording
+#     the filtered list would stop refreshing last_seen on everything already
+#     known, so the damage would show up on some later full run instead of here.
+
+def _two_tenders():
+    seen = Tender(id="old", title="Repair of the Homs clinic", portal="ungm",
+                  closing_date=TODAY + timedelta(days=30))
+    seen.is_new = False
+    fresh = Tender(id="new", title="Supply of water pumps", portal="ungm",
+                   closing_date=TODAY + timedelta(days=30))
+    fresh.is_new = True
+    return seen, fresh
+
+
+@pytest.fixture
+def cli_run(monkeypatch, tmp_path):
+    """Drive cli.main() over a fixed result, and report what was recorded."""
+    from syria_monitor import cli
+    from syria_monitor.pipeline import RunResult
+
+    seen, fresh = _two_tenders()
+    recorded: list[list] = []
+
+    class FakeStore:
+        def __init__(self, *a, **kw):
+            pass
+
+        def record(self, tenders):
+            recorded.append(list(tenders))
+            return len(tenders)
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr("syria_monitor.state.SeenStore", FakeStore)
+    monkeypatch.setattr(cli, "run_pipeline",
+                        lambda *a, **kw: RunResult(started="2026-08-23T00:00:00",
+                                                   tenders=[seen, fresh]))
+    monkeypatch.setenv("MONITOR_CONFIG", str(ROOT / "config.yml"))
+    monkeypatch.setenv("MONITOR_OUTPUT_DIR", str(tmp_path / "out"))
+
+    def go(*argv):
+        assert cli.main(["--run", *argv]) == 0
+        app_json = next((tmp_path / "out").glob("*-app.json"))
+        return json.loads(app_json.read_text(encoding="utf-8")), recorded
+
+    return go
+
+
+def test_new_only_reports_only_the_unseen(cli_run):
+    payload, recorded = cli_run("--new-only")
+
+    assert [t["id"] for t in payload["tenders"]] == ["new"]
+    assert payload["tender_count"] == 1
+    assert payload["run"]["opportunity_count"] == 1
+    assert payload["run"]["new_only"] is True
+
+    # ...and the run still remembers the one it did not report.
+    assert [t.id for t in recorded[0]] == ["old", "new"]
+
+
+def test_without_the_flag_the_whole_open_list_is_reported(cli_run):
+    payload, recorded = cli_run("--no-new-only")
+
+    assert [t["id"] for t in payload["tenders"]] == ["old", "new"]
+    assert payload["run"]["new_only"] is False
+    assert [t.id for t in recorded[0]] == ["old", "new"]

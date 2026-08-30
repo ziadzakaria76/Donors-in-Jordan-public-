@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 import os
 import sys
 from datetime import date
@@ -303,9 +304,30 @@ def main(argv=None) -> int:
                         help="pipeline over committed fixtures; never touches real state")
     parser.add_argument("--portal", action="append",
                         help="limit the run to these portals (repeatable)")
+    # TRI-STATE ON PURPOSE. None means "whatever config says", which is how a
+    # scheduled run keeps behaving as config.yml documents; --new-only and
+    # --no-new-only are an explicit override from a caller that has been asked
+    # for one, which is what the app's "scope" control sends.
+    parser.add_argument("--new-only", action=argparse.BooleanOptionalAction,
+                        default=None,
+                        help="report only tenders never seen before "
+                             "(default: state.new_only from the config)")
     args = parser.parse_args(argv)
 
     cfg = load_config(args.config)
+
+    # --capture validates its portal on line 73 and this did not, which was
+    # survivable while --portal came from someone typing a command they had
+    # just read the registry for. It now also carries a free-text box in the
+    # Android app's Run screen, and run() skips an unknown name with `continue`
+    # -- so "ungn" would have produced a clean run over no portals at all and
+    # reported "0 opportunities, all portals OK". Refusing here is the
+    # difference between a typo and a silent empty report.
+    unknown = [name for name in (args.portal or []) if name not in REGISTRY]
+    if unknown:
+        print(f"unknown portal(s): {', '.join(unknown)}. "
+              f"Known: {', '.join(REGISTRY)}", file=sys.stderr)
+        return 2
 
     if args.check_portals:
         return check_portals(cfg)
@@ -328,7 +350,25 @@ def main(argv=None) -> int:
     store = SeenStore(cfg.db_path, read_only=args.dry_run)
 
     result = run_pipeline(cfg, screener=screener, store=store, portals=args.portal)
-    _print_result(result, cfg)
+
+    # WHAT GETS REPORTED IS NOT ALWAYS WHAT GETS RECORDED.
+    #
+    # `reported` is a filtered view for the documents; `result` stays whole for
+    # store.record below. Recording the filtered list instead would stop
+    # refreshing last_seen on everything that was already known, so a new-only
+    # run would quietly rot the state it depends on -- and the next full run
+    # would be the one that looked wrong.
+    #
+    # Every count in the writers derives from result.tenders and result.portals,
+    # so replacing the one field is enough for the whole document to agree with
+    # itself. The per-portal `count` in the health table is deliberately left
+    # alone: that column answers "what did this portal return", not "how many of
+    # its rows reached the report".
+    new_only = (args.new_only if args.new_only is not None
+                else bool(cfg.get("state.new_only", False)))
+    reported = replace(result, tenders=result.new_tenders) if new_only else result
+
+    _print_result(reported, cfg)
 
     if args.dry_run:
         print("\nDRY RUN -- nothing written, nothing sent, seen-database untouched.")
@@ -340,11 +380,11 @@ def main(argv=None) -> int:
     formats = cfg.get("output.formats", ["docx", "xlsx"])
     written = []
     if "docx" in formats:
-        written.append(write_docx(result, out_dir / f"syria-tenders-{stamp}.docx", top_n))
+        written.append(write_docx(reported, out_dir / f"syria-tenders-{stamp}.docx", top_n))
     if "xlsx" in formats:
-        written.append(write_xlsx(result, out_dir / f"syria-tenders-{stamp}.xlsx"))
+        written.append(write_xlsx(reported, out_dir / f"syria-tenders-{stamp}.xlsx"))
     if "json" in formats:
-        written.append(write_json(result, out_dir / f"syria-tenders-{stamp}.json", cfg.profile))
+        written.append(write_json(reported, out_dir / f"syria-tenders-{stamp}.json", cfg.profile))
 
     # ALWAYS WRITTEN, and not one of the optional formats. This is the only way
     # the Android app can read a run: GitHub's REST API does not expose a job's
@@ -359,12 +399,12 @@ def main(argv=None) -> int:
     # enforces. Reshaping ours to match would lose the diagnostic detail; the
     # two answer different questions and there is no cost to writing both.
     written.append(write_app_json(
-        result, out_dir / f"syria-tenders-{stamp}-app.json", cfg.profile,
-        new_only=bool(cfg.get("state.new_only", False))))
+        reported, out_dir / f"syria-tenders-{stamp}-app.json", cfg.profile,
+        new_only=new_only))
 
     # Always written, whatever the formats: it is what carries portal health to
     # somewhere a person sees without opening a document.
-    summary = write_summary(result, out_dir / f"syria-tenders-{stamp}-summary.md", top_n)
+    summary = write_summary(reported, out_dir / f"syria-tenders-{stamp}-summary.md", top_n)
     written.append(summary)
 
     store.record(result.tenders)

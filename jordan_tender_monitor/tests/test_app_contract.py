@@ -563,6 +563,13 @@ def test_the_apps_workflow_inputs_match_the_workflow():
     run_screen = (APP / "ui" / "screens" / "RunScreen.kt").read_text(encoding="utf-8")
     repository = (APP / "data" / "portals" / "PortalsRepository.kt").read_text(
         encoding="utf-8")
+    # AND THE VIEW MODEL, WHICH IS WHERE THE REPORT RUN'S MAP IS BUILT.
+    # Reading only the two files above left `portals` unchecked: it is sent from
+    # buildMap { put(...) } in AppViewModel, not from a `"x" to y` pair. This
+    # workflow happens to declare it, so the gap cost nothing here -- it cost
+    # the Syria workflow a 422 on the phone, which is why its suite now has the
+    # same test and why this one reads all three files.
+    view_model = (APP / "ui" / "AppViewModel.kt").read_text(encoding="utf-8")
 
     literals = re.findall(r'const val (?:SCOPE|MODE)_\w+ = "([^"]+)"', run_screen)
     literals += re.findall(r'const val PROBE_MODE = "([^"]+)"', repository)
@@ -576,7 +583,9 @@ def test_the_apps_workflow_inputs_match_the_workflow():
               f"contract: monitor.yml offers the option {literal!r}")
 
     # And the input names the app sends.
-    sent = set(re.findall(r'"(\w+)" to ', run_screen + repository))
+    sources = run_screen + repository + view_model
+    sent = set(re.findall(r'"(\w+)" to ', sources))
+    sent |= set(re.findall(r'put\("(\w+)"', sources))
     declared = set(re.findall(r"^      (\w+):$", workflow, re.M))
     unknown = sorted(sent - declared)
     check(not unknown,

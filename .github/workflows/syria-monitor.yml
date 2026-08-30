@@ -11,21 +11,56 @@ name: Syria tender monitor
 
 on:
   workflow_dispatch:
+    # THESE NAMES AND STRINGS ARE THE ANDROID APP'S, NOT THIS PROJECT'S.
+    #
+    # The app dispatches whichever workflow file its Settings name, and it sends
+    # one fixed vocabulary: scope, portals, mode, candidate. This workflow used
+    # to declare `mode` and `capture_portal` with values of its own -- so
+    # pointing the app at it answered
+    #
+    #     422  Unexpected inputs provided: ["scope"]
+    #
+    # before a single step ran. workflow_dispatch rejects any input the workflow
+    # does not declare, and `type: choice` is matched as a literal string, so
+    # even the shared name `mode` disagreed: the app sends "produce the report"
+    # and this file expected "run".
+    #
+    # THE SERVER IS THE CHEAP SIDE TO CHANGE. Same reasoning as the app-json
+    # bridge writer: an installed APK is expensive to update and this file is
+    # read fresh on every dispatch, so the adaptation lives here. The literals
+    # below are copied from RunScreen.kt and PortalsRepository.kt and are
+    # checked against them by tests/test_app_contract.py -- if either side is
+    # edited alone, that test fails instead of a phone.
     inputs:
+      scope:
+        description: "What to report"
+        required: true
+        default: "everything currently open"
+        type: choice
+        options:
+          - "everything currently open"
+          - "only what is new since the last run"
+      portals:
+        description: "Limit to these portals (space-separated keys, blank = all)"
+        required: false
+        default: ""
+        type: string
       mode:
         description: "What to do"
+        required: true
+        default: "produce the report"
         type: choice
-        default: run
         options:
-          - run          # scrape and write the report files
-          - dry-run      # scrape and print, write nothing
-          - check        # reachability only
-          - capture      # fetch live pages and report what the cascade finds
-      capture_portal:
-        description: "Portal to capture (only used when mode = capture)"
-        type: choice
-        default: all
-        options: [all, ungm, undp, srtf, giz, isdb, gtai, worldbank, ted, samgov, uk_fts]
+          - "produce the report"
+          - "diagnose portals (--capture)"
+          - "test a candidate portal (--probe)"
+          - "dry run -- scrape and print, write nothing"
+          - "check reachability only"
+      candidate:
+        description: "Jordan-only. This monitor has no --probe; the run will fail and say so"
+        required: false
+        default: ""
+        type: string
   schedule:
     # 03:17 UTC = 06:17 Europe/Amman (UTC+3, no DST). GitHub Actions cron is
     # always UTC; there is no local-time option.
@@ -103,12 +138,58 @@ jobs:
           # value is ignored, so this is safe either way.
           PLAYWRIGHT_CHROMIUM_PATH: ${{ vars.PLAYWRIGHT_CHROMIUM_PATH }}
           SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+          # NOT INTERPOLATED INTO THE SCRIPT. `portals` and `candidate` are free
+          # text from whoever pressed Run, and `${{ }}` pastes their contents
+          # into the shell before bash ever sees a quote. Through the
+          # environment they stay values.
+          SCOPE: ${{ inputs.scope }}
+          MODE: ${{ inputs.mode }}
+          PORTALS: ${{ inputs.portals }}
         run: |
-          case "${{ inputs.mode }}" in
-            dry-run) python -m syria_monitor.cli --dry-run ;;
-            check)   python -m syria_monitor.cli --check-portals ;;
-            capture) python -m syria_monitor.cli --capture "${{ inputs.capture_portal }}" ;;
-            *)       python -m syria_monitor.cli --run ;;
+          set -euo pipefail
+
+          # read -ra splits on spaces without letting a key like "*" glob
+          # against the working directory, which unquoted $PORTALS would.
+          read -ra keys <<< "${PORTALS:-}"
+
+          args=()
+          for key in ${keys[@]+"${keys[@]}"}; do args+=(--portal "$key"); done
+
+          # An empty SCOPE is the scheduled run, which sends no inputs at all --
+          # there the config file decides, which is what --new-only/--no-new-only
+          # being tri-state is for. A scope the user actually chose overrides it
+          # in both directions: "everything currently open" has to mean
+          # everything even if config.yml says otherwise, or the control lies.
+          case "${SCOPE:-}" in
+            "only what is new since the last run") args+=(--new-only) ;;
+            "everything currently open")           args+=(--no-new-only) ;;
+          esac
+
+          case "${MODE:-}" in
+            "diagnose portals (--capture)")
+              # --capture takes one portal at a time; blank means all of them.
+              if [ ${#keys[@]} -eq 0 ]; then keys=(all); fi
+              for key in "${keys[@]}"; do
+                python -m syria_monitor.cli --capture "$key"
+              done
+              ;;
+            "test a candidate portal (--probe)")
+              # Said out loud rather than quietly falling through to a scrape.
+              # Jordan's monitor can trial an unconfigured portal from a JSON
+              # blob; this one has no such mode, and a run that silently did
+              # something else would read as if the test had passed.
+              echo "::error::This monitor has no --probe mode. Testing a candidate portal is Jordan-only -- point Settings at monitor.yml for that."
+              exit 1
+              ;;
+            "dry run"*)
+              python -m syria_monitor.cli --dry-run ${args[@]+"${args[@]}"}
+              ;;
+            "check reachability only")
+              python -m syria_monitor.cli --check-portals
+              ;;
+            *)
+              python -m syria_monitor.cli --run ${args[@]+"${args[@]}"}
+              ;;
           esac
 
       # This is how the report is delivered: download it from the run page.

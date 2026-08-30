@@ -122,7 +122,8 @@ does not make UNGM return notices.
 | `--run` | Full run. Writes `output/*.docx`, `*.xlsx`, `*.json`. Delivers nothing -- the files are the report. |
 | `--capture PORTAL` | Fetches live pages to `tests/fixtures/live/`, prints per-layer row counts and quality, which layer won, and the selectors the page actually uses. `--capture all` walks every HTML portal. Under GitHub Actions the report is written to the run summary, so it can be read from a phone. |
 | `--self-test` | Pipeline over fixtures with the database and output directory redirected. |
-| `--portal NAME` | Limit a run to one or more portals (repeatable). |
+| `--portal NAME` | Limit a run to one or more portals (repeatable). An unknown key is refused rather than skipped, so a typo cannot look like a run that found nothing. |
+| `--new-only` / `--no-new-only` | Report only tenders never seen before, or the whole open list. Neither flag means "whatever `state.new_only` says", which is how the scheduled run behaves. The seen-database still records everything the run collected either way. |
 
 ---
 
@@ -270,6 +271,17 @@ from nowhere else:
 - **Syria tender monitor** (`.github/workflows/syria-monitor.yml`) —
   `workflow_dispatch` (triggerable from a phone) plus the daily schedule,
   uploading the Word, Excel and JSON files as run artifacts.
+
+Its `workflow_dispatch` inputs are **the Android app's vocabulary, not this
+project's**: `scope`, `portals`, `mode`, `candidate`, with the exact option
+strings the app sends. The app in `android/` dispatches whichever workflow its
+Settings name and cannot be told to send anything else, so a workflow declaring
+inputs of its own answers `422 Unexpected inputs provided` before a run is
+created — no log, nothing to read. `tests/test_app_contract.py` holds the two
+sides together. `mode` also offers "dry run" and "check reachability only" for
+anyone driving it from the Actions page; "test a candidate portal (--probe)" is
+Jordan-only and fails here with a message saying so rather than quietly
+scraping instead.
 
 ## Knowing when it breaks
 
