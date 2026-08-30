@@ -27,9 +27,33 @@ on:
         default: all
         options: [all, ungm, undp, srtf, giz, isdb, gtai, worldbank, ted, samgov, uk_fts]
   schedule:
-    # 03:00 UTC = 06:00 Europe/Amman (UTC+3, no DST). GitHub Actions cron is
+    # 03:17 UTC = 06:17 Europe/Amman (UTC+3, no DST). GitHub Actions cron is
     # always UTC; there is no local-time option.
-    - cron: "0 3 * * *"
+    #
+    # THE MINUTE IS NOT DECORATIVE. This was "0 3 * * *" and it never fired.
+    # The workflow reached the default branch at 07:11 on 2026-08-29, so the
+    # first run was due at 03:00 on the 30th; at 04:24 that day the API still
+    # reported total_count 0 for event=schedule -- not queued, not delayed
+    # behind the dispatched runs, never created.
+    #
+    # GitHub delays scheduled workflows under load and drops them outright,
+    # and the load is worst on the hour, where every default cron in the world
+    # is pointed. Moving off the boundary is the documented mitigation.
+    #
+    # THE SIBLING MONITOR ALREADY LEARNED THIS. monitor.yml runs at "17 4" and
+    # says why: "This workflow was set to '0 4' and had fired zero times; an
+    # odd minute is the cheapest way to stop competing with everyone else's
+    # midnight-and-on-the-hour crons." Syria then shipped with "0 3" and fired
+    # zero times. The two projects share no code, so nothing carried the fix
+    # across but somebody noticing -- which is the same reason this repository
+    # spent a day rediscovering four other bugs Jordan had already solved.
+    #
+    # It is a mitigation and not a guarantee: there is no SLA on cron, so a run
+    # that matters must still be checked for rather than assumed.
+    #
+    # 06:17 rather than 06:00 keeps the intent -- a report waiting before the
+    # working day in Amman -- and the seventeen minutes cost nothing.
+    - cron: "17 3 * * *"
 
 # Never let two runs write the seen-tenders database at once. The other two
 # projects in this repository have their own groups and are unaffected.
