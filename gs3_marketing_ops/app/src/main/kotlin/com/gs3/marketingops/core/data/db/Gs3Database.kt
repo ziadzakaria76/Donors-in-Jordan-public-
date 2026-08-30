@@ -53,7 +53,7 @@ abstract class Gs3Database : RoomDatabase() {
     abstract fun complianceDao(): ComplianceDao
 
     companion object {
-        const val VERSION: Int = 3
+        const val VERSION: Int = 4
         const val NAME: String = "gs3_marketing_ops.db"
 
         /**
@@ -127,14 +127,53 @@ abstract class Gs3Database : RoomDatabase() {
         }
 
         /**
+         * Version 3 → 4: the expatriate market budgets go back to the brief's
+         * own figures.
+         *
+         * D-28 scaled them up so the external track could fund three units at
+         * an assumed 45 JOD per raw lead. The owner removed that assumption on
+         * 2026-08-30 (D-29), and the scaling went with it — a figure derived
+         * from an assumption does not outlive it.
+         *
+         * **This is a revert, and it is still written forwards.** Version 3
+         * exists, some database somewhere may be sitting at it, and the way
+         * back is a new migration rather than deleting `MIGRATION_2_3` and
+         * standing the version number back down. Removing a migration that has
+         * shipped strands every database that already ran it: Room would find
+         * no path from 3 and refuse to open, which on this app means an
+         * unopenable database holding the only copy of the company's leads.
+         *
+         * The same caveat as `MIGRATION_2_3` applies and is the reason both are
+         * still acceptable: no screen can edit a market budget yet, so there is
+         * no hand-made figure for an unconditional `UPDATE` to destroy. That
+         * changes at Milestone 5.
+         */
+        val MIGRATION_3_4: Migration = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "UAE" to 1_370_000L,
+                    "USA" to 1_250_000L,
+                    "KSA" to 1_120_000L,
+                    "QAT" to 600_000L,
+                    "KWT" to 340_000L,
+                ).forEach { (market, annualFils) ->
+                    db.execSQL(
+                        "UPDATE `market_budgets` SET `annualFils` = ? WHERE `marketKey` = ?",
+                        arrayOf<Any>(annualFils, market),
+                    )
+                }
+            }
+        }
+
+        /**
          * The list was created empty at version 1 so that adding version 2
          * would be an edit to an established mechanism rather than a decision
          * taken in a hurry, at the point where the tempting alternative is one
          * destructive line. It has stayed an edit —
          * `Gs3Database.build` already passed `addMigrations(*MIGRATIONS)`, so
-         * no wiring has changed for either migration.
+         * no wiring has changed for any of them.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 
         /**
          * The one place the database is built.

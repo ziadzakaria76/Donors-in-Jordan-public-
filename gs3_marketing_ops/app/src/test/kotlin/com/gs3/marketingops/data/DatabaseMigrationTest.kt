@@ -72,11 +72,12 @@ class DatabaseMigrationTest {
             )
             assertTrue("no NONJO row may survive", budgets.none { it.track == "NONJO" })
 
-            // Opening a version 1 file runs both migrations, so the surviving
-            // rows arrive carrying version 3's figures: 1 -> 2 keeps UAE at
-            // 1,370 and 2 -> 3 re-sizes it to 1,700 (D-28). Asserted against
-            // the domain rather than a literal, so the migration and the seed
-            // cannot drift apart.
+            // Opening a version 1 file runs all three migrations in turn, so
+            // the surviving rows arrive carrying version 4's figures: 1 -> 2
+            // keeps UAE at 1,370, 2 -> 3 re-sizes it to 1,700 (D-28) and
+            // 3 -> 4 puts it back (D-29). Asserted against the domain rather
+            // than a literal, so the migrations and the seed cannot drift
+            // apart.
             assertEquals(
                 Gs3Budget.expatriateMarkets.associate { it.marketKey to it.annual.fils },
                 budgets.associate { it.marketKey to it.annualFils },
@@ -98,25 +99,26 @@ class DatabaseMigrationTest {
     }
 
     @Test
-    fun `version two re-sizes the expatriate budgets rather than leaving them stale`() = runTest {
-        // 2 -> 3 carries no schema change, so this is the one that would be
-        // easiest to skip — and skipping it is silent. The seed inserts with
-        // IGNORE (D-19), so a database that already holds UAE at 1,370 keeps
-        // 1,370 for ever while the domain, the reports and the strategy all
-        // say 1,700.
+    fun `version three's scaled-up budgets are put back to the brief's figures`() = runTest {
+        // 3 -> 4 carries no schema change, so it is the one easiest to skip —
+        // and skipping it is silent. The seed inserts with IGNORE (D-19), so a
+        // database that ran D-28's scaling keeps UAE at 1,700 for ever while
+        // the domain, the reports and the strategy all say 1,370.
+        //
+        // The starting state is deliberately version 3's *data*, not version
+        // 4's. Winding back to the figures this migration is supposed to
+        // produce would let the test pass whether or not the migration ran.
         createVersionOne()
         val migrated = Gs3Database.build(context, databaseFile.name)
         migrated.marketBudgetDao().getAll()
         migrated.close()
 
-        // Wind the file back to version 2 with version 2's data: the four
-        // NONJO rows gone, the five expatriate rows at their old figures.
         SQLiteDatabase.openOrCreateDatabase(databaseFile, null).use { db ->
-            listOf("UAE" to 1_370_000L, "USA" to 1_250_000L, "KSA" to 1_120_000L,
-                "QAT" to 600_000L, "KWT" to 340_000L).forEach { (market, fils) ->
+            listOf("UAE" to 1_700_000L, "USA" to 1_550_000L, "KSA" to 1_390_000L,
+                "QAT" to 745_000L, "KWT" to 420_000L).forEach { (market, fils) ->
                 db.execSQL("UPDATE market_budgets SET annualFils = ? WHERE marketKey = ?", arrayOf<Any>(fils, market))
             }
-            db.version = 2
+            db.version = 3
         }
 
         val database = Gs3Database.build(context, databaseFile.name)
@@ -125,11 +127,13 @@ class DatabaseMigrationTest {
                 Gs3Budget.expatriateMarkets.associate { it.marketKey to it.annual.fils },
                 database.marketBudgetDao().getAll().associate { it.marketKey to it.annualFils },
             )
-            // And the track adds back up to what the domain says it is.
+            // 4,680 again, and asserted against the domain so the migration and
+            // the seed cannot drift apart.
             assertEquals(
                 Gs3Budget.externalTrackTotal.fils,
                 database.marketBudgetDao().getAll().sumOf { it.annualFils },
             )
+            assertEquals(4_680_000L, database.marketBudgetDao().getAll().sumOf { it.annualFils })
         } finally {
             database.close()
         }

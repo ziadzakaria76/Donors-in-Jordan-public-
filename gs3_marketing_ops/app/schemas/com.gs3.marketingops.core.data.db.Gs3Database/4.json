@@ -1,0 +1,236 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "9408543a71c58a5a3d40cd00a0d423d7",
+    "entities": [
+      {
+        "tableName": "units",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`number` INTEGER NOT NULL, `positionEn` TEXT NOT NULL, `positionAr` TEXT NOT NULL, `internalArea` INTEGER NOT NULL, `externalArea` INTEGER NOT NULL, `listPriceFils` INTEGER NOT NULL, `priorityClass` TEXT NOT NULL, `status` TEXT NOT NULL, `agreedPriceFils` INTEGER, `discountJustification` TEXT, PRIMARY KEY(`number`))",
+        "fields": [
+          {
+            "fieldPath": "number",
+            "columnName": "number",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "positionEn",
+            "columnName": "positionEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "positionAr",
+            "columnName": "positionAr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "internalArea",
+            "columnName": "internalArea",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "externalArea",
+            "columnName": "externalArea",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listPriceFils",
+            "columnName": "listPriceFils",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priorityClass",
+            "columnName": "priorityClass",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "agreedPriceFils",
+            "columnName": "agreedPriceFils",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "discountJustification",
+            "columnName": "discountJustification",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "number"
+          ]
+        }
+      },
+      {
+        "tableName": "market_budgets",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`marketKey` TEXT NOT NULL, `track` TEXT NOT NULL, `annualFils` INTEGER NOT NULL, PRIMARY KEY(`marketKey`))",
+        "fields": [
+          {
+            "fieldPath": "marketKey",
+            "columnName": "marketKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "track",
+            "columnName": "track",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "annualFils",
+            "columnName": "annualFils",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "marketKey"
+          ]
+        }
+      },
+      {
+        "tableName": "message_templates",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`templateKey` TEXT NOT NULL, `bodyAr` TEXT NOT NULL, `bodyEn` TEXT NOT NULL, `trackKey` TEXT, `isEditable` INTEGER NOT NULL, PRIMARY KEY(`templateKey`))",
+        "fields": [
+          {
+            "fieldPath": "templateKey",
+            "columnName": "templateKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bodyAr",
+            "columnName": "bodyAr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bodyEn",
+            "columnName": "bodyEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "trackKey",
+            "columnName": "trackKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isEditable",
+            "columnName": "isEditable",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "templateKey"
+          ]
+        }
+      },
+      {
+        "tableName": "objections",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`objectionKey` TEXT NOT NULL, `objectionAr` TEXT NOT NULL, `objectionEn` TEXT NOT NULL, `responseAr` TEXT NOT NULL, `responseEn` TEXT NOT NULL, `displayOrder` INTEGER NOT NULL, PRIMARY KEY(`objectionKey`))",
+        "fields": [
+          {
+            "fieldPath": "objectionKey",
+            "columnName": "objectionKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "objectionAr",
+            "columnName": "objectionAr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "objectionEn",
+            "columnName": "objectionEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "responseAr",
+            "columnName": "responseAr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "responseEn",
+            "columnName": "responseEn",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayOrder",
+            "columnName": "displayOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "objectionKey"
+          ]
+        }
+      },
+      {
+        "tableName": "contract_claims",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`claim` TEXT NOT NULL, `confirmedPresent` INTEGER NOT NULL, `contractReference` TEXT, `confirmedAt` INTEGER, PRIMARY KEY(`claim`))",
+        "fields": [
+          {
+            "fieldPath": "claim",
+            "columnName": "claim",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confirmedPresent",
+            "columnName": "confirmedPresent",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "contractReference",
+            "columnName": "contractReference",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "confirmedAt",
+            "columnName": "confirmedAt",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "claim"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9408543a71c58a5a3d40cd00a0d423d7')"
+    ]
+  }
+}
