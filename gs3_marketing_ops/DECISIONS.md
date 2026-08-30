@@ -16,7 +16,7 @@ the moment they are answered, with the date and the reference.
 | # | Question | Status | Answered on | Reference |
 | --- | --- | --- | --- | --- |
 | B-1 | Has a written statement been obtained from the Department of Lands and Survey confirming the classification of this project's units and that non-Jordanians may own them? | **Answered — no.** No longer blocks v1: the track it gated was removed instead (D-23) | 2026-08-29 | Owner |
-| B-2 | Does the signed contract actually contain (a) the named finishing-specifications annex, (b) a delay penalty in the buyer's favour, (c) the two-year finishing and ten-year structural warranty, and (d) the quarterly photographic progress report? | **Answered in part — (a) and (d) yes; (b) and (c) not confirmed** | 2026-08-29 | Owner |
+| B-2 | Does the signed contract actually contain (a) the named finishing-specifications annex, (b) a delay penalty in the buyer's favour, (c) the two-year finishing and ten-year structural warranty, and (d) the quarterly photographic progress report? | **Answered in part — (a) and (d) yes.** (b) and (c) were never confirmed and were removed unasked on 2026-08-30 — D-30 | 2026-08-29 | Owner |
 
 **B-1 answered 2026-08-29: no.** The statement has not been obtained.
 
@@ -26,8 +26,7 @@ that cannot be activated, a persistent Dashboard banner — are all gone, becaus
 the module they guarded is gone. **This is not the gate being opened.** Nothing
 in v1 markets to, processes, or promises anything to a non-Jordanian buyer, and
 there is no longer a locked door to unlock: see **D-23** below for what was
-deleted, and **D-24**, **D-26**, **D-27** and **D-29** for the consequences that
-had to be decided along the way — none of them settled yet.
+deleted.
 
 B-1 therefore stops being a blocker for v1 and becomes a precondition for ever
 putting the track back. Whoever revives it needs the Department of Lands and
@@ -39,16 +38,17 @@ carries **(a)** the finishing-specifications annex and **(d)** the quarterly
 photographic progress report. **(b)** the delay penalty and **(c)** the two-year
 and ten-year warranty are **not confirmed**.
 
-This is the case the four-rows-not-one-switch design was for, and it is now
-carrying it: (a) and (d) are seeded confirmed and dropped from the banned-phrase
-guard, so client-facing text may use them; (b) and (c) stay unverified and stay
-banned. No clause references were supplied, so `contractReference` is null on
+This was the case the row-per-claim design was built for: (a) and (d) are seeded
+confirmed and dropped from the banned-phrase guard, so client-facing text may
+use them. No clause references were supplied, so `contractReference` is null on
 both confirmations — worth filling in when someone next has the contract open,
 because without it the next reader has to ask a person rather than open a file.
 
-"Not confirmed" means nobody has checked, **never** "verified absent". Both
-readings keep the claim out of a client's hands, so the app behaves identically
-either way; the distinction matters only to whoever is still chasing (b) and (c).
+**(b) and (c) were never answered.** They were removed on 2026-08-30 without
+being checked, along with the guard that kept them out of client text — see
+**D-30**. "Not confirmed" meant nobody had read the contract, which is not the
+same as the terms being absent; the app no longer holds either reading, or the
+question.
 
 One consequence worth stating plainly: (d) was previously flagged during
 authoring, when a delivery objection offering "regular photographic updates on
@@ -551,13 +551,15 @@ authored, client-facing text also existed in Kotlin seed data — outside
 everything that guard checks. That was a real gap, opened by this milestone.
 
 `SeedContentTest` closes it by scanning every seeded template and objection, in
-both languages, for two families of phrase:
+both languages, for forbidden phrases — a fee exemption the company cannot
+grant, an approval belonging to the authorities, a return belonging to the
+market.
 
-- the four **B-2 contract claims** — the finishing annex, the delay penalty, the
-  warranty, the quarterly progress report. Nobody has read the signed contract
-  and confirmed any of them, so none may be promised;
-- the standing **forbidden phrases** — a fee exemption the company cannot grant,
-  an approval belonging to the authorities, a return belonging to the market.
+It scanned for a second family until 2026-08-30: the **B-2 contract claims**
+nobody had verified against the signed contract — the delay penalty and the
+warranty — which no template or objection was allowed to promise. That guard
+was removed with the claims themselves (D-30). What it used to catch is now
+caught by nothing.
 
 It caught its first defect during authoring: the delivery-timing objection
 originally offered "regular photographic updates on progress", which is close
@@ -596,7 +598,8 @@ Gone, in full:
 | Two `NationalityCategory` values | `ARAB_NON_JORDANIAN`, `NON_ARAB` — removed, not remapped; see below |
 | Eight `strings.xml` keys, in **both** locales | every `gate_*`, plus `track_nonjo` and `disclaimer_non_jordanian`. 106 keys down to 98, both files in step |
 
-**Kept, deliberately.** The four B-2 contract claims: they are terms of the
+**Kept, deliberately.** The B-2 contract claims (four at the time, two since
+D-30): they are terms of the
 signed contract every buyer signs, not a non-Jordanian matter, and B-2 answered
 (a) and (d) on the same day. They only ever *lived* in a package called
 `nonjordanian` — which was wrong about them before the track went — so the file
@@ -660,90 +663,16 @@ relied on:** removing the `DELETE` fails it, removing the `DROP TABLE` fails it,
 and restoring each makes it pass. `fallbackToDestructiveMigration` is still
 absent and the test that proves it is untouched.
 
-### D-24 — The four non-Jordanian market rows are deleted, and the local track absorbs the money
-
-**Needs the owner's confirmation.** The default applied is the conservative,
-reversible one.
-
-The external track was 7,200 JOD: expatriates 4,680 plus non-Jordanians 2,520
-(IRQ 1,260, GULF 560, PSE 420, TEST 280). Those four rows are deleted with the
-track. Total paid media stays at **18,000** — it is the approved annual figure
-and it is editable in Settings — so the external track becomes expatriates alone
-at 4,680, and `localTrackTotal` rises from 10,800 to **13,320** by the existing
-subtraction, `local = total − external`. Nothing was re-derived to produce that
-number; it falls out of arithmetic that was already there.
-
-The tests were changed to the new truth rather than kept green. The old
-`the external track takes forty per cent of paid media, split sixty-five
-thirty-five` asserted two figures that described a track which no longer exists,
-and the honest replacement is not a re-split — it is that there is nothing left
-to split. The external share is now 26% of paid media, all of it expatriate.
-**Inventing new market rows to keep a 65/35 assertion passing was available and
-was not done.**
-
-**What this does not settle.** The 2,520 lands on the local track because that
-is where the subtraction puts it, not because anyone decided local media should
-grow by a quarter. Withdrawing it from the plan instead is a one-line change to
-`totalPaidMedia`, and is the owner's call.
-
-### D-26 — The 150 JOD qualified-lead target is left alone, and no longer matches the budget
-
-**Needs the owner's confirmation.** This one is not in the brief that asked for
-the removal; it was found while doing it.
-
-D-3 settled on one target for the external track: 150 JOD per qualified lead,
-with a recorded decision forced above 200. That 150 was not a preference — it
-was 7,200 ÷ 48, the budget's own arithmetic. Removing the non-Jordanian track
-takes the external budget to 4,680, and the same division gives **97.500**. The
-target and its budget no longer agree.
-
-The target is deliberately **left at 150**. Moving it down to 97.5 would tighten
-an alarm on a funnel model nobody has re-estimated, which is D-3's failure
-repeated exactly: an alarm that fires from week one, never clears, and teaches
-the team to ignore alarms. When a threshold has to move on an unconfirmed
-assumption, loose is the safe direction. Both figures remain editable in
-Settings.
-
-The test that asserted "the budget's arithmetic meets it" now asserts the gap
-instead, with the numbers written out, so the next person to touch the default
-finds the discrepancy and this entry rather than a stale claim.
-
-### D-27 — The targets and the funnel model are left exactly as they were, and one of them is now doing more work
-
-**Live again, and every word below is true as written (2026-08-30).** D-28
-briefly answered this entry by funding the target — the external track went to
-5,805 JOD and `FunnelModel.EXTERNAL.rawLeads` to 129. D-29 removed the 45 JOD
-per raw lead that answer was made of, and the sizing went with it. The budget is
-4,680 again, the funnel is 160 raw leads again, and the question this entry
-raises is open again exactly as first written.
-
-Not a change — a statement of what was deliberately **not** changed, because the
-arithmetic underneath it moved.
-
-The 11-unit annual target, the 3-unit external-track target and the ≥27%
-external share are unchanged. None was ever non-Jordanian-specific, and the
-expatriate track carries them now.
-
-`FunnelModel.EXTERNAL` is unchanged too: 160 raw leads → 48 qualified → 17
-viewings → 3 contracts. **But those 160 were modelled for the whole external
-track, when that meant expatriates and non-Jordanians together.** Expatriate
-marketing alone now has to supply all 160 — on 4,680 JOD rather than 7,200.
-Whether it can has not been re-estimated, and the numbers were left alone rather
-than adjusted by guesswork, because a funnel model invented to make a
-spreadsheet balance is worse than one that is visibly out of date. Flagged to
-the owner; the model is a single object with five numbers in it and changing it
-costs nothing once someone has decided what it should say.
-
 ### D-28 — 1,125 JOD of the freed 2,520 stays on the external track (2026-08-29)
 
-**Superseded by D-29 (2026-08-30).** The owner removed the 45 JOD per raw
-lead, and this decision was built entirely on it: the 5,805 figure, the 129
-raw leads and the claim that 1,125 was "the least that had to stay" are all
-that assumption doing arithmetic. A figure derived from an assumption does not
-outlive it, so the sizing is reverted — external back to 4,680, local back to
-13,320, the funnel back to 160 raw leads. The entry stays as written because it
-is the record of what was believed and why, and because the question it asked
-is open again.
+**Reverted on 2026-08-30, and left here as the record of it.** The owner
+removed the 45 JOD per raw lead, and this decision was built entirely on it:
+the 5,805 figure, the 129 raw leads and the claim that 1,125 was "the least
+that had to stay" are all that assumption doing arithmetic. A figure derived
+from an assumption does not outlive it, so the sizing went back — external to
+4,680, local to 13,320, the funnel to 160 raw leads, which is where they stand
+today. Nothing below is current; it is kept because a reverted decision that
+leaves no trace invites the same reasoning a second time.
 
 **The owner's answer to D-24, D-26 and D-27, which turned out to be one
 question rather than three.** D-24 asked where the freed money goes, D-26 asked
@@ -818,69 +747,52 @@ budget** — that arrives at Milestone 5, and the next migration of this kind
 must preserve edited rows instead. Both migration tests were proved to fail
 with `MIGRATION_2_3` unwired and to pass with it restored.
 
-### D-29 — The 45 JOD per raw lead is removed, and D-28's sizing goes with it (2026-08-30)
 
-**The owner's instruction was "remove the 45 JOD per raw lead".** It is gone
-rather than reinterpreted, and so is everything that was standing on it.
+### D-30 — The two unverified B-2 contract claims are removed, and the guard with them (2026-08-30)
 
-D-3 removed the 45 JOD *target* on 2026-08-16. What survived was quieter: 45
-kept working as a **planning assumption**. D-28 used it to turn a budget into a
-lead count and back again — 5,805 JOD buys 129 raw leads, 129 yields three
-contracts, therefore 1,125 of the freed 2,520 must stay on the external track.
-Every one of those figures is the assumption doing arithmetic. Remove it and
-they have nothing underneath them, so they are reverted rather than kept as
-orphans:
+**The owner's instruction, and it is the one entry in this log that removes a
+safeguard rather than a number.** It is written plainly for that reason.
 
-| | D-28 | Now |
-| --- | --- | --- |
-| Expatriate rows | 1,700 / 1,550 / 1,390 / 745 / 420 | **1,370 / 1,250 / 1,120 / 600 / 340** |
-| External track | 5,805 | **4,680** |
-| Local track | 12,195 | **13,320** |
-| `FunnelModel.EXTERNAL.rawLeads` | 129 | **160** |
-| External share of paid media | 32.25% | **26%** |
+B-2 asked whether the signed contract contains four terms. Two came back
+confirmed on 2026-08-29 — the finishing-specifications annex and the quarterly
+photographic progress report. Two never did: **a delay penalty in the buyer's
+favour, and the two-year finishing and ten-year structural warranty.** Nobody
+read the contract to check.
 
-`totalPaidMedia` stays at the approved 18,000 throughout. The five market rows
-are the brief's own figures again, and the funnel is the strategy's own five
-numbers again.
+Both are now deleted:
 
-**What this actually changes is smaller than the table suggests, and larger
-than it looks.** Smaller: nothing behaves differently, no test fails, and the
-funnel still projects three contracts against a three-unit target, so the app is
-internally consistent. Larger: the app can no longer answer whether 4,680 JOD
-buys 160 raw leads. Under D-28 that question had an answer, and the answer was
-no. Now it has no answer at all, because answering it needs a cost per lead and
-there isn't one.
+| Removed | Was doing |
+| --- | --- |
+| `ContractClaim.DELAY_PENALTY_IN_BUYERS_FAVOUR` | recording that nobody had verified a delay penalty |
+| `ContractClaim.TWO_YEAR_AND_TEN_YEAR_WARRANTY` | recording that nobody had verified the warranty |
+| Six banned phrases in `SeedContentTest` | «غرامة تأخير», «غرامة التأخير», "delay penalty", «ضمان», «كفالة», "warranty" — blocked from every seeded template and objection |
+| `MIGRATION_4_5` | clears the two rows from databases that already have them |
 
-**That is the point, not a side effect.** 45 was a *blended* figure across
-expatriate and non-Jordanian markets, and the non-Jordanian half is gone (D-23).
-Carrying it forward meant every derived number inherited a blend that no longer
-described anything the company buys. A plan that says "we do not know what a
-lead costs" is worse to look at and better to act on than one that quietly
-assumes a number nobody has measured.
+**What changed for a buyer today: nothing.** No seeded template or objection
+contained either phrase — the guard was passing, not catching. Removing a check
+does not write a promise.
 
-`ChannelSpend.costPerRawLead` is **kept**, as it was through D-3. Measuring what
-a lead actually costs is the thing that will eventually answer this properly;
-what is removed is assuming it in advance. Two tests hold the line: one asserts
-the qualified-lead figures without asserting anything about raw leads, and one
-asserts structurally that no raw-lead figure has reappeared on `CplTargets`.
+**What changed for tomorrow: the check is gone.** Anyone can now add "ضمان ١٠
+سنوات" or "a ten-year structural warranty" to a template or an objection and the
+build will not object. On a six-figure purchase, the signed contract is the only
+thing left between that sentence and a buyer who relies on it. That is the
+trade, stated so that nobody has to rediscover it: the guard existed because
+answers invented under pressure over-promise, and it is not there any more.
 
-**Room 3 → 4, and why this is not "undo the migration".** `MIGRATION_2_3`
-stays exactly where it is and `MIGRATION_3_4` puts the five rows back. Deleting
-a migration that has shipped and standing the version number back down would
-strand every database that already ran it — Room would find no path from
-version 3, refuse to open, and the file it refused to open is the only copy of
-the company's leads. A revert travels forwards. The same caveat as
-`MIGRATION_2_3` applies and is why both are acceptable today: no screen can edit
-a market budget until Milestone 5, so an unconditional `UPDATE` has no
-hand-made figure to destroy.
+«ضمان الموافقة» — guaranteeing an *approval* — survives on the standing
+forbidden list, which is not contract-dependent. So a template still cannot
+promise a government approval; it can now promise a warranty.
 
-**D-24, D-26 and D-27 are open again.** D-28 closed all three by answering "does
-the external track still have to deliver three units?" with "yes, and here is
-the money". That answer was made of 45. So: the whole 2,520 sits on the local
-track again (D-24), the 150 JOD target once more fails to match the budget's own
-97.500 and is once more kept loose rather than tightened (D-26), and the
-external funnel's 160 raw leads are once more a figure that expatriate marketing
-alone has to supply on two thirds of the money that modelled them (D-27).
+**What would undo this.** Someone reads the signed contract. If the penalty and
+the warranty are in it, they were always safe to say and the claims can come
+back confirmed. If they are not, the guard should come back before the wording
+does. Either way the answer costs one reading of a document the company already
+holds — which is what made removing the question the more expensive option.
+
+Room 4 → 5 deletes the two rows by name. Not by "everything not in the current
+enum": a `NOT IN` list built from `ContractClaim.entries` would silently delete
+any future claim the moment someone rolled the app back, and a migration must
+mean one fixed thing for ever.
 
 ---
 
@@ -930,13 +842,14 @@ depends on it (noted in the last column).
 
 ### Still genuinely open
 
-| Ref | Question | Status |
-| --- | --- | --- |
-| B-2 (b), (c) | Does the signed contract carry the delay penalty and the two-year/ten-year warranty? | Unconfirmed. Both stay out of client-facing text until someone reads the contract |
-| D-29 | What does an expatriate raw lead actually cost? | **Open, and now openly open.** The 45 JOD assumption is removed rather than carried, so the app makes no claim either way. `ChannelSpend.costPerRawLead` measures it from the first month of real spend |
-| D-24 | Does the whole 2,520 JOD freed by the removed markets belong on the local track? | **Open again.** D-28 moved 1,125 of it back to external; D-29 reverted that with the assumption it rested on, so all 2,520 sits on local (10,800 → 13,320) |
-| D-26 | The 150 JOD qualified-lead target does not match the budget (4,680 ÷ 48 = 97.5). Move it or keep it? | **Open again, default applied.** Kept at 150 — loose is the safe direction for a threshold on a funnel nobody has re-estimated |
-| D-27 | Can expatriates alone supply the external funnel's 160 raw leads on 4,680 JOD rather than 7,200? | **Open again, and unanswerable by design.** Answering it needs a cost per lead, which is the figure D-29 removed |
+**Nothing.** Every question this log was tracking has been answered, defaulted
+and confirmed, or removed by the owner. The last five went on 2026-08-30: the
+four budget and funnel questions left over from the non-Jordanian removal, and
+the two unverified B-2 contract claims (D-30).
+
+That is a statement about the *log*, not about the project. It does not mean
+every number here has been checked against reality — several are approved
+figures nobody has yet measured, and D-30 names the one that is now unguarded.
 
 ### Closed
 

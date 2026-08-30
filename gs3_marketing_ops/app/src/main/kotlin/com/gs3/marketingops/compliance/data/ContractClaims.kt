@@ -5,36 +5,36 @@ import androidx.room.PrimaryKey
 import java.time.Instant
 
 /**
- * The four contract terms the marketing material would like to promise.
+ * The contract terms the marketing material may point at.
  *
- * B-2 asks whether the signed contract actually contains each of these. Until
- * someone has read the contract and said so, none of them may appear in a
- * WhatsApp template, a share card or ad copy — the app must not put a promise
- * in front of a client that the contract does not carry.
+ * B-2 asked whether the signed contract actually contains each of these. Both
+ * survivors are **confirmed present** by the owner (2026-08-29), so both may
+ * appear in a WhatsApp template, a share card or ad copy.
  *
- * They are **four separate rows on purpose**, not one flag. If three turn out
- * to be in the contract and one does not, three can be used and only the
- * missing one stays out. A single "contract verified" switch would force the
- * team to choose between over-claiming and under-claiming.
+ * They are **separate rows on purpose**, not one flag. A single "contract
+ * verified" switch would force the team to choose between over-claiming and
+ * under-claiming the moment the answers differed — which is exactly what
+ * happened when B-2 came back answered in part.
+ *
+ * **There were four.** The delay penalty and the two-year/ten-year warranty
+ * were the two nobody had verified, and on 2026-08-30 the owner removed them
+ * along with the guard that kept them out of client-facing text — see
+ * DECISIONS.md → D-30, which records what that guard was doing and what is
+ * no longer checked. Anything added here in future starts unconfirmed and
+ * should stay out of client text until someone has read the contract.
  *
  * **These rows are not about non-Jordanian buyers**, which is why they survived
  * the removal of that track (DECISIONS.md → D-23) while the eligibility gate
- * that used to share this file did not. A finishing annex and a delay penalty
- * are terms of the same signed contract every buyer signs. This file was called
+ * that used to share this file did not. A finishing annex is a term of the same
+ * signed contract every buyer signs. This file was called
  * `nonjordanian/data/ComplianceEntities.kt`; the package was wrong about it
  * even before the track went.
  */
 enum class ContractClaim {
-    /** A finishing-specifications annex, named and attached. */
+    /** A finishing-specifications annex, named and attached. Confirmed 2026-08-29. */
     FINISHING_SPECIFICATIONS_ANNEX,
 
-    /** A delay penalty payable to the buyer. */
-    DELAY_PENALTY_IN_BUYERS_FAVOUR,
-
-    /** Two-year finishing and ten-year structural warranty. */
-    TWO_YEAR_AND_TEN_YEAR_WARRANTY,
-
-    /** A quarterly photographic progress report. */
+    /** A quarterly photographic progress report. Confirmed 2026-08-29. */
     QUARTERLY_PHOTOGRAPHIC_PROGRESS_REPORT,
 }
 

@@ -14,7 +14,7 @@ permission) with lint and `verifyStrings` clean. The version matrix in
 
 The bilingual foundation and the data layer are in: a live language switch, both
 string files in step at 98 keys, five Room tables with an exported schema for
-every version and a real migration for each step from 1 to 4, and a seed derived
+every version and a real migration for each step from 1 to 5, and a seed derived
 from `:domain` rather than re-typed. **Milestone 7 lost half its scope** when the
 non-Jordanian track was removed (D-23); Milestone 3 is the next unstarted row.
 
@@ -38,7 +38,7 @@ Inside `:app`, packages by feature (`inventory`, `leads`, `campaigns`,
 each with its own `ui` / `data` split. MVVM, unidirectional flow, one activity.
 
 There was a `nonjordanian` package. It is gone with the track (`DECISIONS.md` →
-D-23); `compliance` is what is left of it, and holds the four contract claims,
+D-23); `compliance` is what is left of it, and holds the contract claims,
 which were never about non-Jordanian buyers in the first place.
 
 ## Cross-cutting work that cannot be retrofitted

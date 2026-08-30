@@ -68,11 +68,11 @@ class SeedOnDeviceTest {
             database.unitDao().count(),
         )
         assertEquals(
-            "five expatriate markets and no non-Jordanian ones -- D-23, D-24",
+            "five expatriate markets and no non-Jordanian ones -- D-23",
             Gs3Budget.externalTrackMarkets.size,
             database.marketBudgetDao().count(),
         )
-        assertEquals(4, database.complianceDao().getClaims().size)
+        assertEquals(2, database.complianceDao().getClaims().size)
         assertTrue(database.outreachDao().getTemplates().isNotEmpty())
         assertTrue(database.outreachDao().getObjections().isNotEmpty())
     }
@@ -102,9 +102,12 @@ class SeedOnDeviceTest {
             ),
             confirmed,
         )
-        // Four rows, so a partial answer to B-2 can be stored as a partial
-        // answer. This is that partial answer, having survived a real database.
-        assertEquals(4, claims.size)
+        // Two rows, both confirmed. D-30 removed the unverified two rather
+        // than shipping them unconfirmed, so there is no partial answer left
+        // for the row-per-claim design to carry -- but the shape survives, and
+        // the next claim added starts unconfirmed.
+        assertEquals(2, claims.size)
+        assertTrue(claims.all { it.confirmedPresent })
     }
 
     @Test
@@ -130,13 +133,11 @@ class SeedOnDeviceTest {
         seeder.seed()
 
         val dao = database.complianceDao()
-        val target = dao.getClaims().first { !it.confirmedPresent }
-        dao.update(
-            target.copy(
-                confirmedPresent = true,
-                contractReference = "Annex B, clause 7",
-            ),
-        )
+        // Every seeded claim is confirmed since D-30, so the edit to protect is
+        // the clause reference rather than the tick. It is the same guarantee:
+        // an insert carrying an existing primary key must change nothing.
+        val target = dao.getClaims().first()
+        dao.update(target.copy(contractReference = "Annex B, clause 7"))
 
         seeder.seed()
 

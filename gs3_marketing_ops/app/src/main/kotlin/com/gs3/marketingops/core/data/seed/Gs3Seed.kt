@@ -35,7 +35,7 @@ object Gs3Seed {
      * Five rows, all expatriate.
      *
      * There were nine. IRQ, GULF, PSE and TEST were the non-Jordanian markets
-     * and are gone with the track (DECISIONS.md → D-23, D-24). Because the seed
+     * and are gone with the track (DECISIONS.md → D-23). Because the seed
      * only inserts, deleting them here is not enough on its own to clear them
      * from a phone that already has them — `Gs3Database.MIGRATION_1_2` does
      * that.
@@ -52,22 +52,23 @@ object Gs3Seed {
     )
 
     /**
-     * Two of the four contract claims start confirmed.
+     * Both remaining contract claims ship confirmed.
      *
-     * **B-2 is answered in part** (2026-08-29). The owner confirms the signed
+     * **B-2 was answered in part** (2026-08-29). The owner confirmed the signed
      * contract carries the finishing-specifications annex and the quarterly
-     * photographic progress report. It does not confirm the delay penalty or
-     * the two-year and ten-year warranty — and "not confirmed" here means
-     * exactly that, not "verified absent". Both readings keep the claim out of
-     * client-facing text, so the app behaves identically; the distinction
-     * matters only to whoever is still chasing an answer.
+     * photographic progress report, and did not confirm the delay penalty or
+     * the two-year and ten-year warranty. On 2026-08-30 the owner removed those
+     * two unconfirmed claims outright (D-30), so what is left is the confirmed
+     * half.
+     *
+     * That means **every row this seeds is confirmed**, and the design that
+     * exists to carry a partial answer is not carrying one at the moment. It
+     * still earns its place: the next claim added starts unconfirmed, and the
+     * row is what keeps it out of client text until someone reads the contract.
      *
      * No clause references were supplied, so [ContractClaimEntity.contractReference]
      * stays null on both. Worth filling in when someone next has the contract
-     * open.
-     *
-     * This is why the four are four rows and not one switch. All four apply to
-     * every buyer, so all four stayed when the non-Jordanian track went (D-23).
+     * open — nothing else records which clause these rest on.
      */
     fun contractClaims(): List<ContractClaimEntity> =
         ContractClaim.entries.map { claim ->
@@ -172,16 +173,17 @@ object Gs3Seed {
      * Written because the alternative is each salesperson inventing an answer
      * under pressure, and answers invented under pressure over-promise.
      *
-     * Two hard rules, both enforced by tests rather than by memory:
+     * One hard rule, enforced by a test rather than by memory:
      *
-     * 1. **No B-2 claim appears here.** Not the finishing annex, the delay
-     *    penalty, the warranty, or the quarterly progress report — none of them
-     *    may be promised until the signed contract has been read and confirmed
-     *    to contain them.
-     * 2. **Nothing guarantees an outcome that belongs to someone else.** Not a
-     *    government approval, not a market yield. `verifyStrings` blocks the
-     *    worst phrasings outright; these answers avoid the shape of the claim,
-     *    not just the words.
+     * **Nothing guarantees an outcome that belongs to someone else.** Not a
+     * government approval, not a market yield. `verifyStrings` blocks the worst
+     * phrasings outright; these answers avoid the shape of the claim, not just
+     * the words.
+     *
+     * There was a second rule — no unverified B-2 contract claim, so no delay
+     * penalty and no warranty. D-30 removed both claims and the test that
+     * enforced it. The answers below still avoid them, but that is now a
+     * property of the text rather than something the build checks.
      *
      * What they *do* lean on is what the company already publishes on its own
      * website: the two street frontages, the named finishing specifications, the
@@ -248,12 +250,15 @@ object Gs3Seed {
             objectionKey = "delivery_timing",
             objectionAr = "متى التسليم، وماذا لو تأخّر؟",
             objectionEn = "When is delivery, and what if it is late?",
-            // Promises neither a delay penalty nor a scheduled photographic
-            // progress report: both are B-2 claims, unverified against the
-            // signed contract. What is offered instead is the delivery date and
-            // a commitment to keep in touch -- and the second one is already
-            // backed by the app's own ten-day update rule for external-track
-            // clients, so it is a promise the team is actually held to.
+            // Deliberately still promises no delay penalty, though nothing
+            // stops it any more: D-30 removed that claim and the guard that
+            // banned the phrase. The text is unchanged because the reason for
+            // it is unchanged -- nobody has read the signed contract and
+            // confirmed a penalty is in it, and this answer is given to a buyer
+            // weighing a six-figure purchase. What is offered instead is the
+            // delivery date and a commitment to keep in touch, and the second
+            // is backed by the app's own ten-day update rule, so it is a
+            // promise the team is actually held to.
             responseAr = "أعطيك تاريخ التسليم المعتمد للمشروع خطّياً ضمن العرض. " +
                 "وألتزم بإبقائك على اطّلاع بسير العمل أولاً بأول حتى لا تكون بعيداً عمّا يجري، " +
                 "وخصوصاً إن كنت خارج الأردن. أما ما يترتّب على التأخير فيحدّده نصّ العقد، وتُراجعه قبل التوقيع.",

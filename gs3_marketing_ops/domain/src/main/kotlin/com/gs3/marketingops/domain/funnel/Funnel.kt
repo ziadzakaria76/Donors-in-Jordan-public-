@@ -72,7 +72,7 @@ data class FunnelModel(
          * **All five numbers are the strategy's own, and none is derived from
          * the budget.** D-28 briefly made the lead count follow the money, at
          * an assumed 45 JOD per raw lead; the owner removed that assumption on
-         * 2026-08-30 (D-29), so 160 is once more simply what the plan says the
+         * 2026-08-30, so 160 is once more simply what the plan says the
          * external track brings in.
          *
          * **What that leaves open, deliberately.** The 160 was modelled when

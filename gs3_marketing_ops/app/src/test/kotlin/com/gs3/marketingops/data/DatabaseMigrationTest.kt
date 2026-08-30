@@ -75,7 +75,7 @@ class DatabaseMigrationTest {
             // Opening a version 1 file runs all three migrations in turn, so
             // the surviving rows arrive carrying version 4's figures: 1 -> 2
             // keeps UAE at 1,370, 2 -> 3 re-sizes it to 1,700 (D-28) and
-            // 3 -> 4 puts it back (D-29). Asserted against the domain rather
+            // 3 -> 4 puts it back. Asserted against the domain rather
             // than a literal, so the migrations and the seed cannot drift
             // apart.
             assertEquals(

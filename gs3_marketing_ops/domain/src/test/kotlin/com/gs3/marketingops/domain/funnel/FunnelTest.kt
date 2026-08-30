@@ -21,9 +21,9 @@ class FunnelTest {
     @Test
     fun `the external funnel projects three units from a hundred and sixty leads`() {
         // The strategy's own figures. D-28 briefly derived the lead count from
-        // the budget at 45 JOD each; that assumption is removed (D-29), so
-        // these five numbers stand on their own again and nothing in the app
-        // converts money into leads.
+        // the budget at 45 JOD each; that assumption is removed, so these five
+        // numbers stand on their own again and nothing in the app converts
+        // money into leads.
         val projection = FunnelModel.EXTERNAL.project()
         assertEquals(160, projection.rawLeads)
         assertEquals(48, projection.qualified)

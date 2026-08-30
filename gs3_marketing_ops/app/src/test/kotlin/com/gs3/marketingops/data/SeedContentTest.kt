@@ -61,7 +61,7 @@ class SeedContentTest {
         )
         // 4,680, not 7,200: the four non-Jordanian market rows are gone with
         // the track (D-23), and D-28's scaling to 5,805 went with the
-        // cost-per-raw-lead assumption it rested on (D-29).
+        // cost-per-raw-lead assumption it rested on.
         assertEquals(Jod.ofDinars(4_680), Gs3Budget.externalTrackTotal)
         assertEquals(5, seeded.size)
     }
@@ -79,40 +79,34 @@ class SeedContentTest {
     }
 
     @Test
-    fun `the two confirmed contract claims ship confirmed and the other two do not`() {
+    fun `both surviving contract claims ship confirmed, and the unverified two are gone`() {
         val claims = Gs3Seed.contractClaims()
 
         assertEquals(ContractClaim.entries.size, claims.size)
-        assertEquals(4, claims.size)
-        // Four rows rather than one switch. This is the case that design was
-        // for: B-2 came back answered in part, and a single switch would have
-        // forced all four to share the most cautious answer.
+        assertEquals(2, claims.size)
         assertEquals(ContractClaim.entries.map { it.name }.toSet(), claims.map { it.claim }.toSet())
 
-        val confirmed = claims.filter { it.confirmedPresent }.map { it.claimType }.toSet()
+        // Every remaining claim is confirmed. D-30 removed the unverified two
+        // rather than leaving them unconfirmed, so the partial answer this
+        // design exists to carry is not being carried at the moment.
         assertEquals(
             setOf(
                 ContractClaim.FINISHING_SPECIFICATIONS_ANNEX,
                 ContractClaim.QUARTERLY_PHOTOGRAPHIC_PROGRESS_REPORT,
             ),
-            confirmed,
+            claims.filter { it.confirmedPresent }.map { it.claimType }.toSet(),
         )
+        assertTrue(claims.all { it.confirmedPresent })
 
-        // Not confirmed means "nobody has verified it", never "verified
-        // absent". Either way it stays out of client text.
-        val unconfirmed = claims.filterNot { it.confirmedPresent }.map { it.claimType }.toSet()
-        assertEquals(
-            setOf(
-                ContractClaim.DELAY_PENALTY_IN_BUYERS_FAVOUR,
-                ContractClaim.TWO_YEAR_AND_TEN_YEAR_WARRANTY,
-            ),
-            unconfirmed,
-        )
+        // Named individually, so reintroducing either by mistake fails here
+        // rather than passing as "some claim or other".
+        val names = claims.map { it.claim }.toSet()
+        assertTrue("DELAY_PENALTY_IN_BUYERS_FAVOUR" !in names)
+        assertTrue("TWO_YEAR_AND_TEN_YEAR_WARRANTY" !in names)
 
         // A confirmation is dated, so its age is visible. No clause references
         // were supplied, so they stay null until someone has the contract open.
-        assertTrue(claims.filter { it.confirmedPresent }.all { it.confirmedAt != null })
-        assertTrue(claims.filterNot { it.confirmedPresent }.all { it.confirmedAt == null })
+        assertTrue(claims.all { it.confirmedAt != null })
         assertTrue(claims.all { it.contractReference == null })
     }
 
@@ -176,35 +170,24 @@ class SeedContentTest {
      * text now also lives in Kotlin seed data, which is a real gap the moment
      * templates and objections were written. This closes it.
      *
-     * Two families of phrase are banned. The first is the **B-2 contract claims
-     * that are still unconfirmed**. B-2 came back answered in part on
-     * 2026-08-29: the finishing-specifications annex and the quarterly
-     * photographic progress report are in the signed contract, so they are no
-     * longer promises the company cannot make and are no longer banned here.
-     * The delay penalty and the warranty are not confirmed, so they stay banned
-     * — and they stay banned on the same reasoning as before, not a weaker one:
-     * unconfirmed means nobody has checked, which is not the same as absent,
-     * and both keep the phrase out of a client's hands.
+     * **This list used to have a second family, and no longer does.** The
+     * unconfirmed B-2 claims — a delay penalty and a two-year/ten-year warranty
+     * — were banned here because nobody had read the signed contract to confirm
+     * them. The owner removed both claims and this guard on 2026-08-30
+     * (DECISIONS.md → D-30). Nothing now stops a future template or objection
+     * promising either, so the contract text is the only thing standing between
+     * a buyer and a promise the company may not be able to keep.
      *
-     * The second family is the standing **forbidden phrases**: a fee exemption
-     * the company cannot grant, an approval that belongs to the authorities, a
-     * return that belongs to the market. Note that «ضمان» stays on the list
-     * twice over — as the unconfirmed warranty, and inside «ضمان الموافقة»,
-     * which is forbidden regardless of what any contract says.
+     * What remains is the standing **forbidden phrases**: a fee exemption the
+     * company cannot grant, an approval that belongs to the authorities, a
+     * return that belongs to the market. These are not contract-dependent and
+     * are forbidden whatever any contract says. Note «ضمان الموافقة» survives
+     * as one of them even though the bare «ضمان» ban is gone — guaranteeing an
+     * approval is never the company's to promise.
      */
     @Test
     fun `no seeded client-facing text promises anything unverified`() {
         val banned = mapOf(
-            // --- B-2 claims still unconfirmed against the signed contract ---
-            // The annex and the quarterly report were confirmed on 2026-08-29
-            // and are deliberately no longer here.
-            "غرامة تأخير" to "a delay penalty is an unconfirmed B-2 claim",
-            "غرامة التأخير" to "a delay penalty is an unconfirmed B-2 claim",
-            "delay penalty" to "a delay penalty is an unconfirmed B-2 claim",
-            "ضمان" to "a warranty is an unconfirmed B-2 claim",
-            "كفالة" to "a warranty is an unconfirmed B-2 claim",
-            "warranty" to "a warranty is an unconfirmed B-2 claim",
-
             // --- Standing forbidden phrases, same list verifyStrings enforces ---
             "إعفاء من الرسوم" to "the company contributes toward fees; it cannot exempt anyone",
             "fee exemption" to "the company contributes toward fees; it cannot exempt anyone",

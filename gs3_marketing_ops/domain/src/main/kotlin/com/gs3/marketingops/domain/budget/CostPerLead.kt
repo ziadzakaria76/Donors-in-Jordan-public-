@@ -20,15 +20,15 @@ import java.math.BigDecimal
  * **150 no longer comes out of the budget's arithmetic, and is kept anyway.**
  * Removing the non-Jordanian track (D-23) took the external budget to 4,680, so
  * the same division over the same 48 qualified leads gives 97.500. The target
- * stays at 150 — see DECISIONS.md → D-26 and D-29. It is an approved figure and
- * moving it down would tighten an alarm on a funnel nobody has re-estimated,
+ * stays at 150. It is an approved figure, and moving it down would tighten an
+ * alarm on a funnel nobody has re-estimated,
  * which is the D-3 failure again: an alarm that fires from week one and teaches
  * the team to ignore it. Loose is the safe direction for an unconfirmed
  * threshold.
  *
  * **No cost per raw lead is assumed anywhere.** The owner removed that figure
- * on 2026-08-30 (D-29), so nothing in this app converts a budget into a lead
- * count or a lead count into a budget. The external track's 4,680 JOD and the
+ * on 2026-08-30, so nothing in this app converts a budget into a lead count or
+ * a lead count into a budget. The external track's 4,680 JOD and the
  * external funnel's 160 raw leads are both approved figures that stand on their
  * own; whether the first can buy the second is an open question, and the app no
  * longer answers it by assumption.

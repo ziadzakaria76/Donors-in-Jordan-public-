@@ -20,7 +20,7 @@ class BudgetAllocationTest {
         // 4,680 — the brief's own expatriate figures. The four non-Jordanian
         // rows (IRQ 1,260, GULF 560, PSE 420, TEST 280) are deleted with the
         // track (D-23), and D-28's scaling to 5,805 is reverted with the
-        // cost-per-raw-lead assumption it rested on (D-29).
+        // cost-per-raw-lead assumption it rested on.
         assertEquals(Jod.ofDinars(4_680), Gs3Budget.expatriateTotal)
         assertEquals(Jod.ofDinars(4_680), Gs3Budget.externalTrackTotal)
         assertEquals(5, Gs3Budget.externalTrackMarkets.size)
@@ -160,7 +160,7 @@ class StopRulesTest {
 
     @Test
     fun `the only target is per qualified lead, and it no longer comes from the budget`() {
-        // D-3 removed the raw-lead *target* in August. D-29 removes the last
+        // D-3 removed the raw-lead *target* in August. 2026-08-30 removed the last
         // thing 45 JOD was still doing: the planning assumption that turned a
         // budget into a lead count. So this test deliberately asserts nothing
         // about cost per raw lead — the figure is measured in production and
@@ -186,13 +186,13 @@ class StopRulesTest {
         assertEquals(Jod.ofDinars(150), targets.perQualifiedLead)
         assertTrue(
             onPlan.costPerQualifiedLead!! < targets.perQualifiedLead,
-            "the target must stay at or above what the plan spends, never below — see D-3, D-26 and D-29",
+            "the target must stay at or above what the plan spends, never below — see D-3",
         )
     }
 
     @Test
     fun `nothing converts a budget into a lead count`() {
-        // D-29, asserted structurally rather than trusted to comments. The
+        // Asserted structurally rather than trusted to comments. The
         // external budget and the external funnel are both approved figures
         // and are deliberately unrelated: 4,680 / 160 is 29.25, a number that
         // appears nowhere and means nothing. If a future change makes one

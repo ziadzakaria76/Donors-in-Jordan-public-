@@ -59,7 +59,7 @@ class DatabaseSeedTest {
         assertEquals(5, database.marketBudgetDao().count())
         assertEquals(Gs3Seed.messageTemplates().size, database.outreachDao().getTemplates().size)
         assertEquals(Gs3Seed.objections().size, database.outreachDao().getObjections().size)
-        assertEquals(4, database.complianceDao().getClaims().size)
+        assertEquals(2, database.complianceDao().getClaims().size)
     }
 
     @Test
@@ -82,7 +82,7 @@ class DatabaseSeedTest {
         assertEquals(14, database.unitDao().count())
         assertEquals(5, database.marketBudgetDao().count())
         assertEquals(Gs3Seed.objections().size, database.outreachDao().getObjections().size)
-        assertEquals(4, database.complianceDao().getClaims().size)
+        assertEquals(2, database.complianceDao().getClaims().size)
     }
 
     /**
