@@ -610,3 +610,89 @@ def test_an_unreadable_deadline_cell_is_not_passed_through_raw(profile, gate):
               cells={"deadline": "see tender documents"})
     record = portal.row_to_record(row, "https://www.ungm.org/Public/Notice/Search")
     assert record.get("closing_date") is None, record.get("closing_date")
+
+
+def _undp_row(i, office, title):
+    """The live row anatomy, per the capture of 2026-08-30: the row IS the
+    anchor, and every cell carries its column label as an inline element."""
+    return (f'<a class="country_4 vacanciesTableLink vacanciesTable__row" '
+            f'href="/view_notice.cfm?notice_id={i}">'
+            f'<div class="vacanciesTable__cell">'
+            f'<div class="vacanciesTable__cell__label">Title</div>{title}</div>'
+            f'<div class="vacanciesTable__cell">Ref No UNDP-{i}</div>'
+            f'<div class="vacanciesTable__cell">UNDP Office/Country {office}</div>'
+            f'<div class="vacanciesTable__cell">Deadline 08-Sep-26 09:20 AM (New York time)</div>'
+            f'<div class="vacanciesTable__cell">Posted 29-Aug-26</div></a>')
+
+
+def test_undp_titles_drop_the_column_label(profile, gate):
+    """Two of the top ten were one tender counted twice.
+
+    Every UNDP entry reached the report as "Title Providing Health Facilities
+    with Renewable Energy Ref No UNDP-SYR-..." -- the column heading, then the
+    notice. Cosmetically a bad title; mechanically a duplicate, because
+    _dedupe_key is title|closing and UNGM lists the same notices under their
+    real names. Once deadlines began parsing, the two rows agreed on the date
+    and differed only by the word "Title".
+    """
+    from types import SimpleNamespace
+
+    html = ("<html><body>"
+            + _undp_row(1, "UNDP-SYR/SYRIA",
+                        "Rehabilitation of Schools &amp; Health Centers in Aleppo")
+            + "</body></html>")
+
+    class Fetcher(StubFetcher):
+        def get(self, url, **kw):
+            return SimpleNamespace(text=html, status=200, ok=True)
+
+    tenders = build("undp", Fetcher(), profile, gate, cfg={}).collect().tenders
+    assert len(tenders) == 1
+    assert tenders[0].title == "Rehabilitation of Schools & Health Centers in Aleppo", \
+        tenders[0].title
+    assert not tenders[0].title.startswith("Title"), "the column label is not the title"
+
+
+def test_undp_reads_the_country_undp_itself_assigns(profile, gate):
+    """The gate was reading prose: 8 of 572 rows were kept on a text match.
+
+    UNDP states the country in its office/country column. A field the source
+    states is better evidence than a word found in a description, and it lets
+    the other rows be rejected for the reason they should be -- naming another
+    country -- rather than for silence.
+    """
+    from types import SimpleNamespace
+
+    html = ("<html><body>"
+            + _undp_row(1, "UNDP-SYR/SYRIA", "Rehabilitation of clinics, Aleppo")
+            + _undp_row(2, "UNDP-GMB/GAMBIA", "Supply and Delivery of Postal Fleet Vehicles")
+            + "</body></html>")
+
+    class Fetcher(StubFetcher):
+        def get(self, url, **kw):
+            return SimpleNamespace(text=html, status=200, ok=True)
+
+    outcome = build("undp", Fetcher(), profile, gate, cfg={}).collect()
+    assert outcome.stats.seen == 2
+    kept = [t.title for t in outcome.tenders]
+    assert kept == ["Rehabilitation of clinics, Aleppo"], kept
+
+
+def test_the_duplicate_pair_collapses_once_the_label_is_gone():
+    """The pair as the run of 2026-08-30 printed it, keyed by title|closing."""
+    from datetime import date
+    from syria_monitor.pipeline import _dedupe_key
+    from syria_monitor.models import Tender
+
+    base = "Rehabilitation of Schools & Health Centers in Aleppo & Costal Areas"
+
+    def tender(title, portal):
+        t = Tender(id=title, portal=portal, title=title)
+        t.closing_date = date(2026, 9, 8)
+        return t
+
+    ungm = tender(base, "ungm")
+    assert _dedupe_key(ungm) != _dedupe_key(
+        tender(f"Title {base} Ref No UNDP-SYR-00612", "undp")), \
+        "precondition: the labelled title is what kept them apart"
+    assert _dedupe_key(ungm) == _dedupe_key(tender(base, "undp"))
