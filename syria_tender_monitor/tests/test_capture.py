@@ -469,3 +469,39 @@ def test_ungm_reads_the_notice_row_not_a_column_of_it(profile, gate):
     assert not any("Unsave" in t for t in titles), "never the save button's label"
     assert not any((t.url or "").endswith("#") for t in outcome.tenders), \
         "href='#' is not a link"
+
+
+def test_undp_rows_are_the_anchors_that_carry_the_notice(profile, gate):
+    """572 notices in the markup, six read.
+
+    Every UNDP row carries its country and region in its own class list, so
+    grouping by class signature shatters one listing into dozens of per-country
+    fragments -- the largest 49, none reaching the 0.45 threshold -- and a
+    six-row structural group wins instead. Naming the row answers it.
+
+    The row is ALSO the link: the cells sit inside <a class="vacanciesTableLink">,
+    so searching within the row finds no anchor and every notice would come back
+    with no URL.
+    """
+    from syria_monitor.extraction import extract
+
+    rows = "".join(
+        f'<a class="country_{i % 8} region_RAS vacanciesTableLink vacanciesTable__row" '
+        f'href="/view_notice.cfm?notice_id={1000 + i}">'
+        f'<div class="vacanciesTable__cell">Rehabilitation of clinics, lot {i}</div>'
+        f'<div class="vacanciesTable__cell">Deadline: 30-Sep-2026</div>'
+        f'<div class="vacanciesTable__cell">Syrian Arab Republic</div></a>'
+        for i in range(120))
+    html = f"<html><body><div>{rows}</div></body></html>"
+
+    loose = extract(html, base_url="https://procurement-notices.undp.org")
+    assert len(loose.rows) < 120, (
+        "precondition: without the selector the class groups fragment "
+        f"(got {len(loose.rows)} via {loose.layer})")
+
+    result = extract(html, base_url="https://procurement-notices.undp.org",
+                     selectors={"row": "a.vacanciesTableLink"})
+    assert result.layer == "selectors"
+    assert len(result.rows) == 120, f"every notice, got {len(result.rows)}"
+    assert all(r.url and "notice_id=" in r.url for r in result.rows), \
+        "the row is the anchor; its own href is the notice URL"

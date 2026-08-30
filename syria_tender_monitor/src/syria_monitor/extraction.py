@@ -234,6 +234,12 @@ def selector_layer(soup: BeautifulSoup, selectors: Optional[dict], base_url: str
         configured = selectors.get("link")
         candidates = node.select(configured) if configured else node.find_all("a")
         link_node = next((a for a in candidates if _is_navigable(a.get("href"))), None)
+        # The row may BE the link rather than contain one. UNDP's listing is 572
+        # <a class="vacanciesTableLink"> elements with the cells inside them, so
+        # searching within the row finds no anchor at all and every notice would
+        # come back without a URL.
+        if link_node is None and node.name == "a" and _is_navigable(node.get("href")):
+            link_node = node
         href = link_node.get("href") if link_node else None
         cells = {}
         for key in ("deadline", "published", "value", "buyer", "type"):
