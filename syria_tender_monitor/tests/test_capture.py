@@ -156,6 +156,44 @@ def test_ungm_deadline_uses_the_countdown_guard(profile, gate):
     assert record["closing_date"] == date(2026, 9, 30).isoformat()
 
 
+def test_ungm_multiple_destinations_is_not_read_as_another_country(profile, gate):
+    """The live run of 2026-08-30 kept 7 of 15 UNGM rows. The 8 it dropped were
+    the ones labelled "Multiple destinations" -- a label, not a country, and the
+    reason their row text never says Syria.
+
+    They are kept on the strength of the request that produced them: the search
+    was filtered to Countries=[country_id], and a column that cannot express a
+    country is not the source contradicting that.
+    """
+    from syria_monitor.extraction import Row
+
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": 2490})
+    row = Row(title="Provision of equipment for Jobar TVET Centre",
+              text="Deadline: 30-Sep-2026 UNDP UNDP-SYR-00659 Multiple destinations")
+    record = portal.row_to_record(row, "https://www.ungm.org/Public/Notice/Search")
+
+    assert record.get("country") == "Syria", (
+        "a multi-destination row carries the country the search asked for")
+    keep, _link, _delivery = gate.check(record)
+    assert keep, "and the gate therefore keeps it"
+
+
+def test_ungm_a_row_naming_another_country_is_still_not_claimed(profile, gate):
+    """The other half of the tri-state, and the half that keeps it honest.
+
+    Where the column CAN express a country and names one that is not ours, it is
+    the source disagreeing with our request and it is believed. Only the blank
+    answer stops being read as a "no".
+    """
+    from syria_monitor.extraction import Row
+
+    portal = build("ungm", StubFetcher(), profile, gate, cfg={"country_id": 2490})
+    row = Row(title="Supply of office furniture",
+              text="Deadline: 30-Sep-2026 UNDP UNDP-LBN-00123 Lebanon")
+    record = portal.row_to_record(row, "https://www.ungm.org/Public/Notice/Search")
+    assert not record.get("country"), "no country is claimed for it"
+
+
 def test_sam_gov_is_skipped_without_a_key_rather_than_failing(profile, gate):
     outcome = REGISTRY["samgov"]({}, profile, StubFetcher(), gate).collect()
     assert outcome.skipped_reason and "SAM_API_KEY" in outcome.skipped_reason

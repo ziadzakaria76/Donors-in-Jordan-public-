@@ -428,16 +428,33 @@ def _rows_from_group(group: list, base_url: str) -> list[Row]:
     anyone would question -- it is a plausible-looking listing of the wrong
     thing, and the row count is the only hint.
 
-    So: the title comes from the first anchor that actually has text, and the
-    URL from the first anchor that actually goes somewhere. They are usually
-    the same anchor and are looked up separately anyway, because a row whose
-    link is an icon and whose title is plain text is a real arrangement.
+    NOR IS IT THE FIRST ANCHOR WITH TEXT. That was the first correction and it
+    was still wrong, because it assumed the save button is an icon with no text.
+    UNGM's is an icon with an accessible label -- "Unsave this procurement
+    opportunity. Subscribe to UNGM Pro ..." -- so it satisfies "has text" and
+    won the title anyway. Confirmed live: every UNGM notice in the run of
+    2026-08-30 was titled "Unsave this procurement opportunity." The fixture
+    that vetted the first correction rendered that button as
+    `<a href="#"><svg></svg></a>`, textless, which is the one shape where the
+    bug does not reproduce -- so the test passed and the page stayed broken.
+
+    So the rule is a conjunction, not two independent lookups: prefer the
+    anchor that BOTH goes somewhere AND says something, which is what a title
+    link is. A button wired with href="#" is excluded by the first half however
+    much text it carries, and a bare icon link by the second.
+
+    The split lookup remains as the fallback, because a row whose link is an
+    icon and whose title is plain text is a real arrangement -- it is just not
+    the common one, and it must not be what decides the common one.
     """
     rows = []
     for node in group:
         anchors = node.find_all("a")
-        titled = next((a for a in anchors if a.get_text(" ", strip=True)), None)
-        linked = next((a for a in anchors if _is_navigable(a.get("href"))), None)
+        # A title link goes somewhere and says something. Look for that first.
+        primary = next((a for a in anchors
+                        if _is_navigable(a.get("href")) and a.get_text(" ", strip=True)), None)
+        titled = primary or next((a for a in anchors if a.get_text(" ", strip=True)), None)
+        linked = primary or next((a for a in anchors if _is_navigable(a.get("href"))), None)
 
         text = node.get_text(" ", strip=True)
         # Fall back to the node's own text, as before, when no anchor carries

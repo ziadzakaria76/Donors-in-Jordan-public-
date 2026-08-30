@@ -16,10 +16,11 @@ TWO THINGS THAT MUST BE READ OFF THE LIVE SITE, NOT GUESSED
    difference between the build's best portal working and it silently
    returning nothing.
 
-2. The POST body below is a documented skeleton, NOT a verified capture. It
-   must be replaced field-for-field from a real network trace before it can be
-   trusted. A previous reconstruction of this request from documentation is
-   what convinced everyone the endpoint was dead.
+2. The POST body below WAS a documented skeleton and is no longer one: it was
+   replaced field-for-field from a real network trace on 2026-08-30, and the
+   skeleton had been wrong in six places. See search_body(). A reconstruction
+   of this request from documentation is what convinced everyone the endpoint
+   was dead; it was proof of a wrong body, not a dead endpoint.
 
 The UI's own IsActive and DeadlineFrom fields are sent because they are what
 the UI sends -- but every deadline is re-checked downstream anyway. A source's
@@ -30,10 +31,15 @@ r"""
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from ..dates import CLOSING_LABELS, find_labelled_date
 from .base import HtmlPortal
+
+# What UNGM prints in the country cell when a notice covers several countries.
+# It is a label, not a country -- see row_to_record().
+MULTI_DESTINATION_RE = re.compile(r"multiple\s+destinations", re.I)
 
 BASE = "https://www.ungm.org"
 NOTICE_PAGE = f"{BASE}/Public/Notice"
@@ -165,4 +171,26 @@ class UngmPortal(HtmlPortal):
         deadline = find_labelled_date(row.text, CLOSING_LABELS)
         if deadline:
             record["closing_date"] = deadline.isoformat()
+
+        # "MULTIPLE DESTINATIONS" IS NOT ANOTHER COUNTRY. It is UNGM saying the
+        # column has no room for the answer, and on a country-filtered search it
+        # is the majority of the result set: the live run of 2026-08-30 read 15
+        # rows, 7 naming this country and 8 labelled this way, and kept 7. The
+        # eight were dropped for "no evidence" -- their row text never says
+        # Syria, because the cell that would have said it says this instead.
+        #
+        # The evidence those rows do have is the request that produced them. We
+        # sent Countries=[country_id] and UNGM answered with these; a label that
+        # cannot express a country is not the source disagreeing with us.
+        #
+        # This is not a retreat from "a source's own filter is a hint, never a
+        # guarantee". Rows that name some OTHER country still say so and are
+        # still rejected on that -- there the column CAN express the answer and
+        # does. What changes is that a blank answer stops being read as "no".
+        #
+        # The sibling Jordan monitor reached this the expensive way: its text
+        # filter was discarding 51 of 70 notices, and the kept count ROSE when
+        # the bug was introduced (3 to 19), so it read as an improvement.
+        if not record.get("country") and MULTI_DESTINATION_RE.search(row.text or ""):
+            record["country"] = self.profile.get("name", "")
         return record

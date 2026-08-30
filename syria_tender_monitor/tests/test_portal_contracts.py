@@ -347,3 +347,54 @@ def test_ted_reports_what_the_server_said_not_a_guess(profile, gate):
 
     # An error page can be a whole HTML document.
     assert len(Stub()._rejection(Response(400, "<html>" + "x" * 5000), 1)) < 600
+
+
+# The opening of the reply TED actually sent on 2026-08-30 is verbatim from the
+# run log; only the first 400 characters of the real list were ever printed, so
+# the tail here is the shipped field names appended on the evidence that the
+# sibling Jordan monitor sends exactly these and gets HTTP 200 in production.
+#
+# WHAT THIS THEREFORE PROVES, and what it does not: it pins the parser, and it
+# fails the moment an unverified name is added to FIELDS -- which is the
+# regression that took the portal down. It is NOT independent proof that TED
+# accepts these ten; only a live run is that.
+_TED_400_BODY = (
+    '{"message":"Parameter \'fields\' contains unsupported value '
+    '(supported values are: sme-part,touchpoint-gateway-ted-esen,submission-url-lot,'
+    'publication-number,notice-title,publication-date,deadline-receipt-tender-date-lot,'
+    'notice-type,total-value,buyer-name,links,description-lot,'
+    'place-of-performance-country-lot,BT-13(t)-Part,BT-821-Lot)"}'
+)
+
+
+def test_ted_requests_only_fields_ted_supports():
+    """Every requested name appears in TED's own supported list.
+
+    An unsupported name is not a missing column -- it is HTTP 400 on page 1 and
+    the entire portal reported down, which is how it behaved on every live run
+    until the reply was printed.
+    """
+    from syria_monitor.portals.ted import FIELDS, _unsupported_fields_note
+
+    note = _unsupported_fields_note(_TED_400_BODY)
+    assert note.startswith("Every field"), (
+        f"the shipped field list must be a subset of TED's own: {note}")
+    assert len(FIELDS) == len(set(FIELDS)), "no duplicate field names"
+
+
+def test_ted_rejection_names_the_offending_field():
+    """The 400 excerpt truncates thousands of names before reaching the answer,
+    so the comparison is made for the reader rather than left to them."""
+    import syria_monitor.portals.ted as ted
+
+    note = ted._unsupported_fields_note(_TED_400_BODY.replace(
+        "deadline-receipt-tender-date-lot,", ""))
+    assert "deadline-receipt-tender-date-lot" in note, note
+    assert "Fields TED does not support" in note
+
+
+def test_ted_field_note_is_silent_when_fields_are_not_the_problem():
+    from syria_monitor.portals.ted import _unsupported_fields_note
+
+    assert _unsupported_fields_note('{"message":"Rate limit exceeded"}') == ""
+    assert _unsupported_fields_note("") == ""
