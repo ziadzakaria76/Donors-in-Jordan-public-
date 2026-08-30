@@ -139,6 +139,68 @@ class DatabaseMigrationTest {
         }
     }
 
+    @Test
+    fun `version four's two unverified contract claims are deleted`() = runTest {
+        // This test exists because the obvious way to check `MIGRATION_4_5`
+        // does not check it at all.
+        //
+        // Unwiring the migration makes every other test fail — but for the
+        // wrong reason. Room cannot find a path from 4 to 5 and refuses to
+        // open, so the failure proves the migration is *wired*, not that its
+        // `DELETE` removes the right rows. Replacing the two claim names with
+        // one that does not exist leaves the whole suite green. That was
+        // verified by doing it, not assumed.
+        //
+        // So this starts from a version 4 database that actually contains the
+        // two rows, and asserts they are gone afterwards.
+        createVersionOne()
+        val migrated = Gs3Database.build(context, databaseFile.name)
+        migrated.complianceDao().getClaims()
+        migrated.close()
+
+        SQLiteDatabase.openOrCreateDatabase(databaseFile, null).use { db ->
+            listOf("DELAY_PENALTY_IN_BUYERS_FAVOUR", "TWO_YEAR_AND_TEN_YEAR_WARRANTY").forEach { claim ->
+                db.insert(
+                    "contract_claims",
+                    null,
+                    ContentValues().apply {
+                        put("claim", claim)
+                        put("confirmedPresent", 0)
+                    },
+                )
+            }
+            db.version = 4
+        }
+
+        // Three rows at version 4: the confirmed annex, and the two nobody
+        // verified against the signed contract.
+        assertEquals(3, claimNames().size)
+
+        val database = Gs3Database.build(context, databaseFile.name)
+        try {
+            val names = database.complianceDao().getClaims().map { it.claim }.toSet()
+            assertEquals(setOf("FINISHING_SPECIFICATIONS_ANNEX"), names)
+            assertTrue("DELAY_PENALTY_IN_BUYERS_FAVOUR" !in names)
+            assertTrue("TWO_YEAR_AND_TEN_YEAR_WARRANTY" !in names)
+
+            // And the confirmed row is untouched, not merely surviving: a
+            // migration that cleared the table would also pass the assertions
+            // above.
+            val kept = database.complianceDao().getClaims().single()
+            assertTrue(kept.confirmedPresent)
+            assertEquals("Annex 3, clause 2", kept.contractReference)
+        } finally {
+            database.close()
+        }
+    }
+
+    private fun claimNames(): List<String> =
+        SQLiteDatabase.openDatabase(databaseFile.path, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            db.rawQuery("SELECT claim FROM contract_claims", null).use { cursor ->
+                buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+            }
+        }
+
     /**
      * Builds a version 1 database: the exported `CREATE TABLE` statements, a
      * `room_master_table` carrying version 1's identity hash, and rows in the

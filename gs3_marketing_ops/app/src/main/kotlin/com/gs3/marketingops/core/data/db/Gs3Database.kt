@@ -114,6 +114,15 @@ abstract class Gs3Database : RoomDatabase() {
          * to assert them against. `DatabaseMigrationTest` asserts the *end* of
          * the chain against `Gs3Budget`, which is the property that matters.
          *
+         * **This migration cannot be tested, and that is a property of it
+         * rather than a gap.** `MIGRATION_3_4` overwrites the same five
+         * columns immediately afterwards, so gutting this body changes nothing
+         * any test can observe — confirmed by doing it and watching the suite
+         * stay green. It has to stay regardless: Room needs a 2 → 3 step to
+         * reach 5 from 2, and deleting it would strand any database at
+         * version 2. Do not add a test that appears to cover it; there is no
+         * observable behaviour left to assert.
+         *
          * **This overwrites the rows unconditionally, and that is only
          * acceptable today.** Nothing in the app can edit a market budget yet —
          * there is no Settings screen for it until Milestone 5 — so there is no
