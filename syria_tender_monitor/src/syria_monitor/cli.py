@@ -115,6 +115,11 @@ def capture(cfg, name: str) -> int:
             for extra in _structure_lines(html):
                 say(extra)
             if target == "ungm":
+                # Only the search page carries notice rows; the dropdown page
+                # is the country list and has none.
+                if label == "search":
+                    for extra in _row_country_lines(html):
+                        say(extra)
                 for extra in _ungm_country_lines(html):
                     say(extra)
         say()
@@ -168,6 +173,62 @@ def _ungm_country_lines(html: str) -> list[str]:
     for value, text in options:
         if "syria" in text.lower() or "syrian" in text.lower():
             out.append(f"      >>> set portals.ungm.country_id: {value}    ({text})")
+    return out
+
+
+def _row_country_lines(html: str, limit: int = 12) -> list[str]:
+    """What country each returned row actually says, straight from the markup.
+
+    THE QUESTION THIS ANSWERS. A search filtered by country and a search that
+    ignored the filter both return HTTP 200 and a full page. Nothing else in a
+    capture distinguishes them, so "the endpoint works" has been as far as this
+    project could get. Reading the country out of the rows is what turns that
+    into "the endpoint works AND it filtered".
+
+    Deliberately independent of the extraction cascade. The cascade read 6 rows
+    from a page holding 15, and a tally over what it managed to parse would
+    inherit that gap and report on a biased sample. This walks the markup.
+
+    Which column holds the country is not assumed. The last cell of a row is
+    where UNGM puts it, but that is an observation about one portal on one day,
+    so the first row's cells are printed in full alongside the tally -- if the
+    guess is wrong, the printout says so immediately rather than the tally
+    quietly counting the wrong column.
+    """
+    from bs4 import BeautifulSoup
+    from collections import Counter
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    rows = soup.select("div.tableRow") or soup.select("div.dataRow") or soup.select("tr")
+    if not rows:
+        return ["    no row containers found -- cannot say what country the rows carry"]
+
+    cells_per_row = []
+    for row in rows:
+        cells = [c.get_text(" ", strip=True) for c in row.select("div.tableCell, td, th")]
+        cells = [c for c in cells if c]
+        if cells:
+            cells_per_row.append(cells)
+    if not cells_per_row:
+        return [f"    {len(rows)} row container(s), but no cells inside them"]
+
+    out = [f"    Rows in the markup: {len(cells_per_row)}"]
+
+    # The evidence for the guess, before the guess is used.
+    first = cells_per_row[0]
+    out.append("    First row's cells, in order (the country column should be "
+               "identifiable here):")
+    for index, cell in enumerate(first):
+        out.append(f"      [{index}] {cell[:70]}")
+
+    tally: Counter = Counter(cells[-1] for cells in cells_per_row)
+    out.append(f"    Last cell across all {len(cells_per_row)} rows:")
+    for value, count in tally.most_common(limit):
+        out.append(f"      {(value or '(blank)')[:40]:40} {count:5}")
+    out.append("      (the request named one country; anything else here is the "
+               "source's filter")
+    out.append("       disagreeing with its own column, and decides whether "
+               "dropping those rows is right)")
     return out
 
 
