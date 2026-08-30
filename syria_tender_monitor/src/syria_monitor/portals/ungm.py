@@ -35,7 +35,7 @@ import logging
 import re
 from datetime import date
 
-from ..dates import CLOSING_LABELS, find_labelled_date
+from ..dates import CLOSING_LABELS, find_labelled_date, parse_date
 from .base import HtmlPortal
 
 log = logging.getLogger(__name__)
@@ -49,6 +49,20 @@ MAX_PAGES = 40
 # What UNGM prints in the country cell when a notice covers several countries.
 # It is a label, not a country -- see row_to_record().
 MULTI_DESTINATION_RE = re.compile(r"multiple\s+destinations", re.I)
+
+# The date at the front of a cell, ignoring whatever trails it. UNGM appends a
+# time, a timezone and a fractional countdown to its deadline cell.
+_LEADING_DATE = re.compile(
+    r"\b(\d{1,2}[-/\s][A-Za-z]{3,9}[-/\s]\d{4}"
+    r"|\d{4}-\d{2}-\d{2}"
+    r"|\d{1,2}[-/]\d{1,2}[-/]\d{4})")
+
+
+def _cell_date(value):
+    """The date a deadline cell starts with, or None."""
+    match = _LEADING_DATE.search(str(value or ""))
+    return parse_date(match.group(1)) if match else None
+
 
 BASE = "https://www.ungm.org"
 NOTICE_PAGE = f"{BASE}/Public/Notice"
@@ -93,6 +107,10 @@ class UngmPortal(HtmlPortal):
     selectors = {
         "row": "div.dataRow.notice-table",
         "title": "span.ungm-title",
+        # div.deadline.resultInfo1.tableCell x87 in the same capture -- one per
+        # notice, and the group that outscored the notices themselves. See
+        # row_to_record() for why the cell is re-parsed rather than used as-is.
+        "deadline": "div.deadline",
     }
 
     def unavailable_reason(self):
@@ -286,9 +304,29 @@ class UngmPortal(HtmlPortal):
         # then carries a deadline months earlier than its real one, and a
         # deadline in the past is dropped as closed -- so the portal's entire
         # open pipeline disappears with nothing to indicate anything went wrong.
-        deadline = find_labelled_date(row.text, CLOSING_LABELS)
+        # EVERY LINE OF THE REPORT SAID "closes not published". UNGM prints its
+        # column labels in the table header, not in the rows, so there is no
+        # "Deadline:" in a row's text for find_labelled_date to anchor to, and
+        # it returned None for all 87 notices. The cell itself did not help
+        # either: it reads
+        #
+        #     30-Aug-2026 08:00 (GMT -4.00) 0.413660439452546
+        #
+        # and parse_date refuses the whole string -- the trailing countdown
+        # fraction is not part of any date. So the leading date is taken out of
+        # the deadline cell and parsed on its own.
+        #
+        # This is not cosmetic. With no closing date, `drop_expired: true` has
+        # nothing to test, so a closed tender is reported as open -- the report
+        # was carrying them silently.
+        deadline = _cell_date(record.get("closing_date")) or find_labelled_date(
+            row.text, CLOSING_LABELS)
         if deadline:
             record["closing_date"] = deadline.isoformat()
+        elif record.get("closing_date"):
+            # A cell that is present but unparseable must not reach the report
+            # as a date-shaped string that nothing downstream can read.
+            record["closing_date"] = None
 
         # "MULTIPLE DESTINATIONS" IS NOT ANOTHER COUNTRY. It is UNGM saying the
         # column has no room for the answer, and on a country-filtered search it
