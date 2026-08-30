@@ -327,6 +327,74 @@ def table_layer(soup: BeautifulSoup, base_url: str = "") -> LayerResult:
     return best or LayerResult("table", [], note="no header table found")
 
 
+# ------------------------------------------------- layer 4b: repeated class
+def _class_signature(el) -> Optional[str]:
+    classes = el.get("class") or []
+    return f"{el.name}.{'.'.join(sorted(classes))}" if classes else None
+
+
+def repeated_class_layer(soup: BeautifulSoup, base_url: str = "") -> LayerResult:
+    """Rows that share a class, wherever they sit in the tree.
+
+    WHY THIS EXISTS. `structural_layer` groups DIRECT SIBLINGS. On UNGM the
+    notice rows are not siblings of one another -- the live capture found
+    fifteen `div.tableRow` in the markup and no structural candidate above six,
+    every one of them `div>span`, which is the cells inside a single row
+    matched as though they were the listing. The rows were never considered.
+    Nothing about a better title or URL could help, because no row was ever a
+    candidate.
+
+    A page that repeats a class fifteen times is telling you what its rows are.
+    That is evidence the page volunteers, unlike a hand-written selector, which
+    is why this does not conflict with the project's refusal to ship guessed
+    CSS: nothing here is configured per portal, it is all discovered.
+
+    ORDERED BEFORE structural, and that placement is the whole risk. The
+    cascade returns the FIRST layer over the quality bar rather than the best,
+    so a layer added after structural would never run on this page -- structural
+    already "wins" with its wrong 0.56. Going first means this layer now
+    decides pages that structural used to decide, which is what the committed
+    fixtures exist to police.
+
+    The nav menu is the failure this must not cause. A navigation list repeats
+    its class more consistently than any listing does, so class repetition
+    ALONE would hand the page to the navigation -- exactly what
+    `structural_layer` warns about. The quality gate is what separates them: nav
+    items carry no dates and repeat their titles, so they score far below the
+    bar and lose to a later layer or to nothing at all.
+    """
+    groups: dict[str, list] = {}
+    for element in soup.find_all(True):
+        signature = _class_signature(element)
+        if signature:
+            groups.setdefault(signature, []).append(element)
+
+    best = LayerResult("repeated_class", [], note="no class repeated three times")
+    seen: list[tuple[int, int, float, str]] = []
+    for signature, group in groups.items():
+        if len(group) < 3:
+            continue
+        # Drop groups whose members nest inside one another. A wrapper class
+        # used at two depths would otherwise count the same notice twice, and
+        # the duplicate rows would look like a fuller listing rather than a
+        # double count.
+        outermost = [el for el in group
+                     if not any(other is not el and other in el.parents for other in group)]
+        if len(outermost) < 3:
+            continue
+        candidate = _finish("repeated_class", _rows_from_group(outermost, base_url))
+        seen.append((len(outermost), len(candidate.rows), candidate.quality, signature))
+        if (candidate.quality, len(candidate.rows)) > (best.quality, len(best.rows)):
+            best = candidate
+
+    if seen:
+        seen.sort(key=lambda c: (-c[2], -c[0]))
+        best.note = ("candidates (group->rows kept, quality, class): "
+                     + "; ".join(f"{size}->{kept} q={q:.2f} {sig}"
+                                 for size, kept, q, sig in seen[:6]))
+    return best
+
+
 # ---------------------------------------------------------- layer 5: structural
 def _signature(el) -> str:
     """Shape of a node, ignoring class names entirely."""
@@ -489,6 +557,7 @@ def extract(html: str, base_url: str = "", selectors: Optional[dict] = None,
     for layer in (embedded_json_layer(soup, base_url),
                   selector_layer(soup, selectors, base_url),
                   table_layer(soup, base_url),
+                  repeated_class_layer(soup, base_url),
                   structural_layer(soup, base_url),
                   anchor_layer(soup, anchor_pattern, base_url)):
         attempts.append(layer)
