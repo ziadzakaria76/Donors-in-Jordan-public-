@@ -505,3 +505,50 @@ def test_undp_rows_are_the_anchors_that_carry_the_notice(profile, gate):
     assert len(result.rows) == 120, f"every notice, got {len(result.rows)}"
     assert all(r.url and "notice_id=" in r.url for r in result.rows), \
         "the row is the anchor; its own href is the notice URL"
+
+
+def test_the_row_printout_uses_the_portals_own_row_selector():
+    """It was scoped to UNGM while UNDP read 6 rows of 572.
+
+    Its row fallback chain is UNGM's shape -- div.tableRow, div.dataRow, tr --
+    and UNDP's rows are anchors, so running it there would have found nothing
+    and said so. A portal that has named its row is the authority on what a row
+    is, and the cells come from the row's own children when neither UNGM's nor
+    Bootstrap's cell classes are present.
+    """
+    from syria_monitor.cli import _row_country_lines
+
+    undp = "".join(
+        f'<a class="country_4 vacanciesTableLink vacanciesTable__row" href="/n{i}">'
+        f'<div class="vacanciesTable__cell">Title Rehabilitation works lot {i}</div>'
+        '<div class="vacanciesTable__cell">Deadline: 30-Sep-2026</div>'
+        '<div class="vacanciesTable__cell">Syrian Arab Republic</div></a>'
+        for i in range(4))
+    lines = _row_country_lines(f"<html><body>{undp}</body></html>",
+                               "a.vacanciesTableLink")
+    body = "\n".join(lines)
+    assert "Rows in the markup: 4" in body, body
+    assert "Rehabilitation works lot 0" in body, "the first row's cells are printed"
+    assert "Syrian Arab Republic" in body
+
+    # Without the selector, UNGM's fallback chain finds no rows here at all --
+    # which is the state this change exists to end.
+    blind = "\n".join(_row_country_lines(f"<html><body>{undp}</body></html>", None))
+    assert "no row containers found" in blind, blind
+
+
+def test_the_row_printout_still_reads_ungm():
+    """The portal it was written for must not regress."""
+    from syria_monitor.cli import _row_country_lines
+
+    rows = "".join(
+        '<div class="dataRow notice-table tableRow">'
+        '<div class="tableCell">Unsave this procurement opportunity.</div>'
+        '<div class="resultTitle tableCell">Rehab of clinics</div>'
+        f'<div class="tableCell">{country}</div></div>'
+        for country in ("Syrian Arab Republic", "Multiple destinations",
+                        "Syrian Arab Republic"))
+    body = "\n".join(_row_country_lines(f"<html><body>{rows}</body></html>",
+                                        "div.dataRow.notice-table"))
+    assert "Rows in the markup: 3" in body
+    assert "Multiple destinations" in body and "Syrian Arab Republic" in body
