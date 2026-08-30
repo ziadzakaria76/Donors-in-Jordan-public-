@@ -114,12 +114,21 @@ def capture(cfg, name: str) -> int:
                 say(f"    diagnosis: {result.diagnosis}")
             for extra in _structure_lines(html):
                 say(extra)
+            # Every portal, not only UNGM. This printout is what identified
+            # UNGM's country column and its 87-vs-15 row count, and it was
+            # scoped to one portal while UNDP was reading 6 rows of 572 and
+            # GTAI was reading its own navigation menu. The cost is a dozen
+            # lines per captured page; the alternative is guessing at markup
+            # that cannot be fetched from every environment this runs in.
+            #
+            # UNGM's dropdown page is skipped because it is a country list with
+            # no notice rows -- there the printout would report on the filter
+            # widget and mean nothing.
+            if not (target == "ungm" and label == "dropdown"):
+                row_selector = (getattr(portal, "selectors", None) or {}).get("row")
+                for extra in _row_country_lines(html, row_selector):
+                    say(extra)
             if target == "ungm":
-                # Only the search page carries notice rows; the dropdown page
-                # is the country list and has none.
-                if label == "search":
-                    for extra in _row_country_lines(html):
-                        say(extra)
                 for extra in _ungm_country_lines(html):
                     say(extra)
         say()
@@ -176,7 +185,8 @@ def _ungm_country_lines(html: str) -> list[str]:
     return out
 
 
-def _row_country_lines(html: str, limit: int = 12) -> list[str]:
+def _row_country_lines(html: str, row_selector: str | None = None,
+                       limit: int = 12) -> list[str]:
     """What country each returned row actually says, straight from the markup.
 
     THE QUESTION THIS ANSWERS. A search filtered by country and a search that
@@ -199,13 +209,27 @@ def _row_country_lines(html: str, limit: int = 12) -> list[str]:
     from collections import Counter
 
     soup = BeautifulSoup(html or "", "html.parser")
-    rows = soup.select("div.tableRow") or soup.select("div.dataRow") or soup.select("tr")
+    # The portal's own pinned row selector when it has one. The fallback chain
+    # below is UNGM's shape, and running it on another portal reports on
+    # whatever happens to match -- UNDP's rows are anchors, and "tr" finds none
+    # of them. A portal that has named its row is the authority on what a row is.
+    rows = soup.select(row_selector) if row_selector else []
+    if not rows:
+        rows = (soup.select("div.tableRow") or soup.select("div.dataRow")
+                or soup.select("tr"))
     if not rows:
         return ["    no row containers found -- cannot say what country the rows carry"]
 
     cells_per_row = []
     for row in rows:
         cells = [c.get_text(" ", strip=True) for c in row.select("div.tableCell, td, th")]
+        if not any(cells):
+            # Those class names are UNGM's and Bootstrap's. When neither is
+            # present the row's own element children are the columns -- which is
+            # how UNDP's vacanciesTable__cell divs get read without this having
+            # to know that name, or the next portal's.
+            cells = [c.get_text(" ", strip=True)
+                     for c in row.find_all(recursive=False)]
         cells = [c for c in cells if c]
         if cells:
             cells_per_row.append(cells)

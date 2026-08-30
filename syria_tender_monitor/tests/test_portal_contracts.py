@@ -482,3 +482,94 @@ def test_a_sanctions_list_that_cannot_be_resolved_says_so(tmp_path):
         assert "no download link" in str(exc) and "the-uk-sanctions-list" in str(exc)
     else:
         raise AssertionError("an unresolvable list must raise, not return nothing")
+
+
+def test_an_unresolvable_sanctions_list_names_what_the_page_does_offer(tmp_path):
+    """Naming only what is missing is not enough to act on.
+
+    The first version of this message said "the page layout or the file format
+    offered has changed; open it and look". It ran against the live page,
+    resolved nothing, and pointed the reader at a page that several of the
+    environments this runs in cannot open -- gov.uk answers 403 to CONNECT
+    behind an egress allowlist. So the next pattern would have been guessed,
+    and guessing it once already produced a fix that shipped and did not work.
+    """
+    from types import SimpleNamespace
+    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
+
+    page = ('<a href="https://assets.publishing.service.gov.uk/media/abc/'
+            'UK_Sanctions_List.ods">ODS</a>'
+            '<a href="https://assets.publishing.service.gov.uk/media/abc/'
+            'UK_Sanctions_List.xml">XML</a>')
+
+    class OnlyOtherFormats:
+        def get(self, url, **kw):
+            return SimpleNamespace(text=page, status=200, ok=True)
+
+    screener = Screener(cache_dir=tmp_path, fetcher=OnlyOtherFormats())
+    try:
+        screener.resolve_url(SOURCES["uk_sanctions"])
+    except ScreeningUnavailable as exc:
+        message = str(exc)
+        assert "UK_Sanctions_List.ods" in message, message
+        assert "UK_Sanctions_List.xml" in message, message
+    else:
+        raise AssertionError("must raise rather than resolve to nothing")
+
+
+def test_it_says_so_when_the_page_carries_no_asset_links_at_all(tmp_path):
+    """A JavaScript-rendered page and a renamed file are different problems and
+    need different fixes, so the message must tell them apart."""
+    from types import SimpleNamespace
+    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
+
+    class Empty:
+        def get(self, url, **kw):
+            return SimpleNamespace(text="<html><body>loading</body></html>",
+                                   status=200, ok=True)
+
+    screener = Screener(cache_dir=tmp_path, fetcher=Empty())
+    try:
+        screener.resolve_url(SOURCES["uk_sanctions"])
+    except ScreeningUnavailable as exc:
+        assert "no assets.publishing.service.gov.uk links at all" in str(exc)
+        assert "bytes" in str(exc), "the size distinguishes an empty page from a full one"
+
+
+def test_a_magnitude_must_end_where_it_matches():
+    """"Multiple" is not a million.
+
+    The run of 2026-08-30 reported three UNGM notices at US$ 947,000,000,
+    946,000,000 and 830,000,000, and they took the top three places in the
+    report BECAUSE of it -- value feeds the score. The figures came from UNGM's
+    own row text, where a reference number is followed by the country cell:
+
+        ... UNICEF-2026-000946 Multiple destinations   ->  946 M
+
+    `mn?` matched the M of "Multiple" with nothing requiring the token to end,
+    and M means a million. "Ministry", "Metric" and "Mr" did it too.
+
+    This is the second bug today caused by that same label; the first read it
+    as a country.
+    """
+    from syria_monitor.money import parse_value
+
+    for text in ("Request for proposal UNICEF-2026-000946 Multiple destinations",
+                 "RFP-830 Multiple destinations",
+                 "Ref 500 Ministry of Health",
+                 "Lot 12 Metric tonnes of flour"):
+        assert parse_value(text).amount is None, f"invented a value from {text!r}"
+
+
+def test_real_magnitudes_still_parse():
+    """The guard must not cost the values it exists to protect."""
+    from syria_monitor.money import parse_value
+
+    assert parse_value("Contract value USD 2.5 million").amount == 2_500_000
+    assert parse_value("Budget: $3 M").amount == 3_000_000
+    assert parse_value("Estimated 750 k").amount == 750_000
+    assert parse_value("Total 1.2 bn USD").amount == 1_200_000_000
+    # European thousands separators: 1.500.000 is 1.5 million, not 1.5.
+    assert parse_value("EUR 1.500.000").amount == 1_500_000
+    # Arabic, where the lookahead also must not reject a legitimate suffix.
+    assert parse_value("قيمة العقد 5 مليون دولار").amount == 5_000_000

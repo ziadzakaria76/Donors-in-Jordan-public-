@@ -156,12 +156,33 @@ class Screener:
             raise ScreeningUnavailable(
                 f"{source['label']}: publication page {landing} returned "
                 f"HTTP {response.status}")
-        matches = re.findall(source["link_pattern"], response.text or "")
+        page = response.text or ""
+        matches = re.findall(source["link_pattern"], page)
         if not matches:
+            # SAY WHAT THE PAGE DOES OFFER, not only what is missing.
+            #
+            # The first version of this said "the page layout or the file format
+            # offered has changed; open it and look". It ran, it resolved
+            # nothing, and it sent the reader to a page that several of the
+            # environments this runs in cannot open -- gov.uk answers 403 to
+            # CONNECT behind an egress allowlist. So the message named the
+            # problem and withheld the one thing that would fix it, leaving the
+            # next pattern to be guessed. Guessing it once already produced a
+            # fix that shipped and did not work.
+            offered = re.findall(r"https://assets\.publishing\.service\.gov\.uk"
+                                 r"/[^\s\"'<>]+\.[A-Za-z0-9]{2,5}", page)
+            seen, unique = set(), []
+            for link in offered:
+                if link not in seen:
+                    seen.add(link)
+                    unique.append(link)
+            found = ("; ".join(unique[:8]) if unique
+                     else f"no assets.publishing.service.gov.uk links at all "
+                          f"in {len(page)} bytes")
             raise ScreeningUnavailable(
                 f"{source['label']}: no download link matching "
-                f"{source['link_pattern']!r} on {landing} -- the page layout or "
-                f"the file format offered has changed; open it and look")
+                f"{source['link_pattern']!r} on {landing}. "
+                f"What the page offers: {found}")
         return matches[0]
 
     def refresh(self, key: str) -> SanctionsList:
