@@ -74,7 +74,7 @@ class DatabaseMigrationTest {
 
             // Opening a version 1 file runs all three migrations in turn, so
             // the surviving rows arrive carrying version 4's figures: 1 -> 2
-            // keeps UAE at 1,370, 2 -> 3 re-sizes it to 1,700 (D-28) and
+            // keeps UAE at 1,370, 2 -> 3 re-sizes it to 1,700 and
             // 3 -> 4 puts it back. Asserted against the domain rather
             // than a literal, so the migrations and the seed cannot drift
             // apart.
@@ -102,7 +102,7 @@ class DatabaseMigrationTest {
     fun `version three's scaled-up budgets are put back to the brief's figures`() = runTest {
         // 3 -> 4 carries no schema change, so it is the one easiest to skip —
         // and skipping it is silent. The seed inserts with IGNORE (D-19), so a
-        // database that ran D-28's scaling keeps UAE at 1,700 for ever while
+        // database that ran the 2026-08-29 scaling keeps UAE at 1,700 for ever while
         // the domain, the reports and the strategy all say 1,370.
         //
         // The starting state is deliberately version 3's *data*, not version

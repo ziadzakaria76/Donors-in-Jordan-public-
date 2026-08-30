@@ -19,7 +19,7 @@ class BudgetAllocationTest {
     fun `market rows sum exactly to the external track total`() {
         // 4,680 — the brief's own expatriate figures. The four non-Jordanian
         // rows (IRQ 1,260, GULF 560, PSE 420, TEST 280) are deleted with the
-        // track (D-23), and D-28's scaling to 5,805 is reverted with the
+        // track (D-23), and the 2026-08-29 scaling to 5,805 is reverted with the
         // cost-per-raw-lead assumption it rested on.
         assertEquals(Jod.ofDinars(4_680), Gs3Budget.expatriateTotal)
         assertEquals(Jod.ofDinars(4_680), Gs3Budget.externalTrackTotal)

@@ -70,8 +70,9 @@ data class FunnelModel(
          * further through the decision than a local walk-in.
          *
          * **All five numbers are the strategy's own, and none is derived from
-         * the budget.** D-28 briefly made the lead count follow the money, at
-         * an assumed 45 JOD per raw lead; the owner removed that assumption on
+         * the budget.** A 2026-08-29 decision briefly made the lead count
+         * follow the money, at an assumed 45 JOD per raw lead; the owner removed
+         * that assumption on
          * 2026-08-30, so 160 is once more simply what the plan says the
          * external track brings in.
          *
