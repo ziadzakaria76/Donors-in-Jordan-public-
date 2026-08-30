@@ -199,3 +199,90 @@ def test_a_row_whose_only_anchor_goes_nowhere_gets_no_url():
 
     assert rows[0].url is None, "a dead href is worse than no href"
     assert "Water supply works" in rows[0].title, "title falls back to the node's text"
+
+
+def _ungm_shaped_rows(count=15):
+    """Rows sharing a class but NOT siblings of one another.
+
+    The live shape from issue #56: `div.tableRow x15` in the markup and no
+    structural candidate above six. Each row sits under its own wrapper, and
+    the wrappers differ in shape, so no parent holds three similar children.
+    """
+    out = []
+    for i in range(count):
+        extra = ["<span>ad</span>", "<p>promo</p>", "<a href='/x'>more</a>"][i % 3]
+        out.append(
+            f'<section><div class="notice-table"><div class="tableRow">'
+            f'<div class="tableCell"><a class="save" href="#"><svg></svg></a></div>'
+            f'<div class="tableCell"><a href="/Public/Notice/{309000 + i}">'
+            f'Provision of equipment for site {i}, Aleppo</a></div>'
+            f'<div class="tableCell">closes 30-Sep-2026</div>'
+            f'<div class="tableCell">UNDP</div>'
+            f'<div class="tableCell">Syrian Arab Republic</div>'
+            f'</div></div>{extra}</section>')
+    return "<html><body><main>" + "".join(out) + "</main></body></html>"
+
+
+def test_rows_that_share_a_class_are_found_even_when_they_are_not_siblings():
+    """Issue #56, the case structural cannot reach.
+
+    structural_layer groups direct siblings. UNGM's rows are not siblings of
+    one another, so they never formed a candidate at all -- the layer reported
+    on six `div>span` blocks, the cells inside one row, and the report carried
+    a tender titled "Syrian Arab Republic" with a score of 0.
+
+    A page that repeats a class fifteen times is telling you what its rows are.
+    """
+    from syria_monitor.extraction import extract
+
+    result = extract(_ungm_shaped_rows(), "https://www.ungm.org")
+
+    assert len(result.rows) == 15, "every row, not the cells of one row"
+    assert all("Provision of equipment" in r.title for r in result.rows)
+    assert all((r.url or "").startswith("https://www.ungm.org/Public/Notice/")
+               for r in result.rows), "the notice link, not the save-icon's href"
+
+
+def test_a_navigation_menu_is_not_accepted_as_a_listing():
+    """The failure the class-aware layer is most likely to cause.
+
+    A nav menu repeats its class more consistently than any listing does, so
+    class repetition ALONE would hand the page to the navigation -- the exact
+    trap structural_layer's docstring warns about. The quality gate is what
+    separates them, and this asserts on `wins`, not on row count: finding the
+    items is fine, accepting them as tenders is not.
+    """
+    from syria_monitor.extraction import extract
+
+    items = "".join(
+        f'<li class="nav"><a class="nav-content" href="/section/{i}">Section {i}</a>'
+        f'<ul class="nav-children"><li class="nav">'
+        f'<a class="nav-content" href="/section/{i}/sub">Sub {i}</a></li></ul></li>'
+        for i in range(20))
+    html = f"<html><body><nav><ul>{items}</ul></nav><p>No notices today.</p></body></html>"
+
+    result = extract(html, "https://x.test")
+
+    assert not any(a.wins for a in result.attempts), \
+        "no layer may accept a nav menu as a listing"
+    assert result.quality < 0.45, "below the bar, whatever the row count"
+
+
+def test_the_repeated_class_layer_does_not_count_a_nested_class_twice():
+    """A wrapper class used at two depths must not double the listing.
+
+    Counting the same notice twice does not look like a bug -- it looks like a
+    fuller listing, which is the shape of failure this project keeps meeting.
+    """
+    from bs4 import BeautifulSoup
+    from syria_monitor.extraction import repeated_class_layer
+
+    inner = "".join(
+        f'<div class="box"><a href="/n/{i}">Water works, Homs {i}</a>'
+        f'<span>closes 30-Sep-2026</span></div>' for i in range(4))
+    # Same class on an outer wrapper as on each row.
+    html = f'<div class="box">{inner}</div>'
+
+    result = repeated_class_layer(BeautifulSoup(html, "html.parser"), "https://x.test")
+    titles = [r.title for r in result.rows]
+    assert len(titles) == len(set(titles)), f"duplicated rows: {titles}"
