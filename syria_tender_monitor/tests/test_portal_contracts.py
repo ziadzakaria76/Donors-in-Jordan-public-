@@ -398,3 +398,87 @@ def test_ted_field_note_is_silent_when_fields_are_not_the_problem():
 
     assert _unsupported_fields_note('{"message":"Rate limit exceeded"}') == ""
     assert _unsupported_fields_note("") == ""
+
+
+def test_ted_reads_the_country_city_title_form():
+    """TED's commoner title shape, which never matched.
+
+    The pattern required whitespace after the separator, and in
+    "Belgium-Brussels" the hyphen is followed by a letter -- so every
+    Country-City notice reached the gate carrying no country and was judged on
+    its text. For a full-text search on "syria" that is a search returning
+    EU-wide notices that mention Syria and a check that cannot reject any of
+    them. This title is verbatim from the report of 2026-08-30, where it ranked
+    third and was filed as inside_syria.
+    """
+    from syria_monitor.portals.ted import TedPortal
+
+    latvian = ("Beļģija-Brisele: Ārējā uzraudzība un izvērtēšana Eiropas "
+               "Savienības ārējās darbības instrumentiem")
+    assert TedPortal.country_from_title(latvian) == "Beļģija"
+    assert TedPortal.country_from_title(
+        "Belgium-Brussels: External monitoring of EU external action") == "Belgium"
+    # The " - " form still works and is what the previous pattern covered.
+    assert TedPortal.country_from_title(
+        "Austria – License management software development services") == "Austria"
+    assert TedPortal.country_from_title("Syria - Electricity Emergency Project") == "Syria"
+
+
+def test_ted_makes_no_country_claim_it_cannot_check():
+    """This prefix is used to REJECT, so a wrong reading discards real work.
+
+    Three ways it can be wrong, and all three now abstain rather than guess:
+    a sentence fragment that happens to contain a dash, a multi-word country in
+    the Country-City form, and a script with no capitals to check. Abstaining
+    costs nothing -- the record falls through to the text check.
+    """
+    from syria_monitor.portals.ted import TedPortal
+
+    # Pre-existing: the " - " form claimed this as a country.
+    assert TedPortal.country_from_title("Supply of equipment - Lot 3") is None
+    assert TedPortal.country_from_title("United Kingdom-London: Technical assistance") is None
+    # Arabic has no capitals. Exempting it read "supply of equipment, lot 3" as
+    # a country and would have dropped the tender.
+    assert TedPortal.country_from_title("توريد معدات - الحصة 3") is None
+    assert TedPortal.country_from_title("Rehabilitation of water networks in Aleppo") is None
+
+
+def test_uk_sanctions_list_is_resolved_from_its_publication_page():
+    """OFSI's consolidated list closed on 28 January 2026 and the old URL 404s
+    for good. Its replacement is served from a content-addressed path whose hash
+    changes on every republication, so the download link is read off the stable
+    publication page rather than pinned.
+    """
+    import re
+    from syria_monitor.screening import SOURCES
+
+    source = SOURCES["uk_sanctions"]
+    assert "gov.uk/government/publications/the-uk-sanctions-list" in source["landing"]
+    assert "url" not in source, "a pinned URL is what expired last time"
+
+    page = ('<a class="govuk-link" href="https://assets.publishing.service.gov.uk'
+            '/media/68b1f0aa9c7d/UK_Sanctions_List.csv">CSV</a>'
+            '<a href="https://assets.publishing.service.gov.uk'
+            '/media/68b1f0aa9c7d/UK_Sanctions_List.xml">XML</a>')
+    found = re.findall(source["link_pattern"], page)
+    assert found == ["https://assets.publishing.service.gov.uk"
+                     "/media/68b1f0aa9c7d/UK_Sanctions_List.csv"], found
+
+
+def test_a_sanctions_list_that_cannot_be_resolved_says_so(tmp_path):
+    """Silence here is the dangerous failure: screening carries on against the
+    lists that did load, and a run reporting two of three reads as normal."""
+    from types import SimpleNamespace
+    from syria_monitor.screening import ScreeningUnavailable, Screener, SOURCES
+
+    class NoLink:
+        def get(self, url, **kw):
+            return SimpleNamespace(text="<html>no downloads here</html>", status=200, ok=True)
+
+    screener = Screener(cache_dir=tmp_path, fetcher=NoLink())
+    try:
+        screener.resolve_url(SOURCES["uk_sanctions"])
+    except ScreeningUnavailable as exc:
+        assert "no download link" in str(exc) and "the-uk-sanctions-list" in str(exc)
+    else:
+        raise AssertionError("an unresolvable list must raise, not return nothing")
