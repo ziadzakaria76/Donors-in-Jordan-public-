@@ -53,7 +53,7 @@ abstract class Gs3Database : RoomDatabase() {
     abstract fun complianceDao(): ComplianceDao
 
     companion object {
-        const val VERSION: Int = 4
+        const val VERSION: Int = 5
         const val NAME: String = "gs3_marketing_ops.db"
 
         /**
@@ -101,7 +101,7 @@ abstract class Gs3Database : RoomDatabase() {
          * units, and the five values below are that decision's figures.
          *
          * **They are frozen literals, and they no longer match
-         * `Gs3Budget.expatriateMarkets` — deliberately.** D-29 reverted the
+         * `Gs3Budget.expatriateMarkets` — deliberately.** The 2026-08-30 revert undid the
          * scaling, so the domain says 1,370 where this says 1,700. Do not
          * "correct" one to the other: a migration describes what version 3 *was*,
          * not what the app currently believes, and a shipped migration that
@@ -143,7 +143,7 @@ abstract class Gs3Database : RoomDatabase() {
          *
          * D-28 scaled them up so the external track could fund three units at
          * an assumed 45 JOD per raw lead. The owner removed that assumption on
-         * 2026-08-30 (D-29), and the scaling went with it — a figure derived
+         * 2026-08-30, and the scaling went with it — a figure derived
          * from an assumption does not outlive it.
          *
          * **This is a revert, and it is still written forwards.** Version 3
@@ -177,6 +177,32 @@ abstract class Gs3Database : RoomDatabase() {
         }
 
         /**
+         * Version 4 → 5: the two unconfirmed contract claims are deleted.
+         *
+         * `DELAY_PENALTY_IN_BUYERS_FAVOUR` and `TWO_YEAR_AND_TEN_YEAR_WARRANTY`
+         * were the half of B-2 nobody had verified against the signed contract.
+         * The owner removed them on 2026-08-30 (D-30). The seed no longer emits
+         * them, and — as with every data change in this file — the seed alone
+         * cannot clear them from a database that already has them, because
+         * every insert is `IGNORE` (D-19) and none of them is a delete.
+         *
+         * Deleting by name rather than by "everything not in the current enum":
+         * a `NOT IN` list built from `ContractClaim.entries` would silently
+         * delete any *future* claim the moment someone rolled back the app, and
+         * a migration must mean one fixed thing for ever.
+         */
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf(
+                    "DELAY_PENALTY_IN_BUYERS_FAVOUR",
+                    "TWO_YEAR_AND_TEN_YEAR_WARRANTY",
+                ).forEach { claim ->
+                    db.execSQL("DELETE FROM `contract_claims` WHERE `claim` = ?", arrayOf<Any>(claim))
+                }
+            }
+        }
+
+        /**
          * The list was created empty at version 1 so that adding version 2
          * would be an edit to an established mechanism rather than a decision
          * taken in a hurry, at the point where the tempting alternative is one
@@ -184,7 +210,7 @@ abstract class Gs3Database : RoomDatabase() {
          * `Gs3Database.build` already passed `addMigrations(*MIGRATIONS)`, so
          * no wiring has changed for any of them.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
         /**
          * The one place the database is built.

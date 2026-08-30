@@ -39,8 +39,8 @@ data class MarketAllocation(
  *
  * **The external track is expatriates, and nothing else.** It used to carry a
  * second half — 2,520 JOD across IRQ, GULF, PSE and TEST — for non-Jordanian
- * buyers. Those four rows are deleted with the track (DECISIONS.md → D-23,
- * D-24). [totalPaidMedia] is unchanged at the approved 18,000, so that money is
+ * buyers. Those four rows are deleted with the track (DECISIONS.md → D-23).
+ * [totalPaidMedia] is unchanged at the approved 18,000, so that money is
  * not withdrawn from the plan: all 2,520 of it falls to the local track by the
  * existing arithmetic below, which takes local as whatever the external track
  * does not.
@@ -48,8 +48,8 @@ data class MarketAllocation(
  * The five rows are the brief's original figures, untouched. D-28 briefly
  * scaled them up to 5,805 so the track could fund three units at an assumed
  * 45 JOD per raw lead; the owner removed that assumption on 2026-08-30 and the
- * scaling with it (D-29). **Nothing here is derived from a cost per lead any
- * more.** These are approved figures, and how many leads they buy is a question
+ * scaling with it. **Nothing here is derived from a cost per lead any more.**
+ * These are approved figures, and how many leads they buy is a question
  * the app deliberately does not answer.
  */
 object Gs3Budget {
