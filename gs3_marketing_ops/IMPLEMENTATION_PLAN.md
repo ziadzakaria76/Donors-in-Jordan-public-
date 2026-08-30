@@ -5,11 +5,18 @@ Sherman 3. Offline, local-only, Arabic-first. Built from the v1.4 build brief;
 this file is the plan for executing it, and [`DECISIONS.md`](DECISIONS.md) is
 the record of what was decided along the way.
 
-**Current status: Milestone 0 complete and green.** The `dl.google.com` block
-that stopped the first two attempts is lifted. The SDK is installed, `:app` is
-in `settings.gradle.kts`, and `./gradlew check assembleDebug` produces a real
-APK at targetSdk 36 with lint and `verifyStrings` clean. The version matrix in
+**Current status: Milestones 0, 0.5, 1 and 2 complete and green.** The
+`dl.google.com` block that stopped the first two attempts is lifted. The SDK is
+installed, `:app` is in `settings.gradle.kts`, and `./gradlew check
+assembleDebug` produces a real APK at targetSdk 36 (minSdk 26, no `INTERNET`
+permission) with lint and `verifyStrings` clean. The version matrix in
 `DECISIONS.md` → D-2 is confirmed rather than proposed.
+
+The bilingual foundation and the data layer are in: a live language switch, both
+string files in step at 98 keys, five Room tables with an exported schema for
+every version and a real migration for each step from 1 to 4, and a seed derived
+from `:domain` rather than re-typed. **Milestone 7 lost half its scope** when the
+non-Jordanian track was removed (D-23); Milestone 3 is the next unstarted row.
 
 ---
 

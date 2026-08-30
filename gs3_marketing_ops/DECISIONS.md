@@ -26,8 +26,8 @@ that cannot be activated, a persistent Dashboard banner — are all gone, becaus
 the module they guarded is gone. **This is not the gate being opened.** Nothing
 in v1 markets to, processes, or promises anything to a non-Jordanian buyer, and
 there is no longer a locked door to unlock: see **D-23** below for what was
-deleted and **D-24** and **D-26** for the consequences that had to be decided
-along the way.
+deleted, and **D-24**, **D-26**, **D-27** and **D-29** for the consequences that
+had to be decided along the way — none of them settled yet.
 
 B-1 therefore stops being a blocker for v1 and becomes a precondition for ever
 putting the track back. Whoever revives it needs the Department of Lands and
@@ -708,6 +708,32 @@ The test that asserted "the budget's arithmetic meets it" now asserts the gap
 instead, with the numbers written out, so the next person to touch the default
 finds the discrepancy and this entry rather than a stale claim.
 
+### D-27 — The targets and the funnel model are left exactly as they were, and one of them is now doing more work
+
+**Live again, and every word below is true as written (2026-08-30).** D-28
+briefly answered this entry by funding the target — the external track went to
+5,805 JOD and `FunnelModel.EXTERNAL.rawLeads` to 129. D-29 removed the 45 JOD
+per raw lead that answer was made of, and the sizing went with it. The budget is
+4,680 again, the funnel is 160 raw leads again, and the question this entry
+raises is open again exactly as first written.
+
+Not a change — a statement of what was deliberately **not** changed, because the
+arithmetic underneath it moved.
+
+The 11-unit annual target, the 3-unit external-track target and the ≥27%
+external share are unchanged. None was ever non-Jordanian-specific, and the
+expatriate track carries them now.
+
+`FunnelModel.EXTERNAL` is unchanged too: 160 raw leads → 48 qualified → 17
+viewings → 3 contracts. **But those 160 were modelled for the whole external
+track, when that meant expatriates and non-Jordanians together.** Expatriate
+marketing alone now has to supply all 160 — on 4,680 JOD rather than 7,200.
+Whether it can has not been re-estimated, and the numbers were left alone rather
+than adjusted by guesswork, because a funnel model invented to make a
+spreadsheet balance is worse than one that is visibly out of date. Flagged to
+the owner; the model is a single object with five numbers in it and changing it
+costs nothing once someone has decided what it should say.
+
 ### D-28 — 1,125 JOD of the freed 2,520 stays on the external track (2026-08-29)
 
 **Superseded by D-29 (2026-08-30).** The owner removed the 45 JOD per raw
@@ -855,32 +881,6 @@ track again (D-24), the 150 JOD target once more fails to match the budget's own
 97.500 and is once more kept loose rather than tightened (D-26), and the
 external funnel's 160 raw leads are once more a figure that expatriate marketing
 alone has to supply on two thirds of the money that modelled them (D-27).
-
-### D-27 — The targets and the funnel model are left exactly as they were, and one of them is now doing more work
-
-**Superseded by D-28 (2026-08-29), which is what this entry asked for.** The
-targets it lists are unchanged and still stand; what changed is that the
-external track is now funded to reach them. `FunnelModel.EXTERNAL.rawLeads` is
-129 rather than the 160 recorded below. The entry is left as written because it
-is the record of the question, and of the fact that the answer was to fund the
-plan rather than to quietly re-cut the numbers.
-
-Not a change — a statement of what was deliberately **not** changed, because the
-arithmetic underneath it moved.
-
-The 11-unit annual target, the 3-unit external-track target and the ≥27%
-external share are unchanged. None was ever non-Jordanian-specific, and the
-expatriate track carries them now.
-
-`FunnelModel.EXTERNAL` is unchanged too: 160 raw leads → 48 qualified → 17
-viewings → 3 contracts. **But those 160 were modelled for the whole external
-track, when that meant expatriates and non-Jordanians together.** Expatriate
-marketing alone now has to supply all 160 — on 4,680 JOD rather than 7,200.
-Whether it can has not been re-estimated, and the numbers were left alone rather
-than adjusted by guesswork, because a funnel model invented to make a
-spreadsheet balance is worse than one that is visibly out of date. Flagged to
-the owner; the model is a single object with five numbers in it and changing it
-costs nothing once someone has decided what it should say.
 
 ---
 
