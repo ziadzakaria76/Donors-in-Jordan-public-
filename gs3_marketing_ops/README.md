@@ -15,8 +15,8 @@ same Arabic wording, and nothing else — no code, no build, no deployment.
 ```
 ./gradlew check assembleDebug
                      ->  BUILD SUCCESSFUL
-                         241 tests passing (212 in :domain, 29 in :app)
-                         98.7% line coverage on :domain (gate: 80%)
+                         243 tests passing (214 in :domain, 29 in :app)
+                         98.9% line coverage on :domain (gate: 80%)
                          verifyStrings: 98 keys, both locales in step
                          lint: clean, abortOnError + warningsAsErrors
 ```

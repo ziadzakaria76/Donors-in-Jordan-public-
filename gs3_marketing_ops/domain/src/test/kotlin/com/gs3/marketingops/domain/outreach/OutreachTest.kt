@@ -29,6 +29,22 @@ class WhatsAppLinkTest {
     }
 
     @Test
+    fun `a number already carrying the country code is not given a second one`() {
+        // The branch no test reached until a QA pass went looking. It is not
+        // hypothetical: a salesperson copying a number out of a listing or a
+        // CRM gets "962790730903" with no plus and no leading zero.
+        //
+        // What makes it worth a test is how it fails. Without this branch the
+        // number falls through to the default and becomes
+        // "962962790730903" -- fifteen digits, which passes the E.164 length
+        // check and produces a wa.me link that looks perfectly valid and
+        // reaches nobody. A wrong number that validates is worse than a null.
+        assertEquals("962790730903", WhatsAppLink.normalisePhone("962790730903"))
+        assertEquals("962790730903", WhatsAppLink.normalisePhone("962 79 073 0903"))
+        assertEquals("971501234567", WhatsAppLink.normalisePhone("971501234567", defaultCountryCode = "971"))
+    }
+
+    @Test
     fun `nonsense returns null rather than a dead link`() {
         assertNull(WhatsAppLink.normalisePhone(""))
         assertNull(WhatsAppLink.normalisePhone("   "))
