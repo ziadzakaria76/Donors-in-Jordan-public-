@@ -225,7 +225,15 @@ def selector_layer(soup: BeautifulSoup, selectors: Optional[dict], base_url: str
     rows = []
     for node in soup.select(selectors["row"]):
         title_node = node.select_one(selectors["title"]) if selectors.get("title") else node
-        link_node = node.select_one(selectors.get("link", "a")) or node.find("a")
+        # The link must go somewhere. This took `node.find("a")` unconditionally,
+        # so a row whose first anchor is a button wired href="#" -- UNGM renders
+        # two such save controls per row -- produced a URL that resolves to the
+        # listing page with a fragment. The other layers already refuse those;
+        # this one emitted them, and a dead link in a report satisfies neither
+        # the reader nor the Word writer's promise of a link or a stated reason.
+        configured = selectors.get("link")
+        candidates = node.select(configured) if configured else node.find_all("a")
+        link_node = next((a for a in candidates if _is_navigable(a.get("href"))), None)
         href = link_node.get("href") if link_node else None
         cells = {}
         for key in ("deadline", "published", "value", "buyer", "type"):
