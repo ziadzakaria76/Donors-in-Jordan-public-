@@ -88,6 +88,10 @@ def fetch_tenders() -> list[dict]:
             contact=_contact(item),
             reference=item.get("noticeId") or item.get("solicitationNumber"),
             default_currency="USD",
+            # Already extracted above, and until now only used as a fallback
+            # description. It is the place of performance, which is exactly
+            # what the delivery-country column is for.
+            delivery_country=country,
         ))
 
     return base.jordan_only(records)

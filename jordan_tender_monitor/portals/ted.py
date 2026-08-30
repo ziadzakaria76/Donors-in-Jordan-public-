@@ -93,6 +93,20 @@ def _country_from_title(title: str | None) -> bool | None:
     return False
 
 
+def _country_value(item: dict) -> str | None:
+    """The country the notice ITSELF names, before any verdict is taken on it.
+
+    _country_verdict() has always read these fields and then kept only its
+    yes/no. The value is what a reader of the report needs in order to check
+    the decision, so it is carried through rather than discarded.
+    """
+    for name in _COUNTRY_FIELDS:
+        value = _text(item.get(name))
+        if value:
+            return value
+    return None
+
+
 def _country_verdict(item: dict) -> bool | None:
     """True / False from a country FIELD; None when the notice carries none.
 
@@ -194,6 +208,7 @@ def fetch_tenders() -> list[dict]:
             contact=_text(item.get("buyer-name")),
             reference=number,
             default_currency="EUR",
+            delivery_country=_country_value(item),
         )
         (confirmed if verdict else unconfirmed).append(record)
 

@@ -505,6 +505,21 @@ def alert_recipients() -> list[str]:
 # Arabic terms stay substring-based because Arabic is agglutinative --
 # الأردنية legitimately contains الأردن.
 # --------------------------------------------------------------------------
+# The country this monitor is scoped to, as it should read in a report.
+# Every record it produces is about this country, so the value is set once in
+# build_record() rather than per portal. It exists as a field, and not only as
+# the report's title, because the Syria monitor produces the same shape of
+# record and the two are meant to be readable side by side: a row that does not
+# say which country it belongs to cannot be merged with one that does.
+COUNTRY_NAME = "Jordan"
+
+# How a source may write this country when it uses a code rather than a name.
+# ted.py has carried these as a private set for a while; they are here because
+# the report needs the same knowledge to tell "delivered here" from "delivered
+# somewhere else", and two copies of a country's identity is how the two
+# monitors in this repository ended up with five of the same bugs.
+COUNTRY_CODES = ("jor", "jo")
+
 COUNTRY_TERMS_LATIN = [
     "jordan", "jordanian", "hashemite kingdom", "jordanien", "jordanie",
     "amman", "aqaba", "irbid", "zarqa", "mafraq", "karak", "madaba", "salt",
