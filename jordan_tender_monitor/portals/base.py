@@ -263,6 +263,7 @@ def build_record(
     notice_type: str | None = None,
     reference: str | None = None,
     default_currency: str | None = None,
+    delivery_country: str | None = None,
 ) -> dict:
     """Normalise anything a portal produced into the standard record."""
     # strip_html, not clean: a portal that hands over HTML must not put tags in
@@ -300,6 +301,23 @@ def build_record(
         "notice_type": textutil.clean(notice_type) or None,
         "language": language,
         "reference": reference,
+        # WHICH COUNTRY THIS ROW IS ABOUT, and what the source said about it.
+        #
+        # `country` is this monitor's scope and is therefore constant here. It
+        # is a field rather than only a report title because the Syria monitor
+        # emits the same shape of record, and two reports meant to be read side
+        # by side cannot be merged if one of them does not say which country
+        # its rows belong to.
+        #
+        # `delivery_country` is what the SOURCE states, where it states one.
+        # The portals already compute this to decide what to keep -- TED and
+        # the World Bank read it out of a country field, SAM.gov out of the
+        # place of performance -- and until now every one of them threw it away
+        # after the decision. Blank means the source named no country, which is
+        # a different thing from naming a country that is not this one, and the
+        # report should be able to show the difference.
+        "country": config.COUNTRY_NAME,
+        "delivery_country": textutil.clean(delivery_country) or None,
     }
 
 

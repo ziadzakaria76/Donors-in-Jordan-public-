@@ -71,6 +71,17 @@ _COUNTRY_FIELDS = ("project_ctry_name", "countryshortname", "country_name",
                    "countryname", "cty_name", "country", "project_country")
 
 
+def _country_value(item: dict) -> str | None:
+    """The country the notice itself names. _country_verdict() reads the same
+    fields and keeps only its yes/no; the value is what lets a reader check
+    that decision, so it is carried into the record."""
+    for name in _COUNTRY_FIELDS:
+        value = item.get(name)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _country_verdict(item: dict) -> bool | None:
     """True / False from the country FIELD; None when the notice has none.
 
@@ -306,6 +317,7 @@ def fetch_tenders() -> list[dict]:
             contact=_pick(item, "contact_email", "contact_name", "agency_name"),
             reference=_pick(item, "id", "notice_no", "bid_reference_no", "project_id"),
             default_currency="USD",
+            delivery_country=_country_value(item),
         )
         (confirmed if verdict else unconfirmed).append(record)
 

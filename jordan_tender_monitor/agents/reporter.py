@@ -38,6 +38,13 @@ log = logging.getLogger(__name__)
 COLUMNS = [
     ("score", "Score"),
     ("title", "Title"),
+    # Constant in this report, and that is the point: it is what lets a Jordan
+    # sheet and a Syria sheet be stacked without losing which is which. The
+    # delivery country beside it is what the SOURCE said, which is a different
+    # question and is often blank or names somewhere else entirely -- a
+    # regional contract run from Amman, say.
+    ("country", "Country"),
+    ("delivery_country", "Delivery country"),
     ("portal_name", "Portal"),
     ("notice_type", "Notice type"),
     ("sector", "Sector"),
@@ -355,6 +362,21 @@ def status_line(reported: int, health: list) -> str:
     return f"{reported} new opportunities found. All {total} portals were read successfully."
 
 
+def _is_this_country(value: str) -> bool:
+    """Is a stated delivery country simply this country again?
+
+    Sources write it as a name or as a code -- TED says JOR, SAM.gov says
+    Jordan -- and both mean the same place. Only the ones that do NOT are worth
+    a line in the Word pack: "Delivery country: Jordan" under every entry of a
+    Jordan report is noise, while a contract delivered in Lebanon is the single
+    thing a reader most needs to see before spending an afternoon on it.
+    """
+    text = (value or "").strip().lower()
+    if not text:
+        return False
+    return text == config.COUNTRY_NAME.lower() or text in config.COUNTRY_CODES
+
+
 def _cell(t: dict, key: str):
     value = t.get(key)
     if isinstance(value, date):
@@ -494,8 +516,16 @@ def write_docx(tenders: list[dict], health: list, result: dict, path: Path) -> P
         doc.add_heading(t.get("title") or "(untitled)", level=2)
         meta = doc.add_paragraph()
         meta.add_run(f"Score {t.get('score')}").bold = True
-        meta.add_run(f"  |  {t.get('portal_name')}  |  {t.get('sector')}"
+        meta.add_run(f"  |  {t.get('country')}"
+                     f"  |  {t.get('portal_name')}  |  {t.get('sector')}"
                      f"  |  {t.get('notice_type') or 'Type unspecified'}")
+        # Only when the source named one AND it is not simply this country
+        # again: repeating "Jordan" under every Jordan entry is noise, whereas
+        # a contract delivered somewhere else is the thing a reader most needs
+        # to see before spending an afternoon on it.
+        delivery = t.get("delivery_country")
+        if delivery and not _is_this_country(delivery):
+            doc.add_paragraph(f"Delivery country as published: {delivery}")
         doc.add_paragraph(
             f"Published: {t.get('posted_display')}    "
             f"Deadline: {t.get('closing_display')}    "

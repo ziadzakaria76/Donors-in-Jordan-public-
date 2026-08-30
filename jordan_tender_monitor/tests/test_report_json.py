@@ -28,6 +28,7 @@ from pathlib import Path
 from jordan_tender_monitor import config, fixtures
 from jordan_tender_monitor.agents import filter as filters, reporter
 from jordan_tender_monitor.agents.scraper import PortalHealth
+from jordan_tender_monitor.portals import base
 
 from .harness import check, check_eq
 
@@ -38,7 +39,7 @@ TENDER_FIELDS = ("id", "title", "portal", "portal_name", "url", "score",
                  "sector", "notice_type", "language", "flags",
                  "posted_date", "closing_date", "days_left",
                  "estimated_value_usd", "value_display", "eligibility",
-                 "contact", "description")
+                 "contact", "description", "country", "delivery_country")
 
 PORTAL_FIELDS = ("key", "name", "tier", "tier_label", "status", "count",
                  "scanned", "reason", "urls", "layer", "quality")
@@ -276,7 +277,93 @@ def test_the_json_format_is_actually_produced_by_a_run():
                   Path(path).name)
 
 
+
+
+def test_every_row_says_which_country_it_is_about():
+    """A Jordan sheet and a Syria sheet cannot be stacked if one of them does
+    not say which is which.
+
+    The value is constant in this report, and that is the point: it is the
+    column that survives a merge. Reports are not merged yet, so nothing here
+    depends on that -- this is the field being present and correct before
+    anything relies on it.
+    """
+    record = base.build_record(portal="ted", title="Rehabilitation of clinics",
+                               url="https://example.test/1")
+    check_eq(record["country"], config.COUNTRY_NAME,
+             "every record names the country this monitor is scoped to")
+
+
+def test_the_source_country_is_kept_rather_than_only_acted_on():
+    """TED, the World Bank and SAM.gov each read a country field to decide what
+    to keep, and each threw the value away afterwards.
+
+    Three states have to stay distinguishable, because they mean different
+    things to a reader deciding whether to open a notice: the source named this
+    country, the source named a different one, or the source named none at all.
+    Collapsing the last two -- blank and "somewhere else" -- is what makes a
+    regional contract look like a local one.
+    """
+    here = base.build_record(portal="ted", title="Clinic works",
+                             url="https://example.test/1", delivery_country="JOR")
+    elsewhere = base.build_record(portal="ted", title="Regional programme",
+                                  url="https://example.test/2",
+                                  delivery_country="Lebanon")
+    unstated = base.build_record(portal="fcdo", title="Notice with no country",
+                                 url="https://example.test/3")
+
+    check_eq(here["delivery_country"], "JOR", "the source named this country")
+    check_eq(elsewhere["delivery_country"], "Lebanon", "the source named another")
+    check(unstated["delivery_country"] is None,
+          "no country stated is None, not an empty string and not this country")
+
+
+def test_both_country_columns_reach_the_spreadsheet():
+    """The columns are what the request was actually about."""
+    labels = [label for _, label in reporter.COLUMNS]
+    check("Country" in labels, "the spreadsheet has a Country column")
+    check("Delivery country" in labels,
+          "and the country the source stated, beside it")
+
+    record = base.build_record(portal="ted", title="Clinic works",
+                               url="https://example.test/1", delivery_country="JOR")
+    check_eq(reporter._cell(record, "country"), config.COUNTRY_NAME,
+             "the cell renders rather than coming out blank")
+    check_eq(reporter._cell(record, "delivery_country"), "JOR", "and so does the other")
+
+
+def test_the_report_schema_is_not_bumped_for_an_added_field():
+    """Bumping it would stop every installed app rendering anything.
+
+    The app refuses a schema it was not written for -- deliberately, since half
+    parsed nonsense is worse -- and it already ignores keys it does not know.
+    So an ADDED field must not bump: the constant means "what the old fields
+    mean has changed", and these two are new.
+    """
+    check_eq(reporter.REPORT_SCHEMA, 1,
+             "adding country columns is not a breaking schema change")
+
+
+def test_the_word_pack_only_names_a_delivery_country_worth_naming():
+    """"Delivery country: Jordan" under every entry of a Jordan report is noise;
+    a contract delivered in Lebanon is the one thing a reader needs to see.
+
+    Sources write the same place two ways -- TED says JOR, SAM.gov says
+    Jordan -- so the comparison cannot be string equality against the name.
+    """
+    check(reporter._is_this_country("Jordan"), "the name is this country")
+    check(reporter._is_this_country("JOR"), "and so is the ISO code TED uses")
+    check(reporter._is_this_country("  jo  "), "spacing and case do not matter")
+    check(not reporter._is_this_country("Lebanon"), "somewhere else is not")
+    check(not reporter._is_this_country(""), "and nothing stated is not either")
+
+
 TESTS = [
+    test_every_row_says_which_country_it_is_about,
+    test_the_word_pack_only_names_a_delivery_country_worth_naming,
+    test_the_source_country_is_kept_rather_than_only_acted_on,
+    test_both_country_columns_reach_the_spreadsheet,
+    test_the_report_schema_is_not_bumped_for_an_added_field,
     test_the_app_can_render_every_row_without_guessing,
     test_every_portal_is_in_the_table_in_full,
     test_an_unknown_deadline_is_null_rather_than_an_empty_string,
