@@ -57,7 +57,12 @@ portals:
   uk_fts:    {enabled: true, max_pages: 5, updated_within_days: 365}
   ungm:
     enabled: true
-    page_size: 100
+    # 15, because that is what UNGM's own UI asks for -- observed in the
+    # 2026-08-30 capture (Actions run 33282804658). It was 100, which was a
+    # guess and was never seen to work. Whether the endpoint caps or refuses a
+    # larger page is untested; raising this is a change to verify, not a
+    # free win.
+    page_size: 15
     # UNGM uses its own numeric country ids, not ISO codes. This one cannot be
     # guessed or derived -- read it out of the selNoticeCountry dropdown with
     # `--capture ungm` and put it here. The portal refuses to run until it is

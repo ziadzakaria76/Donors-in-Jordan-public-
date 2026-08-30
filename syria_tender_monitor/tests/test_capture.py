@@ -93,6 +93,56 @@ def test_ungm_search_body_carries_the_configured_country_id(profile, gate):
     assert body["IsActive"] is True
 
 
+def test_ungm_search_body_matches_the_request_the_ui_actually_sent(profile, gate):
+    """Pin the body to the recorded request, field for field.
+
+    Recorded 2026-08-30 from the live listing (Actions run 33282804658). The
+    point is not that these values are self-evidently right -- it is that they
+    were observed rather than reasoned about, and the previous version was
+    reasoned about and wrong in six places.
+
+    A wrong body here does not raise. It returns a short response that reads
+    like "no tenders for this country", so nothing downstream will notice the
+    drift. This test is the thing that notices.
+    """
+    from datetime import date
+
+    portal = build("ungm", StubFetcher(), profile, gate,
+                   cfg={"country_id": 2490, "page_size": 15})
+    body = portal.search_body(page=1)
+    today = date.today().strftime("%d-%b-%Y")
+
+    assert body == {
+        "PageIndex": 1,
+        "PageSize": 15,
+        "Title": "",
+        "Description": "",
+        "Reference": "",
+        "PublishedFrom": "",
+        "PublishedTo": today,
+        "DeadlineFrom": today,
+        "DeadlineTo": "",
+        "Countries": [2490],
+        "Agencies": [],
+        "UNSPSCs": [],
+        "NoticeTypes": [],
+        "SortField": "Deadline",
+        "SortAscending": True,
+        "isPicker": False,
+        "IsSustainable": False,
+        "IsActive": True,
+        "NoticeDisplayType": None,
+        "NoticeSearchTotalLabelId": "noticeSearchTotal",
+        "TypeOfCompetitions": [],
+    }
+
+    # Called out separately because each is a specific way the old body was
+    # wrong, and an equality assertion alone would not say which mattered.
+    assert body["SortField"] == "Deadline", "not DeadlineUTC -- see search_body"
+    assert "isPicker" in body, "UNGM's own lower-cased spelling, not IsPicker"
+    assert body["PublishedTo"] != "", "the UI bounds the upper end"
+
+
 def test_ungm_deadline_uses_the_countdown_guard(profile, gate):
     """The portal's own row text carries a countdown between the deadline and
     the publication date."""
