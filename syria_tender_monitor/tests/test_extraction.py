@@ -354,9 +354,31 @@ def test_two_digit_years_are_seen_by_the_scanner():
 
 
 def test_the_shapes_that_already_worked_still_work():
-    """The month vocabulary must not cost the formats the portals already use."""
+    """The month vocabulary must not cost the formats the portals already use.
+
+    EVERY MONTH, IN FULL AND ABBREVIATED. The first version of this test
+    checked "September 1, 2026" and passed -- September is spelled the same in
+    English, German and Dutch, so it is in MONTHS by accident of spelling. The
+    English months that are NOT spelled like their German or French
+    counterparts were all broken, "15 January 2026" among them, and IsDB's
+    reading fell from 50 rows to 3 before anyone noticed. A test that samples
+    one month is a test that samples the one month that works.
+    """
     from syria_monitor.dates import _DATE_SHAPED
 
-    for good in ("30-Aug-2026", "01-Sep-2026", "2026-11-02", "31.12.2026",
-                 "September 1, 2026", "15 Januar 2027"):
+    english = ("January", "February", "March", "April", "May", "June", "July",
+               "August", "September", "October", "November", "December")
+    for month in english:
+        for form in (f"15 {month} 2026", f"15 {month[:3]} 2026",
+                     f"15-{month[:3]}-2026", f"{month} 15, 2026"):
+            assert _DATE_SHAPED.search(form), f"stopped seeing {form!r}"
+
+    # The languages MONTHS exists for, abbreviated as those sources write them.
+    for good in ("15 janvier 2026", "15 janv 2026", "15 févr 2026",
+                 "15 juil 2026", "15 déc 2026", "15 Januar 2027",
+                 "15 Okt 2026", "15 Mär 2026", "15 يناير 2026"):
+        assert _DATE_SHAPED.search(good), f"stopped seeing {good!r}"
+
+    # And the numeric shapes, which never depended on the vocabulary.
+    for good in ("30-Aug-2026", "01-Sep-26", "2026-11-02", "31.12.2026"):
         assert _DATE_SHAPED.search(good), f"stopped seeing {good!r}"
