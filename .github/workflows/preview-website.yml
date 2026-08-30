@@ -196,6 +196,26 @@ jobs:
             *) echo "::warning::Unexpected $code from the preview API." ;;
           esac
 
+      # Check the preview actually refuses indexing, rather than trusting that
+      # the rewrite above worked. The consequence of getting this wrong is a
+      # second copy of a real estate site competing with the real one in search
+      # results, which is expensive to undo and easy not to notice.
+      - name: Check the preview refuses indexing
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -uo pipefail
+          ROBOTS=$(curl -sS --max-time 30 "$URL/robots.txt" || true)
+          printf 'robots.txt:\n%s\n' "$ROBOTS"
+          printf '%s' "$ROBOTS" | grep -q '^Disallow: /$' \
+            || { echo "::error::the preview's robots.txt does not disallow crawling"; exit 1; }
+
+          TAG=$(curl -sSI --max-time 30 "$URL/units.html" | tr -d '\r' | grep -i '^x-robots-tag:' || true)
+          echo "header: ${TAG:-(none)}"
+          printf '%s' "$TAG" | grep -qi 'noindex' \
+            || { echo "::error::the preview does not send X-Robots-Tag: noindex"; exit 1; }
+          echo "The preview refuses indexing, both ways."
+
       # One comment per pull request, edited in place. A new one on every push
       # buries the review under a stack of near-identical links.
       - name: Post the preview link
