@@ -17,85 +17,57 @@ class BudgetAllocationTest {
 
     @Test
     fun `market rows sum exactly to the external track total`() {
-        // 5,805. The four non-Jordanian rows (IRQ 1,260, GULF 560, PSE 420,
-        // TEST 280) are deleted with the track — D-23 — and 1,125 of the 2,520
-        // they held stays on this track so it can still fund three units.
-        // D-28.
-        assertEquals(Jod.ofDinars(5_805), Gs3Budget.expatriateTotal)
-        assertEquals(Jod.ofDinars(5_805), Gs3Budget.externalTrackTotal)
+        // 4,680 — the brief's own expatriate figures. The four non-Jordanian
+        // rows (IRQ 1,260, GULF 560, PSE 420, TEST 280) are deleted with the
+        // track (D-23), and D-28's scaling to 5,805 is reverted with the
+        // cost-per-raw-lead assumption it rested on (D-29).
+        assertEquals(Jod.ofDinars(4_680), Gs3Budget.expatriateTotal)
+        assertEquals(Jod.ofDinars(4_680), Gs3Budget.externalTrackTotal)
         assertEquals(5, Gs3Budget.externalTrackMarkets.size)
     }
 
     @Test
-    fun `the external track takes thirty-two and a quarter per cent of paid media, all of it expatriate`() {
+    fun `the external track takes twenty-six per cent of paid media, all of it expatriate`() {
         // Was 40%, split 65 expatriate / 35 non-Jordanian. Both of those
         // numbers described a track that no longer exists, and the honest
         // replacement is not a re-split — it is that there is nothing left to
         // split. Total paid media is deliberately unchanged at the approved
         // 18,000, so the share moves rather than the budget.
-        assertEquals(BigDecimal("0.322500"), Gs3Budget.externalTrackTotal.ratioOf(Gs3Budget.totalPaidMedia))
+        assertEquals(BigDecimal("0.260000"), Gs3Budget.externalTrackTotal.ratioOf(Gs3Budget.totalPaidMedia))
         assertEquals(BigDecimal("1.000000"), Gs3Budget.expatriateTotal.ratioOf(Gs3Budget.externalTrackTotal))
         assertTrue(Gs3Budget.externalTrackMarkets.all { it.track == Track.EXPAT })
     }
 
     @Test
     fun `local media is whatever the external track does not take`() {
-        // 12,195, up from 10,800 by the 1,395 left over once the external
-        // track has taken the 1,125 it needs. Same subtraction as always;
-        // nothing was re-derived to make this number.
-        assertEquals(Jod.ofDinars(12_195), Gs3Budget.localTrackTotal)
+        // 13,320: the whole 2,520 the non-Jordanian markets held falls here,
+        // by the same subtraction as always. Nothing was re-derived to make
+        // this number, and nothing about a cost per lead informs it.
+        assertEquals(Jod.ofDinars(13_320), Gs3Budget.localTrackTotal)
         assertEquals(Gs3Budget.totalPaidMedia, Gs3Budget.localTrackTotal + Gs3Budget.externalTrackTotal)
     }
 
     @Test
-    fun `rescaling the track left every market's share of it where it was`() {
-        // D-28 scaled the five rows by 5,805/4,680 and rounded to the nearest
-        // 5 JOD. The property that matters is not the individual figures but
-        // that the weighting did not drift: the split follows the geographic
-        // distribution of remittances, and a rounding that quietly moved money
-        // from Kuwait to the Emirates would be a strategy change disguised as
-        // arithmetic. No market moves by more than a tenth of a point.
-        val before = mapOf("UAE" to 1_370, "USA" to 1_250, "KSA" to 1_120, "QAT" to 600, "KWT" to 340)
-        val beforeTotal = before.values.sum().toBigDecimal()
-
-        Gs3Budget.expatriateMarkets.forEach { market ->
-            val was = before.getValue(market.marketKey).toBigDecimal()
-                .divide(beforeTotal, 6, java.math.RoundingMode.HALF_UP)
-            val now = market.annual.ratioOf(Gs3Budget.externalTrackTotal)
-            assertTrue(
-                (was - now).abs() < BigDecimal("0.001"),
-                "${market.marketKey} share moved from $was to $now",
-            )
-        }
-    }
-
-    @Test
-    fun `the displayed monthly figures are the annual rows over twelve`() {
+    fun `the displayed monthly figures match the brief's table`() {
         val monthly = Gs3Budget.externalTrackMarkets.associate { it.marketKey to it.monthlyDisplayDinars }
-        assertEquals(142L, monthly.getValue("UAE"))
-        assertEquals(129L, monthly.getValue("USA"))
-        assertEquals(116L, monthly.getValue("KSA"))
-        assertEquals(62L, monthly.getValue("QAT"))
-        assertEquals(35L, monthly.getValue("KWT"))
+        assertEquals(114L, monthly.getValue("UAE"))
+        assertEquals(104L, monthly.getValue("USA"))
+        assertEquals(93L, monthly.getValue("KSA"))
+        assertEquals(50L, monthly.getValue("QAT"))
+        assertEquals(28L, monthly.getValue("KWT"))
         // IRQ 105, GULF 47, PSE 35 and TEST 23 were here. Their rows are gone.
         assertEquals(setOf("UAE", "USA", "KSA", "QAT", "KWT"), monthly.keys)
     }
 
     @Test
     fun `the displayed monthly figures do not re-sum, which is why they are never added up`() {
-        // DECISIONS.md D-4, made executable. Rounded to whole dinars the way
-        // the strategy document prints them, the five expatriate markets total
-        // 484 JOD a month against a true 483.75.
-        //
-        // Note the direction. On the pre-D-28 figures these same five rounded
-        // *down*, to 389 against a true 390, and the D-4 note was written
-        // around a shortfall. It is an overshoot now. Which way it lands is an
-        // accident of five roundings, and that is the whole argument for never
-        // adding this column up rather than for correcting it by a dinar.
+        // DECISIONS.md D-4, made executable. Rounded to whole dinars the way the
+        // strategy document prints them, the five expatriate markets total 389
+        // JOD a month against a true 390 — a dinar a month, twelve a year, and
+        // it grows with every market added.
         val displayedSum = Gs3Budget.expatriateMarkets.sumOf { it.monthlyDisplayDinars }
-        assertEquals(484L, displayedSum)
-        assertEquals(Jod.ofFils(483_750), Gs3Budget.expatriateTotal.dividedBy(12))
-        assertTrue(Jod.ofDinars(484) > Gs3Budget.expatriateTotal.dividedBy(12))
+        assertEquals(389L, displayedSum)
+        assertEquals(Jod.ofDinars(390), Gs3Budget.expatriateTotal.dividedBy(12))
     }
 
     @Test
@@ -104,7 +76,8 @@ class BudgetAllocationTest {
         // annual figure. This is the reason the app never stores the rounding.
         val exactSum = Gs3Budget.expatriateMarkets.map { it.monthlyIndicative }.sum()
         assertEquals(Gs3Budget.expatriateTotal.dividedBy(12), exactSum)
-        assertEquals(Jod.ofFils(483_750), exactSum)
+        assertEquals(Jod.ofDinars(390), exactSum)
+        assertTrue(Jod.ofDinars(389) < exactSum)
     }
 
     @Test
@@ -186,19 +159,14 @@ class StopRulesTest {
     }
 
     @Test
-    fun `the only target is per qualified lead, and the budget's arithmetic still meets it`() {
-        // D-3, answered 2026-08-16: the owner removed the 45 JOD figure, so the
-        // raw-lead target is gone. Cost per raw lead is still measured; nothing
-        // scores against it — and it is still exactly 45 to the fils, which was
-        // always the reason 45 could not have been a qualified-lead target.
-        //
-        // D-26 and D-28. Removing the non-Jordanian track briefly broke the
-        // agreement between the target and the budget: at 4,680 the same
-        // division gave 97.500 against a target of 150. Sizing the track at
-        // 5,805 so it can still fund three units brings it back to 148.846,
-        // and the 150 did not have to move.
+    fun `the only target is per qualified lead, and it no longer comes from the budget`() {
+        // D-3 removed the raw-lead *target* in August. D-29 removes the last
+        // thing 45 JOD was still doing: the planning assumption that turned a
+        // budget into a lead count. So this test deliberately asserts nothing
+        // about cost per raw lead — the figure is measured in production and
+        // scored against nothing.
         val plannedExternalSpend = Gs3Budget.externalTrackTotal
-        assertEquals(Jod.ofDinars(5_805), plannedExternalSpend)
+        assertEquals(Jod.ofDinars(4_680), plannedExternalSpend)
 
         val planned = FunnelModel.EXTERNAL.project()
         val onPlan = ChannelSpend(
@@ -207,18 +175,35 @@ class StopRulesTest {
             qualifiedLeads = planned.qualified,
         )
 
-        // The budget and the funnel are wired to each other here rather than
-        // being two hardcoded numbers that can drift apart silently. 45 JOD a
-        // raw lead is the assumption both rest on.
-        assertEquals(Jod.ofDinars(45), onPlan.costPerRawLead)
-        assertEquals(Jod.ofFils(148_846), onPlan.costPerQualifiedLead)
+        // 4,680 over the 48 qualified leads the funnel expects is 97.500, and
+        // the target is 150. The gap is real and is kept rather than closed:
+        // tightening a threshold on a funnel nobody has re-estimated is the
+        // D-3 failure repeated. Asserted so the gap is visible to whoever next
+        // touches the default, instead of being quietly true.
+        assertEquals(Jod.ofFils(97_500), onPlan.costPerQualifiedLead)
 
         val targets = CplTargets()
         assertEquals(Jod.ofDinars(150), targets.perQualifiedLead)
         assertTrue(
             onPlan.costPerQualifiedLead!! < targets.perQualifiedLead,
-            "the target must stay at or above what the plan spends, never below — see D-3 and D-26",
+            "the target must stay at or above what the plan spends, never below — see D-3, D-26 and D-29",
         )
+    }
+
+    @Test
+    fun `nothing converts a budget into a lead count`() {
+        // D-29, asserted structurally rather than trusted to comments. The
+        // external budget and the external funnel are both approved figures
+        // and are deliberately unrelated: 4,680 / 160 is 29.25, a number that
+        // appears nowhere and means nothing. If a future change makes one
+        // derive from the other, this is the test that should be revisited
+        // first — and re-deriving it needs an owner's cost-per-lead figure,
+        // which is exactly what was removed.
+        val impliedByDivision = Gs3Budget.externalTrackTotal.dividedBy(FunnelModel.EXTERNAL.rawLeads)
+        assertEquals(Jod.ofFils(29_250), impliedByDivision)
+
+        val fields = CplTargets::class.java.declaredFields.map { it.name }
+        assertFalse(fields.any { it.contains("RawLead", ignoreCase = true) }, "a raw-lead figure is back: $fields")
     }
 
     @Test

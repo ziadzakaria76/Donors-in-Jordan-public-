@@ -15,7 +15,7 @@ same Arabic wording, and nothing else — no code, no build, no deployment.
 ```
 ./gradlew check assembleDebug
                      ->  BUILD SUCCESSFUL
-                         238 tests passing (211 in :domain, 27 in :app)
+                         240 tests passing (212 in :domain, 28 in :app)
                          98.7% line coverage on :domain (gate: 80%)
                          verifyStrings: 98 keys, both locales in step
                          lint: clean, abortOnError + warningsAsErrors
@@ -35,9 +35,11 @@ block that stopped the first two attempts was lifted on 2026-08-15 —
 `DECISIONS.md` → D-1 keeps the record of what was true before that.
 
 **No non-Jordanian buyer track.** It was removed from v1 on 2026-08-29 rather
-than shipped behind a gate nobody could open — `DECISIONS.md` → D-23. The
-external track was then re-sized to 5,805 JOD so that removing it did not cost
-the plan its third external unit — D-28.
+than shipped behind a gate nobody could open — `DECISIONS.md` → D-23.
+
+**And no assumed cost per lead.** The owner removed the 45 JOD per raw lead on
+2026-08-30, so nothing converts a budget into a lead count — D-29. Cost per raw
+lead is still measured; it is no longer assumed.
 
 ## Layout
 
@@ -73,8 +75,13 @@ totals hold: 14 units, 2,320 m² internal, 620 m² external, 1,496,000 JOD gross
 644.83 JOD/m² weighted average. Both funnel models and every budget row sum
 exactly as the brief states.
 
-One figure does not hold, and it is in `DECISIONS.md` as D-3: the 45 JOD
-external-track target is *exactly* 7,200 ÷ 160 raw leads, so it is a cost per
-raw lead, not the cost per qualified lead the brief calls it. Taken literally it
-would hold the track to a target 3.3× harder than its own budget allows, and
-leave the stop-rule alarm on permanently. Awaiting the owner's confirmation.
+One figure did not hold, and it is in `DECISIONS.md` as D-3: the 45 JOD
+external-track target was *exactly* 7,200 ÷ 160 raw leads, so it was a cost per
+raw lead, not the cost per qualified lead the brief called it. Taken literally it
+would have held the track to a target 3.3× harder than its own budget allowed and
+left the stop-rule alarm on permanently.
+
+The owner answered it twice. On 2026-08-16 the 45 JOD **target** was removed,
+leaving one target of 150 JOD per qualified lead. On 2026-08-30 the 45 JOD
+**assumption** was removed too (D-29), so no budget in this app is converted
+into a lead count or derived from one.

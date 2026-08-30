@@ -11,33 +11,31 @@ import java.math.BigDecimal
  * (2026-08-16): the owner removed the 45 JOD figure, so the raw-lead target is
  * gone rather than reinterpreted.
  *
- * That left the track judged on the basis its own budget planned for — 7,200
- * JOD over the 48 qualified leads it expected was 150 each, with a recorded
- * decision forced above 200. Carrying a second target of 45 as well would have
- * meant two numbers that can disagree about whether the same month went well.
+ * That left the track judged on the basis its own budget planned for — when the
+ * external track was 7,200 JOD, its 48 expected qualified leads came to 150
+ * each, with a recorded decision forced above 200. Carrying a second target on
+ * a different basis would have meant two numbers that can disagree about
+ * whether the same month went well.
  *
- * **150 still comes out of the budget's arithmetic, and did not have to be
- * touched.** Removing the non-Jordanian track (D-23) briefly broke that:
- * the external budget fell to 4,680, and the same division gave 97.500 while
- * the target stayed at 150. D-28 restored the track to 5,805 so that it can
- * still fund three units, and 5,805 over the 39 qualified leads it now expects
- * is **148.846** — within 1% of the target that was already there.
+ * **150 no longer comes out of the budget's arithmetic, and is kept anyway.**
+ * Removing the non-Jordanian track (D-23) took the external budget to 4,680, so
+ * the same division over the same 48 qualified leads gives 97.500. The target
+ * stays at 150 — see DECISIONS.md → D-26 and D-29. It is an approved figure and
+ * moving it down would tighten an alarm on a funnel nobody has re-estimated,
+ * which is the D-3 failure again: an alarm that fires from week one and teaches
+ * the team to ignore it. Loose is the safe direction for an unconfirmed
+ * threshold.
  *
- * That is a coincidence worth not leaning on. The two agree because both
- * descend from the same 45-JOD-per-raw-lead assumption, not because anything
- * checks them against each other. If real expatriate lead costs come in above
- * 45 — plausible, since 45 was blended across the cheaper non-Jordanian
- * markets — this target is the first thing that should move, and both figures
- * are editable for that reason.
- *
- * Worth keeping the history, because the figure will come up again: what the
- * brief called a target per *qualified* lead was 7,200 ÷ 160 **raw** leads to
- * the fils. Taken literally it would have scored the track against a target
- * 3.3× harder than the budget allows, so the alarm would have come on in week
- * one and never gone off — which teaches a team to ignore alarms.
+ * **No cost per raw lead is assumed anywhere.** The owner removed that figure
+ * on 2026-08-30 (D-29), so nothing in this app converts a budget into a lead
+ * count or a lead count into a budget. The external track's 4,680 JOD and the
+ * external funnel's 160 raw leads are both approved figures that stand on their
+ * own; whether the first can buy the second is an open question, and the app no
+ * longer answers it by assumption.
  *
  * Cost per raw lead is still *measured* — see [ChannelSpend.costPerRawLead].
- * What no longer exists is a target to score it against.
+ * What does not exist is a target to score it against, or a planning figure to
+ * derive anything from.
  *
  * Both remaining figures are editable in Settings.
  */

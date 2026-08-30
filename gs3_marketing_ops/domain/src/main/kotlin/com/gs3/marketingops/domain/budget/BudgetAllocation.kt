@@ -21,12 +21,10 @@ data class MarketAllocation(
      * The same figure as the strategy document prints it: whole dinars.
      *
      * Display only, and never summed. Rounding each market to the dinar and
-     * adding those up gives 484 JOD a month across the five expatriate markets
-     * against a true 483.75 — and the direction is not fixed either: on the
-     * previous figures the same five rounded *down* to 389 against a true 390.
-     * Either way the displayed column does not re-sum, which is precisely why
-     * [monthlyIndicative] is what the app computes with and this is only what
-     * it shows.
+     * adding those up gives 389 JOD a month across the five expatriate markets
+     * against a true 390 — a dinar a month, twelve a year, growing with every
+     * market added. That is precisely why [monthlyIndicative] is what the app
+     * computes with and this is only what it shows.
      */
     val monthlyDisplayDinars: Long
         get() = monthlyIndicative.dinars.setScale(0, java.math.RoundingMode.HALF_UP).toLong()
@@ -43,29 +41,27 @@ data class MarketAllocation(
  * second half — 2,520 JOD across IRQ, GULF, PSE and TEST — for non-Jordanian
  * buyers. Those four rows are deleted with the track (DECISIONS.md → D-23,
  * D-24). [totalPaidMedia] is unchanged at the approved 18,000, so that money is
- * not withdrawn from the plan; where it lands is D-28.
+ * not withdrawn from the plan: all 2,520 of it falls to the local track by the
+ * existing arithmetic below, which takes local as whatever the external track
+ * does not.
  *
- * **Of the 2,520, 1,125 stays on this track and 1,395 falls to local.** The
- * external track keeps a three-unit target and a ≥27% share of sales, and at
- * the plan's own 45 JOD per raw external lead those need 129 raw leads —
- * 5,805 JOD. Left at 4,680 the same funnel yields two units, not three, and
- * the dashboard would have reported the track at risk from its first month
- * while it performed exactly to budget. The five rows below are the original
- * remittance weighting scaled to 5,805 and rounded to the nearest 5 JOD; no
- * market's share of the track moves by more than 0.03 of a percentage point.
- * See DECISIONS.md → D-28, including why 1,125 is a floor rather than an
- * estimate.
+ * The five rows are the brief's original figures, untouched. D-28 briefly
+ * scaled them up to 5,805 so the track could fund three units at an assumed
+ * 45 JOD per raw lead; the owner removed that assumption on 2026-08-30 and the
+ * scaling with it (D-29). **Nothing here is derived from a cost per lead any
+ * more.** These are approved figures, and how many leads they buy is a question
+ * the app deliberately does not answer.
  */
 object Gs3Budget {
 
     val totalPaidMedia: Jod = Jod.ofDinars(18_000)
 
     val expatriateMarkets: List<MarketAllocation> = listOf(
-        MarketAllocation(Track.EXPAT, "UAE", Jod.ofDinars(1_700)),
-        MarketAllocation(Track.EXPAT, "USA", Jod.ofDinars(1_550)),
-        MarketAllocation(Track.EXPAT, "KSA", Jod.ofDinars(1_390)),
-        MarketAllocation(Track.EXPAT, "QAT", Jod.ofDinars(745)),
-        MarketAllocation(Track.EXPAT, "KWT", Jod.ofDinars(420)),
+        MarketAllocation(Track.EXPAT, "UAE", Jod.ofDinars(1_370)),
+        MarketAllocation(Track.EXPAT, "USA", Jod.ofDinars(1_250)),
+        MarketAllocation(Track.EXPAT, "KSA", Jod.ofDinars(1_120)),
+        MarketAllocation(Track.EXPAT, "QAT", Jod.ofDinars(600)),
+        MarketAllocation(Track.EXPAT, "KWT", Jod.ofDinars(340)),
     )
 
     /**

@@ -69,23 +69,23 @@ data class FunnelModel(
          * converts far better because someone who books one from Dubai is
          * further through the decision than a local walk-in.
          *
-         * **The four rates are untouched; only the lead volume follows the
-         * budget.** 160 raw leads was what 7,200 JOD bought at the plan's own
-         * 45 JOD each, when the external track meant expatriates *and*
-         * non-Jordanians. That track is gone (D-23) and its budget is now
-         * 5,805, which buys 129 — and 129 still yields three contracts, which
-         * is why 5,805 is the figure D-28 settled on rather than any rounder
-         * number. Drop below 129 and the third unit goes with it.
+         * **All five numbers are the strategy's own, and none is derived from
+         * the budget.** D-28 briefly made the lead count follow the money, at
+         * an assumed 45 JOD per raw lead; the owner removed that assumption on
+         * 2026-08-30 (D-29), so 160 is once more simply what the plan says the
+         * external track brings in.
          *
-         * Nothing here is a re-estimate. The qualification, viewing and
-         * contract rates are the strategy's, unchanged; re-deriving them for an
-         * expatriate-only audience would be invention, and is deliberately not
-         * done. What is assumed is that an expatriate raw lead still costs
-         * about 45 JOD — a *blended* figure that included cheaper
-         * non-Jordanian markets, so it may prove optimistic. See D-28.
+         * **What that leaves open, deliberately.** The 160 was modelled when
+         * the external track meant expatriates *and* non-Jordanians. That track
+         * is gone (D-23) and its budget is 4,680 rather than 7,200, so
+         * expatriate marketing alone now has to supply all 160 on two thirds of
+         * the money. Whether it can is not answered here and is not answerable
+         * without a cost per lead, which is precisely the figure that was
+         * removed. It is a question for the first month of real spend —
+         * `ChannelSpend.costPerRawLead` measures it — not for an assumption.
          */
         val EXTERNAL = FunnelModel(
-            rawLeads = 129,
+            rawLeads = 160,
             qualifiedRate = BigDecimal("0.30"),
             viewingRate = BigDecimal("0.35"),
             offerRate = BigDecimal.ONE, // the external track goes from live tour to contract

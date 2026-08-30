@@ -107,9 +107,9 @@ both languages, at the point of use.
 Department of Lands and Survey statement came back not obtained, rather than
 ship a module locked behind a gate nobody could open. Nothing in v1 markets to,
 processes, or promises anything to a non-Jordanian buyer. It is a rebuild, not a
-switch: see `DECISIONS.md` → D-23 for exactly what came out, and D-28 for how
-the external track was re-sized so that dropping it did not quietly cost the
-plan its third external unit.
+switch: see `DECISIONS.md` → D-23 for exactly what came out. D-28 briefly
+re-sized the external track to cover the loss; D-29 reverted that when the owner
+removed the cost-per-lead assumption it rested on.
 
 No backend, accounts or cloud sync — data lives on the device, and encrypted
 backup files are how it moves between phones. No ad-platform API integration;

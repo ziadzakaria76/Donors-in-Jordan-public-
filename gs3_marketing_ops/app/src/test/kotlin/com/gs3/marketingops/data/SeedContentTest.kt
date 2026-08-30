@@ -59,10 +59,10 @@ class SeedContentTest {
             Gs3Budget.externalTrackTotal,
             seeded.fold(Jod.ZERO) { running, row -> running + row.annual },
         )
-        // 5,805, not 7,200: the four non-Jordanian market rows are gone with
-        // the track (D-23), and 1,125 of the 2,520 they held stays here so the
-        // track can still fund three units (D-28).
-        assertEquals(Jod.ofDinars(5_805), Gs3Budget.externalTrackTotal)
+        // 4,680, not 7,200: the four non-Jordanian market rows are gone with
+        // the track (D-23), and D-28's scaling to 5,805 went with the
+        // cost-per-raw-lead assumption it rested on (D-29).
+        assertEquals(Jod.ofDinars(4_680), Gs3Budget.externalTrackTotal)
         assertEquals(5, seeded.size)
     }
 
