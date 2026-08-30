@@ -28,8 +28,16 @@
       "enabled": true,
       "tier": 1,
       "module": "worldbank",
-      "urls": ["https://search.worldbank.org/api/v2/procnotices"],
-      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "urls": [
+        "https://search.worldbank.org/api/v2/procnotices"
+      ],
+      "code_owned": [
+        "selectors",
+        "field_selectors",
+        "anchor_hint",
+        "currency",
+        "filter_to_jordan"
+      ],
       "notes": "REST API. Offset paging, the country-field test that beats the API's own full-text search, and the notice-id link are all in portals/worldbank.py."
     },
     {
@@ -38,8 +46,16 @@
       "enabled": true,
       "tier": 1,
       "module": "ted",
-      "urls": ["https://api.ted.europa.eu/v3/notices/search"],
-      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "urls": [
+        "https://api.ted.europa.eu/v3/notices/search"
+      ],
+      "code_owned": [
+        "selectors",
+        "field_selectors",
+        "anchor_hint",
+        "currency",
+        "filter_to_jordan"
+      ],
       "notes": "REST API with its own query grammar: the country is the three-letter code JOR and the page limit is 100. Both were 400s until they were fixed. portals/ted.py."
     },
     {
@@ -48,8 +64,16 @@
       "enabled": true,
       "tier": 1,
       "module": "samgov",
-      "urls": ["https://api.sam.gov/prod/opportunities/v2/search"],
-      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "urls": [
+        "https://api.sam.gov/prod/opportunities/v2/search"
+      ],
+      "code_owned": [
+        "selectors",
+        "field_selectors",
+        "anchor_hint",
+        "currency",
+        "filter_to_jordan"
+      ],
       "notes": "REST API needing a free key (SAM_API_KEY) whose approval takes 1-4 weeks. Without it the portal reports 'not configured', which is deliberately not the same as 'unavailable'. portals/samgov.py."
     },
     {
@@ -58,8 +82,16 @@
       "enabled": true,
       "tier": 1,
       "module": "fcdo",
-      "urls": ["https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages"],
-      "code_owned": ["selectors", "field_selectors", "anchor_hint", "currency", "filter_to_jordan"],
+      "urls": [
+        "https://www.find-tender.service.gov.uk/api/1.0/ocdsReleasePackages"
+      ],
+      "code_owned": [
+        "selectors",
+        "field_selectors",
+        "anchor_hint",
+        "currency",
+        "filter_to_jordan"
+      ],
       "notes": "OCDS API over the whole UK corpus, which is why country matching is on word boundaries -- Jordanstown and Ammanford are in it. portals/fcdo.py."
     },
     {
@@ -68,8 +100,14 @@
       "enabled": true,
       "tier": 2,
       "module": "ungm",
-      "urls": ["https://www.ungm.org/Public/Notice"],
-      "code_owned": ["selectors", "field_selectors", "filter_to_jordan"],
+      "urls": [
+        "https://www.ungm.org/Public/Notice"
+      ],
+      "code_owned": [
+        "selectors",
+        "field_selectors",
+        "filter_to_jordan"
+      ],
       "anchor_hint": "/Public/Notice/",
       "currency": "USD",
       "notes": "The richest Jordan source. Its rows come from a POST search endpoint filtered to Jordan and paged to the end, not from this URL, which is 141 KB of pure navigation. The selectors and the sibling-span field selectors were derived from the live DOM and carry their reasoning in portals/ungm.py; editing them here would be ignored, so it is rejected."
@@ -99,7 +137,9 @@
       "name": "EIB",
       "enabled": true,
       "tier": 2,
-      "urls": ["https://www.eib.org/en/about/procurement/all/index.htm"],
+      "urls": [
+        "https://www.eib.org/en/about/procurement/all/index.htm"
+      ],
       "selectors": [
         "div.eib-list__item",
         "article.teaser",
@@ -109,14 +149,16 @@
       "anchor_hint": "/about/procurement/",
       "currency": "EUR",
       "filter_to_jordan": true,
-      "notes": "Corporate and project procurement in one listing. Returns a bot wall from a data-centre IP; the selectors are unverified."
+      "notes": "Corporate and project procurement in one listing. NEVER RETURNED A ROW: eib.org answers a Cloudflare challenge to every data-centre address, GitHub's runners included. Two probes on 2026-08-30 confirmed it -- the listing read 91,699 bytes and found nothing under any of the six layers, and the supplier portal and RSS index are walled the same way. The bank publishes no procurement feed: eib.org/en/rss/index.htm offers jobs, press releases and publications only. So no URL and no selector will fix this; it needs a browser on the report path, which was deliberately removed (see ungm.py), or nothing. Left enabled and visible on purpose -- disabling it would turn a known blocked source into a silent gap. ted.py now counts how many TED notices name the EIB as buyer, which is the measure of how much of this is already arriving through a channel that works."
     },
     {
       "key": "giz",
       "name": "GIZ",
       "enabled": true,
       "tier": 2,
-      "urls": ["https://ausschreibungen.giz.de/Satellite/company/welcome.do"],
+      "urls": [
+        "https://ausschreibungen.giz.de/Satellite/company/welcome.do"
+      ],
       "selectors": [
         "div.tender-item",
         "tr.tableRow",
@@ -133,7 +175,9 @@
       "name": "KfW (via Germany Trade & Invest)",
       "enabled": true,
       "tier": 2,
-      "urls": ["https://www.gtai.de/en/trade/tenders"],
+      "urls": [
+        "https://www.gtai.de/en/trade/tenders"
+      ],
       "selectors": [
         "div.gtai-teaser",
         "article.teaser",
@@ -150,7 +194,9 @@
       "name": "IsDB",
       "enabled": true,
       "tier": 2,
-      "urls": ["https://www.isdb.org/project-procurement/tenders"],
+      "urls": [
+        "https://www.isdb.org/project-procurement/tenders"
+      ],
       "selectors": [
         "div.views-row",
         "div.tender-card",
