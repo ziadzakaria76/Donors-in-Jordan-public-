@@ -209,9 +209,12 @@ const PROJECTS = [
     id: "sherman-2",
     name: { ar: "جنرال شيرمان ٢", en: "General Sherman 2" },
     district: "marj-al-hamam",
-    /* No status: the brochure does not say whether the building is delivered
-       or still under construction, and the site does not guess. Add
-       status: "selling" | "delivered" | "upcoming" to show a badge. */
+    /* Delivered. Confirmed by the company, not by the brochure — the brochure is
+       silent on it, which is why this sat without a status until someone who
+       knew the building said so.
+       Four apartments remain available in a delivered building; that is not a
+       contradiction, and the unit schedule is what states availability. */
+    status: "delivered",
     image: "sherman2-exterior-day",
     address: { ar: "مرج الحمام — طريق ناعور، بعد كازية السلام", en: "Marj Al-Hamam — Naour Road, past the Al-Salam petrol station" },
     mapQuery: "Marj Al Hamam, Amman, Jordan",

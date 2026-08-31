@@ -700,6 +700,7 @@
         "en": "General Sherman 2"
       },
       "district": "marj-al-hamam",
+      "status": "delivered",
       "image": "sherman2-exterior-day",
       "address": {
         "ar": "مرج الحمام — طريق ناعور، بعد كازية السلام",
@@ -1111,7 +1112,7 @@
         }
       ],
       "notes": {
-        "status": "No status: the brochure does not say whether the building is delivered\nor still under construction, and the site does not guess. Add\nstatus: \"selling\" | \"delivered\" | \"upcoming\" to show a badge.",
+        "status": "Delivered. Confirmed by the company, not by the brochure — the brochure is\nsilent on it, which is why this sat without a status until someone who\nknew the building said so.\nFour apartments remain available in a delivered building; that is not a\ncontradiction, and the unit schedule is what states availability.",
         "nearby": "Drive times as published in the project brochure.",
         "units": "Every apartment as listed in the brochure's schedule. Prices are per unit\nand do not follow a formula, so they are stated, not derived."
       }
