@@ -27,7 +27,7 @@ globalThis.fetch = async (url) => {
   return reply(500, { message: "the test routed nothing to this URL" });
 };
 
-const { probeRepo } = await import("../functions/api/_lib.js");
+const { probeRepo, gh } = await import("../functions/api/_lib.js");
 
 const CFG = { repo: "owner/repo-", branch: "main", token: "github_pat_example" };
 const HEALTHY = () => reply(
@@ -94,6 +94,28 @@ await test("a missing Actions grant fails only the deploy history",
 await test("a network failure is reported rather than thrown",
   { "*": () => { throw new Error("boom"); } },
   (o, s) => !o.ok && s.includes("Could not reach api.github.com"));
+
+/* The hint gh() attaches to a failure. It once told a 401 to go and check the
+   Contents permission — advice that cannot fix a token GitHub will not accept
+   at all, and that sent a real evening into the wrong settings page. */
+
+async function hintFor(status, body) {
+  routes = { "*": () => reply(status, body) };
+  try {
+    await gh(CFG, "/actions/workflows/deploy-website.yml/runs");
+    return "(no error thrown)";
+  } catch (e) {
+    return e.message;
+  }
+}
+
+const h401 = await hintFor(401, { message: "Bad credentials" });
+await test("a 401 hint says the token is not a token, and names no permission",
+  {}, () => /truncated, revoked or expired/.test(h401) && !/Contents: Read and write/.test(h401));
+
+const h403 = await hintFor(403, { message: "Resource not accessible by personal access token" });
+await test("a 403 hint names both permissions the panel needs",
+  {}, () => /Contents: Read and write/.test(h403) && /Actions: Read/.test(h403));
 
 console.log();
 if (failures.length) {
