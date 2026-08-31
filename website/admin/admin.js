@@ -637,6 +637,18 @@ addEventListener("beforeunload", (e) => { if (dirty()) e.preventDefault(); });
   try {
     const session = await api("/api/session");
     $("#repo").textContent = session.ready ? `${session.repo} · ${session.branch} · ${session.email}` : session.email;
+
+    /* A token that works today and expires in three weeks is worth seeing
+       three weeks early, not on the morning it stops. */
+    if (session.ready && session.tokenExpires) {
+      const days = Math.round((Date.parse(session.tokenExpires.replace(" UTC", "Z").replace(" ", "T")) - Date.now()) / 86_400_000);
+      if (Number.isFinite(days) && days <= 30) {
+        $("#repo").textContent += days > 0
+          ? ` · access token expires in ${days} day${days === 1 ? "" : "s"}`
+          : " · access token has expired";
+      }
+    }
+
     if (!session.ready) { main.replaceChildren(el("p", { class: "empty", text: session.error })); return; }
 
     const { content, commit } = await api("/api/content");

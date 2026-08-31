@@ -32,6 +32,6 @@ export const onRequest = guard(async ({ request, env }) => {
       })),
     });
   } catch (e) {
-    return json({ error: String(e.message || e) }, 502);
+    return json({ error: String(e.message || e), where: "/api/deploys" }, 500);
   }
 });

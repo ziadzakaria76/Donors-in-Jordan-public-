@@ -27,7 +27,7 @@ export const onRequest = guard(async ({ request, env }) => {
       const { text, commit } = await readFile(cfg, CONTENT);
       return json({ content: JSON.parse(text), commit, editor: who.email });
     } catch (e) {
-      return json({ error: String(e.message || e) }, 502);
+      return json({ error: String(e.message || e), where: "/api/content" }, 500);
     }
   }
 
@@ -95,6 +95,6 @@ export const onRequest = guard(async ({ request, env }) => {
 
     return json({ commit: result.commit });
   } catch (e) {
-    return json({ error: String(e.message || e) }, 502);
+    return json({ error: String(e.message || e), where: "/api/content" }, 500);
   }
 });

@@ -6,6 +6,20 @@
  * endpoint.
  */
 
+/**
+ * A JSON response.
+ *
+ * One rule about `status`: never 502, and never 504.
+ *
+ * Those are the statuses Cloudflare treats as "the thing behind me is broken",
+ * and it answers them with its own branded error page — the grey "Bad gateway,
+ * Host Error" one — in place of whatever body we sent. So a carefully worded
+ * explanation returned with a 502 arrives as a page that says nothing at all,
+ * and the failure looks like the platform falling over rather than an answer
+ * the panel is trying to give. This endpoint is not a gateway; when a call to
+ * GitHub fails, that is *our* request failing, and 500 says so without handing
+ * the body to Cloudflare to throw away.
+ */
 export const json = (body, status = 200) =>
   new Response(JSON.stringify(body, null, 2), {
     status,
@@ -105,7 +119,7 @@ export async function identify(request, env) {
       error: `Could not fetch Cloudflare Access signing keys from ${env.ACCESS_TEAM_DOMAIN} (${e.message || e}). ` +
         "Check ACCESS_TEAM_DOMAIN — it should be your team domain with no https:// and no trailing slash, " +
         "and it must match the one in Zero Trust -> Settings -> Team domain.",
-      status: 502,
+      status: 500,
     };
   }
   const key = keys.get(head.kid);
@@ -179,6 +193,109 @@ async function gh(cfg, path, init = {}) {
     throw new Error(`GitHub ${init.method || "GET"} ${path} → ${res.status}${hint}: ${body.slice(0, 300)}`);
   }
   return res.json();
+}
+
+/**
+ * Ask GitHub whether the token actually works, and say what is wrong if not.
+ *
+ * `repoConfig` only proves the variables are set, which is a much weaker claim
+ * than it looks: a token can be present and expired, present and truncated by a
+ * copy-paste, or present and never granted this repository. All three read as
+ * "configured" and then fail at the first real call — which is the end of a
+ * long edit, the worst possible moment to find out.
+ *
+ * The failure this is really written for is GitHub's 404. A fine-grained token
+ * is not told that a repository it cannot see exists, so "no access" and "no
+ * such repository" arrive as the same reply, and the bare status leaves you
+ * guessing which you have. Naming both possibilities is the difference between
+ * a fix and an afternoon.
+ *
+ * Never throws. This runs inside the one endpoint that still answers when
+ * everything else is broken, and it must not become the reason it stops.
+ */
+export async function probeRepo(cfg) {
+  let res;
+  try {
+    res = await fetch(`https://api.github.com/repos/${cfg.repo}`, {
+      headers: {
+        authorization: `Bearer ${cfg.token}`,
+        accept: "application/vnd.github+json",
+        "user-agent": "general-sherman-admin",
+      },
+    });
+  } catch (e) {
+    return { ok: false, problem: `Could not reach api.github.com at all: ${e?.message || e}` };
+  }
+
+  /* Fine-grained tokens carry their own expiry in a response header, so "has it
+     expired?" is answerable here rather than by asking someone to go and look. */
+  const expires = res.headers.get("github-authentication-token-expiration") || null;
+
+  if (res.status === 401) {
+    return {
+      ok: false, expires,
+      problem: "GitHub rejected GITHUB_TOKEN as bad credentials, so the stored value is not a usable token. " +
+        "Most often it was truncated on the way into the dashboard, or it has been revoked. Issue a new " +
+        "fine-grained token and paste it again, checking the whole string arrives — they start with github_pat_ " +
+        "and are long enough to be easy to clip.",
+    };
+  }
+  if (res.status === 404) {
+    return {
+      ok: false, expires,
+      problem: `GitHub answered 404 for the repository "${cfg.repo}". Because a fine-grained token is not told ` +
+        "that a repository it cannot see exists, this is either of two things and both are worth checking: " +
+        "GITHUB_REPO is misspelt (owner/name — case does not matter, but every character does, including a " +
+        "trailing hyphen), or the token was never granted this repository. In the token's settings, Repository " +
+        "access must list it under 'Only select repositories', with Repository permissions → Contents set to " +
+        "'Read and write'.",
+    };
+  }
+  if (!res.ok) {
+    return { ok: false, expires, problem: `GitHub answered ${res.status} for the repository. ${await headline(res)}` };
+  }
+
+  const repo = await res.json();
+
+  /* Being able to see the repository is not enough to save into it. Reading is
+     the weaker permission, and the panel only ever fails on the write. */
+  if (repo.permissions?.push !== true) {
+    return {
+      ok: false, expires, repo: repo.full_name,
+      problem: `The token can see ${repo.full_name} but cannot write to it. Set Repository permissions → ` +
+        "Contents to 'Read and write' — 'Read-only' is enough to load the panel and not enough to save.",
+    };
+  }
+
+  let branchOk = null;
+  try {
+    const ref = await fetch(
+      `https://api.github.com/repos/${cfg.repo}/git/ref/heads/${cfg.branch}`,
+      { headers: { authorization: `Bearer ${cfg.token}`, accept: "application/vnd.github+json", "user-agent": "general-sherman-admin" } },
+    );
+    branchOk = ref.ok;
+  } catch {
+    /* Leave it unknown. One flaky call should not be reported as a missing branch. */
+  }
+  if (branchOk === false) {
+    return {
+      ok: false, expires, repo: repo.full_name,
+      problem: `The token works, but there is no branch "${cfg.branch}" in ${repo.full_name} — the default ` +
+        `branch there is "${repo.default_branch}". Set GITHUB_BRANCH to that, or remove it and let it default.`,
+    };
+  }
+
+  return { ok: true, expires, repo: repo.full_name, branch: cfg.branch };
+}
+
+/** The first useful line of a GitHub error body, for putting inside a sentence. */
+async function headline(res) {
+  try {
+    const body = await res.json();
+    return String(body.message || "").slice(0, 200);
+  } catch {
+    return "GitHub gave no reason.";
+  }
 }
 
 /** The branch head, and a file from it, in one round trip each. */

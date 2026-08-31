@@ -68,6 +68,25 @@ for (const file of ["tools/render-data.mjs", "tools/validate-content.mjs"]) {
     `${file} imports ${bad.join(", ")}, but it also runs in a Worker and in the browser, where that does not exist — keep filesystem work in build-data.mjs`);
 }
 
+/* ------------------------------------------------- statuses Cloudflare eats
+   502 and 504 are the statuses Cloudflare answers with its own branded error
+   page, replacing whatever body came with them. An API that returns a careful
+   explanation with a 502 therefore returns nothing at all, and the failure
+   reads as the platform falling over rather than as an answer.
+
+   That cost real hours here: every GitHub failure in the panel came back as a
+   grey "Bad gateway" page, so the endpoints looked dead when they were in fact
+   describing the problem accurately into a body nobody would ever see. The
+   statuses are honest ones to reach for — which is exactly why this needs to be
+   a rule and not a memory. */
+
+for (const file of readdirSync(resolve(ROOT, "functions/api"))) {
+  const src = read(`functions/api/${file}`);
+  const bad = [...src.matchAll(/\bstatus:\s*(502|504)\b|,\s*(502|504)\s*\)/g)];
+  check(!bad.length,
+    `functions/api/${file} returns ${bad.map((m) => m[1] || m[2]).join(", ")}, but Cloudflare replaces the body of a 502 or 504 with its own error page — use 500 so the explanation survives`);
+}
+
 /* The admin panel imports those two directly. A moved or renamed file is a
    panel that fails to boot, and nothing else in the repository would notice. */
 for (const spec of [...read("admin/admin.js").matchAll(/from\s+"(\.\.\/[^"]+)"/g)].map((m) => m[1])) {
