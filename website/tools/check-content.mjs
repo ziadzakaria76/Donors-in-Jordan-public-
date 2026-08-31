@@ -68,6 +68,22 @@ for (const file of ["tools/render-data.mjs", "tools/validate-content.mjs"]) {
     `${file} imports ${bad.join(", ")}, but it also runs in a Worker and in the browser, where that does not exist — keep filesystem work in build-data.mjs`);
 }
 
+/* ------------------------------------------------ a tab in the wrong language
+   The switcher sets document.title from the two attributes on <title>. A page
+   that ships without them keeps its Arabic tab after switching to English —
+   which is invisible to look at, because the page itself translates perfectly
+   and only the tab, and any bookmark made from it, stays behind. */
+
+for (const file of readdirSync(ROOT).filter((f) => f.endsWith(".html"))) {
+  const title = read(file).match(/<title\b([^>]*)>([^<]*)<\/title>/);
+  check(!!title, `${file} has no <title>`);
+  if (!title) continue;
+  for (const a of ["data-title-ar", "data-title-en"]) {
+    check(title[1].includes(a),
+      `${file} has a <title> without ${a}, so switching language would leave its browser tab in the other one — add both (tools/build-pages.mjs stamps them)`);
+  }
+}
+
 /* --------------------------------------------- statuses we cannot tell apart
    502 and 504 are the statuses Cloudflare answers with when a Pages Function
    dies or the platform is unwell. Its "Bad gateway / Host Error" page carries

@@ -443,6 +443,15 @@ const I18N = {
     document.body.dir = dir;
     if (persist) { try { localStorage.setItem("dao-lang", lang); } catch { /* private mode */ } }
 
+    /* The browser tab, which the [data-i18n] sweep below cannot reach: <title>
+       carries both languages as attributes rather than a key, because the text
+       served in the file has to stay Arabic for crawlers even when the reader
+       has switched. Left alone, English readers kept an Arabic tab — and an
+       Arabic bookmark of a page they read in English. */
+    const titleEl = document.querySelector("title");
+    const titled = titleEl?.dataset[lang === "en" ? "titleEn" : "titleAr"];
+    if (titled) document.title = titled;
+
     document.querySelectorAll("[data-i18n]").forEach((el) => {
       const value = I18N.t(el.dataset.i18n, lang);
       if (value) el.textContent = value;
