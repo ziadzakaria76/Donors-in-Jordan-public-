@@ -129,6 +129,32 @@ def test_ungm_keeps_a_title_that_names_no_country(outcomes):
     assert titled(outcomes["ungm"], "laboratory equipment").syria_link_type == "inside_syria"
 
 
+def test_ungm_declares_the_country_it_inferred_rather_than_passing_it_off(outcomes):
+    """A country the portal wrote in must be distinguishable from one it read.
+
+    The gate treats the country FIELD as authoritative, so writing one in for a
+    "Multiple destinations" row manufactures its strongest signal. Keeping those
+    rows is a deliberate recall choice -- the live run of 2026-08-31 kept 85 of
+    85 -- but nothing downstream could tell an inferred country from a published
+    one, and "85 kept of 85" reads as a portal working perfectly.
+    """
+    outcome = outcomes["ungm"]
+
+    inferred = titled(outcome, "GHG Study")
+    assert inferred.syria_link_type == "inside_syria", "kept, as the recall choice intends"
+    assert "country_inferred:ungm_multiple_destinations" in inferred.flags
+
+    # A row that names the country itself is NOT an inference, and must not be
+    # flagged as one -- otherwise the flag means nothing.
+    named = [t for t in outcome.tenders
+             if not any(f.startswith("country_inferred:") for f in t.flags)]
+    assert named, "every kept row was flagged inferred; the flag is not discriminating"
+
+    # And the health line carries the count, so it is visible without opening
+    # the spreadsheet.
+    assert "country inferred" in outcome.status_line
+
+
 def test_ungm_labels_the_jordan_row_rather_than_dropping_it(profile, gate):
     outcome = collect("ungm", profile, gate, UNGM_CFG)
     mafraq = [t for t in outcome.tenders if "Mafraq" in t.title]

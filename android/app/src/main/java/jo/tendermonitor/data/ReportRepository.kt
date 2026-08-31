@@ -125,32 +125,10 @@ class ReportRepository(
             is Outcome.Ok -> found.value
         }
 
-        if (artifacts.isEmpty()) {
-            return@withContext Outcome.Failed(
-                Problem(
-                    headline = "This run produced no files",
-                    detail = "Run #${run.runNumber} finished ${run.conclusion ?: "with no conclusion"} " +
-                        "and uploaded nothing.",
-                    kind = Kind.NOT_FOUND,
-                    fixHint = if (run.conclusion == "failure") {
-                        "The run failed before it could write a report. Its log says where."
-                    } else {
-                        "Artifacts are kept for 90 days; older runs lose them."
-                    },
-                )
-            )
-        }
-
-        // Jordan's artifact is "jordan-tenders-N" and Syria's is
-        // "syria-tender-report-N", so a prefix match on one country silently
-        // fell through to first() for the other. That worked only because these
-        // runs upload a single artifact; a run that uploaded two would have
-        // picked whichever GitHub listed first. Preferring anything that names
-        // a tender keeps the choice deliberate, and first() stays as the last
-        // resort rather than the usual path.
-        val artifact = artifacts.firstOrNull { it.name.startsWith("jordan-tenders") }
-            ?: artifacts.firstOrNull { it.name.contains("tender", ignoreCase = true) }
-            ?: artifacts.first()
+        // reportArtifact returns null only for an empty list, so this covers
+        // both "the run uploaded nothing" and "it has not uploaded yet".
+        val artifact = reportArtifact(artifacts)
+            ?: return@withContext Outcome.Failed(noArtifacts(run))
 
         if (artifact.expired) {
             return@withContext Outcome.Failed(
@@ -231,14 +209,8 @@ class ReportRepository(
             is Outcome.Failed -> return@withContext found
             is Outcome.Ok -> found.value
         }
-        val artifact = artifacts.firstOrNull { it.name.startsWith("jordan-tenders") }
-            ?: return@withContext Outcome.Failed(
-                Problem(
-                    headline = "This run has no report pack",
-                    detail = "No artifact named jordan-tenders-* was uploaded.",
-                    kind = Kind.NOT_FOUND,
-                )
-            )
+        val artifact = reportArtifact(artifacts)
+            ?: return@withContext Outcome.Failed(noArtifacts(run))
 
         if (artifact.expired) {
             return@withContext Outcome.Failed(
@@ -294,4 +266,61 @@ class ReportRepository(
     }
 
     suspend fun settingsNow(): AppSettings = withContext(Dispatchers.IO) { settings.settings() }
+
+    companion object {
+
+        /**
+         * The artifact carrying a run's report pack, whichever monitor produced it.
+         *
+         * ONE FUNCTION BECAUSE THERE WERE TWO CALL SITES AND THEY DISAGREED.
+         * fetchReport learned that Jordan uploads "jordan-tenders-N" and Syria
+         * uploads "syria-tender-report-N"; downloadFiles kept requiring the
+         * Jordan prefix and answered "No artifact named jordan-tenders-* was
+         * uploaded" for a perfectly good Syria run. Fixing one and not the
+         * other is what made the Files tab fail while the Latest tab worked.
+         *
+         * The order is deliberate: the exact Jordan name first, then anything
+         * naming a tender, and only then whatever came first. These runs upload
+         * a single artifact today, so first() is a last resort rather than the
+         * usual path -- a run that uploaded two would otherwise pick whichever
+         * GitHub happened to list first.
+         */
+        fun reportArtifact(artifacts: List<Artifact>): Artifact? =
+            artifacts.firstOrNull { it.name.startsWith("jordan-tenders") }
+                ?: artifacts.firstOrNull { it.name.contains("tender", ignoreCase = true) }
+                ?: artifacts.firstOrNull()
+
+        /**
+         * Why a run has no files -- and a run still going is not a run that
+         * produced nothing.
+         *
+         * Tapping Files while a run is in progress used to read "No artifact
+         * named jordan-tenders-* was uploaded", which names a cause that is not
+         * the cause and points at a fix that does not exist. A run uploads when
+         * it ends; before that there is simply nothing there yet.
+         */
+        fun noArtifacts(run: WorkflowRun): Problem =
+            if (!run.isFinished) {
+                Problem(
+                    headline = "This run has not finished",
+                    detail = "Run #${run.runNumber} is ${run.status ?: "still going"}. A run " +
+                        "uploads its files only when it ends, so there is nothing to " +
+                        "download yet.",
+                    kind = Kind.NOT_FOUND,
+                    fixHint = "Wait for it to finish -- the Run screen shows when it does.",
+                )
+            } else {
+                Problem(
+                    headline = "This run produced no files",
+                    detail = "Run #${run.runNumber} finished ${run.conclusion ?: "with no conclusion"} " +
+                        "and uploaded nothing.",
+                    kind = Kind.NOT_FOUND,
+                    fixHint = if (run.conclusion == "failure") {
+                        "The run failed before it could write a report. Its log says where."
+                    } else {
+                        "Artifacts are kept for 90 days; older runs lose them."
+                    },
+                )
+            }
+    }
 }
