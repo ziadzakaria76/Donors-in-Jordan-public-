@@ -533,6 +533,12 @@ Applications -> Add an application -> Self-hosted. Free for up to 50 users.
   An Access policy on `/admin` alone would leave the write API facing the
   internet. The panel refuses to work in that case rather than trusting it, but
   the point is not to be in that position.
+- The dashboard's form takes **one hostname per application**, so covering both
+  paths means two applications sharing one policy. Each gets its own AUD tag,
+  and `ACCESS_AUD` takes both, comma-separated. A token from either is accepted
+  — they are both yours and both enforce the same policy, and which one signed
+  it depends on where you landed first. A token from any *other* application is
+  still refused, which is the check that matters.
 - Policy: *Emails* -> your address. Session duration is up to you; a week is
   reasonable for one person.
 - Copy the **Application Audience (AUD) tag** from the application overview.
@@ -543,7 +549,7 @@ project -> Settings -> Variables and Secrets:
 | name | kind | value |
 |---|---|---|
 | `ACCESS_TEAM_DOMAIN` | plaintext | `yourteam.cloudflareaccess.com` |
-| `ACCESS_AUD` | plaintext | the AUD tag from step 1 |
+| `ACCESS_AUD` | plaintext | the AUD tag(s) from step 1 — comma-separated if you made two applications |
 | `GITHUB_REPO` | plaintext | `owner/repository` |
 | `GITHUB_BRANCH` | plaintext | `main` (optional) |
 | `GITHUB_TOKEN` | **encrypted** | see below |
