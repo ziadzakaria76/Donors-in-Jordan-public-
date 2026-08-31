@@ -58,9 +58,49 @@
 
   /* ---------------------------------------------------------- URL syncing */
 
+  /**
+   * What each filter will accept from the query string.
+   *
+   * These values arrive from outside — a link a salesperson sent months ago, a
+   * project id that has since been renamed, a hand-edited URL — and they used
+   * to be trusted verbatim. `?project=nope` then threw on the chip label, which
+   * left the page showing no units and no chips at all: nothing matched, and
+   * nothing on screen said why or offered a way back.
+   *
+   * Two kinds of value are refused. One is a name that is not in a closed
+   * vocabulary — a project, district, type, orientation, status or sort order
+   * that does not exist. The other is a number that is not a number, which is
+   * where `?maxPrice=abc` came from: it filtered nothing, correctly, while
+   * announcing "≤ NaN دينار" in the chips.
+   *
+   * A well-formed value that simply matches nothing is not refused. `beds=99`
+   * and `floor=99` are real questions with the honest answer "none", and the
+   * empty state says so.
+   */
+  const known = (obj) => (v) => Object.prototype.hasOwnProperty.call(obj, v);
+  const numeric = (v) => v.trim() !== "" && Number.isFinite(Number(v));
+  const ACCEPTS = {
+    project: (v) => PROJECTS.some((p) => p.id === v),
+    district: known(DISTRICTS),
+    type: known(UNIT_TYPES),
+    orientation: known(ORIENTATIONS),
+    status: (v) => ["available", "reserved", "sold"].includes(v),
+    sort: (v) => ["priceAsc", "priceDesc", "areaDesc", "floorAsc"].includes(v),
+    beds: numeric,
+    floor: numeric,
+    minArea: numeric,
+    maxPrice: numeric,
+  };
+
   function readUrl() {
     const params = new URLSearchParams(location.search);
-    FILTERS.forEach((k) => { if (params.has(k)) state[k] = params.get(k); });
+    FILTERS.forEach((k) => {
+      if (!params.has(k)) return;
+      const value = params.get(k);
+      /* "" is every filter's neutral setting — ?status= deliberately means
+         "any status", not a status called "". */
+      if (value === "" || ACCEPTS[k](value)) state[k] = value;
+    });
   }
 
   function writeUrl() {

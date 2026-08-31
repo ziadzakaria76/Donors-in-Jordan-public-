@@ -172,6 +172,22 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .header--solid { background: rgba(250, 247, 241, 0.94); backdrop-filter: blur(14px); border-block-end-color: var(--line-soft); }
 .header--solid .brand__name, .header--solid .nav a, .header--solid .lang-btn { color: var(--ink); }
 .header--solid .brand__mark { color: var(--brass); }
+/* A scrim under the floating header, so legibility does not depend on what the
+   photograph happens to look like at the top.
+   Every inner page carries a dark hero overlay and the ivory nav sits at 6.6:1
+   or better on all of them. The home page's hero is a building against open
+   sky, and that sky runs rgb(111,131,151) straight behind the nav — 3.6:1,
+   under the 4.5:1 small text needs, on the one page most visitors see first.
+   Fixing it by darkening that photograph would trade the brightest image on
+   the site for a header; a gradient that fades out before the headline costs
+   nothing on the dark heroes, where it is barely perceptible, and rescues the
+   bright one. It sits behind the content and ignores the pointer. */
+.header--float::before {
+  content: ""; position: absolute; inset-block-start: 0; inset-inline: 0;
+  block-size: calc(var(--header-h) + 2.5rem);
+  background: linear-gradient(to bottom, rgba(15, 21, 24, 0.62), rgba(15, 21, 24, 0));
+  pointer-events: none; z-index: -1;
+}
 .header--float .brand__name, .header--float .nav a, .header--float .lang-btn { color: var(--ivory); }
 .header--float .brand__mark { color: var(--brass-2); }
 .header--float .brand__tag { color: rgba(250, 247, 241, 0.7); }
@@ -191,8 +207,16 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   inline-size: 0; block-size: 1.5px; background: var(--brass); transition: inline-size 0.25s var(--ease);
 }
 .nav a:hover::after, .nav a[aria-current="page"]::after { inline-size: 100%; }
-.nav a[aria-current="page"] { color: var(--brass); }
-.header--float .nav a[aria-current="page"] { color: var(--brass-2); }
+/* The underline marks the current page; the text colour does not.
+   Brass was doing both, and as text it is the one colour in the nav that
+   cannot carry small type: measured against the real backdrops it reaches
+   only 1.5:1 over the home hero's bright sky and 3.4:1 on the scrolled white
+   bar, against the 4.5:1 that body-size text needs. Its siblings, ivory over
+   the hero and ink on the bar, clear that comfortably — so the current link
+   now keeps the colour it already had and is marked by the underline alone,
+   which is the louder signal of the two anyway. `aria-current="page"` was
+   always doing this properly for screen readers. */
+.header--float .nav a[aria-current="page"]::after { background: var(--brass-2); }
 
 .header__actions { display: flex; align-items: center; gap: 0.75rem; }
 .lang-btn {
@@ -224,6 +248,18 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
     max-block-size: calc(100dvh - var(--header-h)); overflow-y: auto;
   }
   .nav a { color: var(--ink) !important; padding-block: 0.95rem; border-block-end: 1px solid var(--line-soft); font-size: 1.05rem; }
+  /* "You are here" in the drawer. The underline that marks it on the desktop
+     bar is switched off at this width, and the colour rule that used to do the
+     job was overridden by the `!important` above — so every row in the drawer
+     read identically, on the surface most of this site's visitors use.
+     aria-current was announcing it correctly the whole time; nothing showed it.
+     Weight and a brass edge say it without tinting the text, which at this size
+     would cost contrast for no gain. */
+  .nav a[aria-current="page"] {
+    font-weight: 700;
+    border-inline-start: 3px solid var(--brass);
+    padding-inline-start: 0.7rem;
+  }
   .nav a::after { display: none; }
   .nav-open .nav { transform: translateY(0); opacity: 1; pointer-events: auto; }
   .nav-open { overflow: hidden; }
@@ -262,6 +298,9 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .crumbs li::after { content: "/"; margin-inline-start: 0.5rem; opacity: 0.5; }
 .crumbs li:last-child::after { content: none; }
 .crumbs a:hover { color: var(--brass-2); }
+/* Same reason as the footer: 19px of text is a small thing to hit, and this is
+   the link back out of a page someone reached by accident. */
+.crumbs a { display: inline-flex; align-items: center; min-height: 24px; }
 
 /* ------------------------------------------------- quick search (in hero) */
 
@@ -520,6 +559,12 @@ table.data tbody tr:hover { background: #FCFAF6; }
 .footer__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr)); gap: clamp(1.75rem, 4vw, 3rem); }
 .footer h2, .footer h3 { font-size: var(--fs-xs); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ivory); margin-block-end: 1.15rem; }
 .footer ul { display: grid; gap: 0.7rem; }
+/* Tall enough to hit with a thumb. These links are 22px of text on a phone,
+   and the gap between them is what kept that from failing WCAG's 24px minimum
+   rather than the targets themselves being big enough. Padding out to 24px
+   costs two pixels of footer and makes them comfortable rather than merely
+   compliant — and this site is read on phones. */
+.footer li a { display: inline-flex; align-items: center; min-height: 24px; }
 .footer .brand__name { color: var(--ivory); }
 .footer .brand__mark { color: var(--brass-2); }
 .footer__tagline {
