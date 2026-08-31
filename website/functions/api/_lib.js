@@ -188,9 +188,15 @@ async function gh(cfg, path, init = {}) {
   });
   if (!res.ok) {
     const body = await res.text();
-    const hint = res.status === 401 || res.status === 403
-      ? " — check GITHUB_TOKEN has Contents: read and write on this repository and has not expired"
-      : "";
+    /* 401 and 403 are different diagnoses and must not share a sentence. A 401
+       is GitHub saying the token is not a token — no permission change can fix
+       that, and sending someone to the permission checkboxes wastes the trip.
+       This message did exactly that, and cost a real evening. */
+    const hint = res.status === 401
+      ? " — GitHub rejected the token itself, not its permissions: the stored GITHUB_TOKEN is truncated, revoked or expired, so it has to be reissued and pasted again"
+      : res.status === 403
+        ? " — check the token's permissions: editing content needs Contents: Read and write, and the deploy list needs Actions: Read"
+        : "";
     throw new Error(`GitHub ${init.method || "GET"} ${path} → ${res.status}${hint}: ${body.slice(0, 300)}`);
   }
   return res.json();
