@@ -104,10 +104,23 @@ export async function identify(request, env) {
   if (payload.exp && payload.exp < now) return { error: "Your session has expired. Reload the page to sign in again.", status: 401 };
   if (payload.iss !== `https://${env.ACCESS_TEAM_DOMAIN}`) return { error: "Access assertion issued for another team.", status: 401 };
 
-  /* aud is the Access application's tag. Without this check any application in
-     the same Access team would be a valid key to this one. */
+  /* aud is the Access application's tag. Without this check, any application in
+     the same Access team would be a valid key to this one.
+
+     ACCESS_AUD may name more than one, comma-separated, because covering both
+     /admin and /api took two Access applications — the dashboard's form allows
+     a single hostname per application. A token issued by either one is
+     legitimate here: both are ours and both enforce the same policy, and which
+     of them signed the token depends on where the person landed first. Naming
+     only one would reject a valid session for no reason a user could act on.
+
+     What this still refuses is a token from an application we did not name,
+     which is the check that matters. */
+  const allowed = String(env.ACCESS_AUD).split(",").map((s) => s.trim()).filter(Boolean);
   const aud = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!aud.includes(env.ACCESS_AUD)) return { error: "Access assertion issued for another application.", status: 401 };
+  if (!aud.some((a) => allowed.includes(a))) {
+    return { error: "Access assertion issued for another application.", status: 401 };
+  }
 
   return { email: payload.email || "unknown" };
 }
