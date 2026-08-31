@@ -231,7 +231,7 @@ Setup, step by step: **[`syria_tender_monitor/docs/RUNBOOK.md`](syria_tender_mon
 ```bash
 cd syria_tender_monitor
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q                            # 508 passed, 1 skipped
+python -m pytest tests/ -q                            # 511 passed, 1 skipped
 PYTHONPATH=src python -m syria_monitor.cli --self-test # whole pipeline, fixtures, no network
 ```
 
@@ -263,7 +263,7 @@ that matter if you are deciding which to touch:
 | --- | --- | --- |
 | Country | Hard-coded throughout | A profile argument; `profiles/syria.yml` holds the country data, so a second country is a second YAML file |
 | Layout | Flat package, run with `python run.py` | `src/` layout, run with `python -m syria_monitor.cli` |
-| Tests | Custom harness, `tests/run_all.py` | pytest, 509 tests |
+| Tests | Custom harness, `tests/run_all.py` | pytest, 512 tests |
 | Extras | Email delivery, Windows deployment guide | Delivery-location classification, sanctions screening, a tri-state country gate |
 | Live status | Ran against live portals on 3 August 2026; results above | Runs daily on a schedule; 9 of 10 portals reached on 31 August 2026 |
 

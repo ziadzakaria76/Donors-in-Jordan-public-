@@ -160,3 +160,185 @@ def test_the_documented_workflow_modes_are_modes_the_workflow_offers():
             f"{name} tells the reader to pick mode {mode!r}, which "
             f"syria-monitor.yml does not offer. Its choices are {sorted(options)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# The report JSON the app actually parses
+# ---------------------------------------------------------------------------
+#
+# THE BRIDGE WRITER HAD NO CONTRACT TEST AT ALL. app_json_writer.py is the only
+# thing feeding the Android app on a Syria run, and nothing checked it against
+# the app's parser. Jordan has had that check since the app was built; this
+# project shipped the writer without one, which is the same gap that let the
+# workflow inputs drift into a 422 and the artifact name drift into a Files tab
+# that refused a good run.
+#
+# A drift here is quiet in the worst way: kotlinx is configured with
+# ignoreUnknownKeys, so a renamed key does not throw -- the app reads the
+# property's default instead and renders a confident, wrong screen.
+
+_KOTLIN_PROPERTY = re.compile(
+    r"^\s*(?:@SerialName\(\"(?P<serial>[^\"]+)\"\)\s*)?"
+    r"val\s+(?P<name>\w+)\s*:\s*(?P<type>[\w<>?.]+)"
+    r"(?P<default>\s*=)?",
+    re.M,
+)
+
+
+def _kotlin_properties(source: str, class_name: str) -> list[tuple[str, str]]:
+    """(json key, kotlin type) for one data class's constructor properties."""
+    start = source.index(f"data class {class_name}(")
+    depth, end = 0, start
+    for i in range(source.index("(", start), len(source)):
+        if source[i] == "(":
+            depth += 1
+        elif source[i] == ")":
+            depth -= 1
+            if depth == 0:
+                end = i
+                break
+    body = source[start:end]
+    out = []
+    for m in _KOTLIN_PROPERTY.finditer(body):
+        # `val x: T get() = ...` is computed, not serialised, and has no default
+        # marker; constructor properties are the ones that come from JSON.
+        if "get()" in body[m.end():m.end() + 12]:
+            continue
+        out.append((m.group("serial") or m.group("name"), m.group("type")))
+    return out
+
+
+def _type_fits(value, kotlin_type: str) -> bool:
+    optional = kotlin_type.endswith("?")
+    base = kotlin_type.rstrip("?")
+    if value is None:
+        return optional
+    if base.startswith("List<"):
+        return isinstance(value, list)
+    if base == "String":
+        return isinstance(value, str)
+    if base in ("Int", "Long"):
+        return isinstance(value, int) and not isinstance(value, bool)
+    if base == "Double":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if base == "Boolean":
+        return isinstance(value, bool)
+    return True          # a nested data class; checked by its own pass
+
+
+def _syria_app_document(tmp_path) -> dict:
+    """A real document from the real writer, over the real pipeline."""
+    import json
+    import yaml
+    from syria_monitor.config import Config
+    from syria_monitor.fetch import Fetcher
+    from syria_monitor.pipeline import run as run_pipeline
+    from syria_monitor.portals import REGISTRY
+    from syria_monitor.portals.base import BasePortal
+    from syria_monitor.report import write_app_json
+
+    root = REPO / "syria_tender_monitor"
+    profile = yaml.safe_load((root / "profiles" / "syria.yml").read_text(encoding="utf-8"))
+    data = yaml.safe_load((root / "config.yml").read_text(encoding="utf-8"))
+    data["state"]["db_path"] = str(tmp_path / "seen.db")
+    data["output"]["dir"] = str(tmp_path / "out")
+    cfg = Config(data, profile)
+
+    def portal(name, records, fails=False, skip=None):
+        class Fake(BasePortal):
+            pass
+        Fake.name, Fake.label, Fake.url = name, name.upper(), f"https://{name}.example"
+        Fake.fetch_tenders = lambda self: (_ for _ in ()).throw(RuntimeError("boom")) \
+            if fails else records
+        Fake.unavailable_reason = lambda self: skip
+        return Fake
+
+    record = {"id": "1", "title": "Rehabilitation of the Aleppo water network",
+              "project_ctry_name": "Syrian Arab Republic",
+              "closing_date": "2099-09-30", "_safe_text_fields": ["title"]}
+
+    original = dict(REGISTRY)
+    try:
+        REGISTRY.clear()
+        # THE THREE STATES THE APP HAS TO RENDER, not just the happy one: a
+        # portal that worked, one that failed, and one skipped for a missing
+        # key. The last two are where the writer emits nulls.
+        REGISTRY["ok"] = portal("ok", [record])
+        REGISTRY["broken"] = portal("broken", [], fails=True)
+        REGISTRY["skipped"] = portal("skipped", [], skip="NO_KEY not set")
+        result = run_pipeline(cfg, fetcher=Fetcher(),
+                              portals=["ok", "broken", "skipped"])
+    finally:
+        REGISTRY.clear()
+        REGISTRY.update(original)
+
+    path = write_app_json(result, tmp_path / "app.json", cfg.profile)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_the_app_reads_every_field_the_syria_writer_writes(tmp_path):
+    """Every constructor property of the app's model must be present and fit."""
+    source = (APP / "data" / "report" / "Report.kt").read_text(encoding="utf-8")
+    doc = _syria_app_document(tmp_path)
+
+    def check_class(class_name, payload, label):
+        props = _kotlin_properties(source, class_name)
+        assert props, f"no properties parsed from {class_name}"
+        for key, ktype in props:
+            assert key in payload, (
+                f"{label} is missing '{key}' for {class_name}.{key} — the app "
+                f"would read a default and render it as fact. Document has: "
+                f"{sorted(payload)}"
+            )
+            assert _type_fits(payload[key], ktype), (
+                f"{label}['{key}'] = {payload[key]!r} does not fit {ktype}"
+            )
+
+    check_class("Report", doc, "the Syria report")
+    check_class("RunSummary", doc["run"], "its run block")
+
+    assert doc["tenders"], "the fixture run produced no opportunity to check"
+    for tender in doc["tenders"]:
+        check_class("Opportunity", tender, "an opportunity")
+
+    assert doc["portals"], "the fixture run produced no portal row to check"
+    for portal in doc["portals"]:
+        check_class("PortalStatus", portal, "a portal status")
+
+
+def test_the_schema_constant_matches_on_both_sides(tmp_path):
+    """A schema the app refuses is a blank screen, whatever the run found."""
+    # SUPPORTED_SCHEMA lives in Report.kt; ReportParser.kt only compares against
+    # it. Reading the parser instead matches its `schema == 0` guard and 
+    # "supports 0" -- which is how the first draft of this test failed.
+    model = (APP / "data" / "report" / "Report.kt").read_text(encoding="utf-8")
+    found = re.search(r"SUPPORTED_SCHEMA\s*(?::\s*Int\s*)?=\s*(\d+)", model)
+    assert found, "no SUPPORTED_SCHEMA constant found in Report.kt"
+    supported = int(found.group(1))
+
+    written = _syria_app_document(tmp_path)["schema"]
+    # The parser refuses anything NEWER than it understands, and treats 0 as a
+    # document with no version at all.
+    assert written != 0, "a schema of 0 is read as 'no version' and refused"
+    assert written <= supported, (
+        f"Syria writes schema {written}; this app understands {supported}, and "
+        f"ReportParser refuses anything newer -- every installed build would "
+        f"show 'the app is out of date' on an otherwise good run"
+    )
+
+
+def test_a_skipped_or_broken_portal_reports_null_scanned_not_zero(tmp_path):
+    """Null and 0 mean different things, and the app renders them differently.
+
+    A portal that was never polled has no count; a portal that read nothing has
+    a count of zero. Collapsing them tells the reader a broken portal looked and
+    found nothing.
+    """
+    doc = _syria_app_document(tmp_path)
+    by_key = {p["key"]: p for p in doc["portals"]}
+
+    assert by_key["ok"]["scanned"] is not None
+    assert by_key["broken"]["scanned"] is None, "an unreachable portal must not claim 0"
+    assert by_key["skipped"]["scanned"] is None, "an unpolled portal must not claim 0"
+    assert by_key["skipped"]["status"] == "unconfigured"
+    assert by_key["broken"]["status"] == "unavailable"
