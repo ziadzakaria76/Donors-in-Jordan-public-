@@ -36,7 +36,7 @@ and are unrelated.
 ```bash
 cd syria_tender_monitor                 # every path below is relative to here
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q              # expect: 506 passed, 1 skipped
+python -m pytest tests/ -q              # expect: 508 passed, 1 skipped
                                         # (the skip is the browser test; it
                                         #  passes once Playwright is installed)
 python -m pyflakes src/ tests/          # expect: no output
@@ -87,7 +87,8 @@ first is now in place; the second still needs a human at a browser.
 
 1. ~~Capture the live pages.~~ **Done** — Actions run 33240256664, 2026-08-29.
    Re-run it any time from GitHub → Actions → **Syria tender monitor** → Run
-   workflow → mode `capture`, portal `ungm`. The id appears on the run summary
+   workflow → mode `diagnose portals (--capture)`, portals `ungm`. The id
+   appears on the run summary
    page and the captured HTML comes back as an artifact.
    ```bash
    PYTHONPATH=src python -m syria_monitor.cli --capture ungm
@@ -119,16 +120,23 @@ against the *dropdown* page, which says nothing about how real notices parse.
 
 ## Stage 5 — Confirm the other portals really parse  (1–2 hours, needs network — or a phone)
 
-No scraper in this repository has ever run against a live page. This is where
-that gets fixed. For each HTML portal:
+Every HTML portal except SAM.gov has now been reached by the daily run, so this
+stage is no longer first contact — it is how you check that reaching a page and
+reading it correctly are the same thing, which for GIZ and GTAI they are not.
+For each HTML portal:
 
 ```bash
 PYTHONPATH=src python -m syria_monitor.cli --capture undp     # then srtf, giz, isdb, gtai
 ```
 
-**From a phone instead:** Actions → **Syria tender monitor** → mode `capture`,
-portal `all`.
-One run walks every HTML portal and puts the whole report on the run summary.
+**From a phone instead:** Actions → **Syria tender monitor** → mode
+`diagnose portals (--capture)`, leaving **portals** blank for all of them (or
+naming keys, space-separated, to narrow it). One run walks every HTML portal and
+puts the whole report on the run summary.
+
+These are the workflow's literal choices, and a `type: choice` input is matched
+as an exact string — the short `capture` this file used to name has not existed
+since the inputs were changed to the Android app's vocabulary.
 
 For each one, read the per-layer table:
 
