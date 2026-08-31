@@ -45,6 +45,10 @@ def _source(*parts: str) -> str:
     return APP.joinpath(*parts).read_text(encoding="utf-8")
 
 
+def _workflow_inputs() -> dict:
+    """The workflow's declared inputs, for tests that are not fixture-scoped."""
+    return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))[True]["workflow_dispatch"]["inputs"]
+
 @pytest.fixture(scope="module")
 def workflow() -> dict:
     # `on:` is parsed by PyYAML as the boolean True (YAML 1.1 keeps "on" as a
@@ -125,4 +129,34 @@ def test_free_text_inputs_reach_the_shell_as_values(workflow):
     for name in ("portals", "candidate"):
         assert f"inputs.{name} }}}}" not in step["run"], (
             f"inputs.{name} is interpolated directly into the script"
+        )
+
+
+def test_the_documented_workflow_modes_are_modes_the_workflow_offers():
+    """A runbook step that names a mode which no longer exists is a dead end.
+
+    `type: choice` is matched as an exact string, so a documented value that has
+    drifted does not degrade -- it is rejected, or silently falls through to the
+    default and does something else.
+
+    This is the same drift that produced the 422, one layer out: when the inputs
+    were changed to the app's vocabulary, RUNBOOK.md still told the reader to
+    pick mode `capture` with portal `all`. Neither had existed since. Someone
+    following the setup guide would have got a rejected dispatch and no clue why.
+    """
+    options = set(_workflow_inputs()["mode"]["options"])
+    docs = [REPO / "syria_tender_monitor" / "docs" / "RUNBOOK.md",
+            REPO / "syria_tender_monitor" / "README.md",
+            REPO / "README.md"]
+
+    documented = []
+    for doc in docs:
+        if doc.is_file():
+            documented += [(doc.name, m) for m in
+                           re.findall(r"mode `([^`]+)`", doc.read_text(encoding="utf-8"))]
+
+    for name, mode in documented:
+        assert mode in options, (
+            f"{name} tells the reader to pick mode {mode!r}, which "
+            f"syria-monitor.yml does not offer. Its choices are {sorted(options)}"
         )

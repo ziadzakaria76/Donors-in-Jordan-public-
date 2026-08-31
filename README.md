@@ -158,22 +158,33 @@ notifies you. That is the failure alert, with no mail credentials involved.
 **[`android/ANDROID.md`](android/ANDROID.md)** — the same thing with fewer taps.
 The last report offline, a Run button with the workflow's real inputs, the full
 portal health table, and the Word and Excel packs downloaded and opened on the
-phone. Install it from the phone: the APK is built by CI and attached to the run.
+phone.
+
+**It drives either monitor.** Point Settings at `monitor.yml` for Jordan or
+`syria-monitor.yml` for Syria; the Run screen, report, health table and file
+downloads all follow whichever is selected. One app, one country at a time —
+there is no combined view.
 
 It does not scrape — it is a client to the pipeline that already runs on
 GitHub's servers. It reads the `*.json` artifact each run writes, because
 GitHub's REST API does not expose the run page's summary to any client.
 
-It also **manages the portal list**: switch a portal on or off, add one by URL,
-or remove one, each as a real commit to `portals.json`. Adding one tests the
-page first — a `--probe` run fetches it on GitHub's runner and reports what
-every extraction layer found, rows included — because committing a URL nobody
-has looked at is how a portal ends up reporting "unavailable" forever while
-looking like an honest failure.
+It also **manages the portal list, for Jordan only**: switch a portal on or off,
+add one by URL, or remove one, each as a real commit to `portals.json`. Adding
+one tests the page first — a `--probe` run fetches it on GitHub's runner and
+reports what every extraction layer found, rows included — because committing a
+URL nobody has looked at is how a portal ends up reporting "unavailable" forever
+while looking like an honest failure. With Settings pointed at Syria the screen
+refuses and says why: that monitor keeps its portals in its own `config.yml`, in
+a shape this screen cannot describe.
 
-Install it from the repository's **Releases** page — a plain `.apk`, no sign-in
-needed. `git tag v0.4.0 && git push origin v0.4.0` cuts one: the workflow runs
-the tests, builds the APK and publishes it with its SHA-256.
+**Two ways to install, and they are not the same thing.** The repository's
+**Releases** page carries cut versions — a plain `.apk`, no sign-in needed;
+`git tag v0.4.0 && git push origin v0.4.0` makes one, and the workflow runs the
+tests, builds it and publishes it with its SHA-256. For the newest build instead,
+every push to `main` attaches an APK to its own Actions run. Both share a
+`versionCode` taken from the commit count, so either upgrades the other in place
+rather than installing twice.
 
 **Compiled by CI, never run on a device.** `ANDROID.md` opens with a table of
 what that leaves unverified, and the generated release notes repeat it.
@@ -190,7 +201,7 @@ not a running service.
 ## Tests
 
 ```bash
-python jordan_tender_monitor/tests/run_all.py    # 2,527 checks, no network, no credentials
+python jordan_tender_monitor/tests/run_all.py    # 2,574 checks, no network, no credentials
 ```
 
 CI runs the suite and `pyflakes` on Python 3.11 and 3.12, on pushes to `main`
@@ -220,7 +231,7 @@ Setup, step by step: **[`syria_tender_monitor/docs/RUNBOOK.md`](syria_tender_mon
 ```bash
 cd syria_tender_monitor
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q                            # 456 passed, 1 skipped
+python -m pytest tests/ -q                            # 508 passed, 1 skipped
 PYTHONPATH=src python -m syria_monitor.cli --self-test # whole pipeline, fixtures, no network
 ```
 
@@ -228,11 +239,20 @@ PYTHONPATH=src python -m syria_monitor.cli --self-test # whole pipeline, fixture
 UNDP, SRTF, GIZ, IsDB and KfW via Germany Trade & Invest (HTML).
 
 **Read its README's "What is verified, and what is not" section before trusting
-any output.** No scraper in it has ever run against a live page: every URL, and
-every HTML portal's page structure, is unverified. It ships no CSS selectors on
-purpose and relies on class-independent extraction, and UNGM refuses to run
-until you supply the numeric country id that `--capture ungm` reads off the
-page. That is the honest starting state, not a defect to be surprised by later.
+any output.** It now runs live on a daily schedule, and that changed what is
+uncertain rather than removing the uncertainty. As of the run of 31 August 2026,
+**nine of its ten portals were reached and parsed**; SAM.gov is the tenth and
+stays inert until someone supplies an API key. Reaching a page is not reading it
+correctly, and three portals are known to be wrong in ways that run cannot see
+by itself: GIZ returned 20 rows where the site states 211, GTAI's extraction
+picks up its navigation menu, and most of what UNGM contributes reaches the
+report on an inferred country rather than a published one.
+
+UNGM and UNDP now pin CSS selectors. The project shipped none by design — a
+guess that matches navigation is worse than none — but on live pages the
+class-independent cascade chose the wrong row group, and pinning the real
+selectors is what fixed it. Anything that restructures extraction has to keep
+them working.
 
 ## Two monitors, one problem
 
@@ -243,9 +263,9 @@ that matter if you are deciding which to touch:
 | --- | --- | --- |
 | Country | Hard-coded throughout | A profile argument; `profiles/syria.yml` holds the country data, so a second country is a second YAML file |
 | Layout | Flat package, run with `python run.py` | `src/` layout, run with `python -m syria_monitor.cli` |
-| Tests | Custom harness, `tests/run_all.py` | pytest, 457 tests |
+| Tests | Custom harness, `tests/run_all.py` | pytest, 509 tests |
 | Extras | Email delivery, Windows deployment guide | Delivery-location classification, sanctions screening, a tri-state country gate |
-| Live status | Ran against live portals on 3 August 2026; results above | Never run against a live page |
+| Live status | Ran against live portals on 3 August 2026; results above | Runs daily on a schedule; 9 of 10 portals reached on 31 August 2026 |
 
 Merging them is a real option and a real project; nothing here has been done
 towards it. Until someone does it, a fix to a shared-looking bug — a date

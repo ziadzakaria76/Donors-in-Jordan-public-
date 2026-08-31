@@ -53,16 +53,47 @@ HTTP 200, as "the scrapers work".
   zero-row workbook.
 - Sanctions screening logic against synthetic lists.
 
-### Not verified at all
-- **Every URL in this repository.** All of them are tier-3: plausible, current
-  as of writing, unchecked. Run `--check-portals` first.
-- **Every HTML portal's page structure.** No CSS selectors are shipped —
-  they would be unverified guesses, and a guess that matches navigation is
-  worse than none. Extraction relies on the class-independent layers; run
-  `--capture PORTAL` to see what each page actually contains and what the
-  cascade makes of it.
-- **UNGM's search POST body.** Shipped as a documented skeleton, to be replaced
-  field-for-field from a real network trace.
+### Verified against live pages, and what that did and did not settle
+This section used to say no scraper had ever run against a live page. That
+stopped being true on 30 August 2026, and the daily schedule has delivered since
+31 August. Nine of the ten portals were reached and parsed on that run:
+
+| Portal | Live result, 31 August 2026 |
+| --- | --- |
+| UNGM | 85 rows read, 85 kept |
+| UNDP | 551 read, 8 kept |
+| World Bank | 14 read, 8 kept |
+| EU TED | 500 read, 0 kept |
+| UK Find a Tender | 500 read, 0 kept |
+| IsDB | 50 read, 0 kept |
+| GIZ | 20 read, 0 kept |
+| SRTF | 11 read, 0 kept |
+| GTAI (KfW) | 6 read, 0 kept |
+| SAM.gov | **skipped** — no API key, so still never exercised |
+
+**Reaching a page is not reading it correctly, and three of these are known to
+be wrong.** GIZ returns 20 rows where the site itself states 211, so most of it
+is missing. GTAI's extraction picks up the site navigation rather than notices.
+And most of UNGM's contribution reaches the report on a country this code
+*inferred* from a "Multiple destinations" label rather than one UNGM published —
+those rows now carry a `country_inferred:` flag and are counted on the health
+line. A live run proves reachability and shape; it does not prove completeness,
+and for these three it actively disproves it.
+
+- **UNGM and UNDP now pin CSS selectors.** The paragraph that used to stand here
+  said none were shipped, on the reasoning that a guess matching navigation is
+  worse than none. That reasoning still holds, but on the live pages the
+  class-independent cascade picked the wrong row group — 87 deadline cells
+  rather than the notice rows, keeping nothing — and pinning the real selectors
+  is what fixed it. Treat them as load-bearing.
+- **The remaining URLs are exercised, not audited.** A portal reading 0 rows may
+  be correct, or may be failing silently. `--capture PORTAL` shows what a page
+  contains and what the cascade makes of it; that is still how to tell the two
+  apart.
+- **UNGM's search POST body works.** It shipped as a skeleton to be replaced
+  from a network trace; the live runs paginate it correctly on a measured
+  stride, so it no longer needs replacing — but it is one endpoint's
+  undocumented shape, and a change on their side would break it silently.
 - **Every institutional fact** in the code comments: World Bank re-engagement
   and its 2026 projects, IsDB membership restoration (March 2025), EBRD and EIB
   status, the sanctions timeline (EO 14312, the Caesar repeal, EU/UK easing),
