@@ -182,6 +182,12 @@ jobs:
         run: node tools/check-content.mjs
         working-directory: website
 
+      # The admin panel's diagnosis of a broken token. Stubbed replies, so this
+      # needs no network and no credentials.
+      - name: Test the repository probe
+        run: node tools/test-probe.mjs
+        working-directory: website
+
   # The Syria monitor is the third, unrelated project in this repository. It
   # keeps its own dependency set and its own suite, so it gets its own job
   # rather than more steps on the one above: a Jordan dependency change must

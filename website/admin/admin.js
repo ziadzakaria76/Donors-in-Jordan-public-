@@ -637,7 +637,34 @@ addEventListener("beforeunload", (e) => { if (dirty()) e.preventDefault(); });
   try {
     const session = await api("/api/session");
     $("#repo").textContent = session.ready ? `${session.repo} · ${session.branch} · ${session.email}` : session.email;
-    if (!session.ready) { main.replaceChildren(el("p", { class: "empty", text: session.error })); return; }
+
+    /* A token that works today and expires in three weeks is worth seeing
+       three weeks early, not on the morning it stops. */
+    if (session.ready && session.tokenExpires) {
+      const days = Math.round((Date.parse(session.tokenExpires.replace(" UTC", "Z").replace(" ", "T")) - Date.now()) / 86_400_000);
+      if (Number.isFinite(days) && days <= 30) {
+        $("#repo").textContent += days > 0
+          ? ` · access token expires in ${days} day${days === 1 ? "" : "s"}`
+          : " · access token has expired";
+      }
+    }
+
+    /* Every call reported by name, not just the verdict. "The panel does not
+       work" and "the deploy list needs one more permission" are very different
+       afternoons, and only the list of checks tells them apart. */
+    /* Explicitly false, not merely falsy: ?probe=0 answers with null to mean
+       "GitHub was not asked", and that is not a failure to report. */
+    if (session.ready === false) {
+      const failed = (session.checks || []).filter((c) => !c.ok);
+      main.replaceChildren(el("div", { class: "card" },
+        el("h3", { text: "The panel cannot reach the repository" }),
+        ...(failed.length
+          ? failed.map((c) => el("p", {}, el("strong", { text: `${c.name}: ` }), c.detail))
+          : [el("p", { text: session.error })]),
+        el("p", { class: "sub", text: `Checked ${session.repo} on branch ${session.branch}. Fix this in the token's settings on GitHub, or under Settings → Variables and Secrets on the Pages project, then reload.` }),
+      ));
+      return;
+    }
 
     const { content, commit } = await api("/api/content");
     state.content = content;

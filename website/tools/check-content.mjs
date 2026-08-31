@@ -68,6 +68,27 @@ for (const file of ["tools/render-data.mjs", "tools/validate-content.mjs"]) {
     `${file} imports ${bad.join(", ")}, but it also runs in a Worker and in the browser, where that does not exist — keep filesystem work in build-data.mjs`);
 }
 
+/* --------------------------------------------- statuses we cannot tell apart
+   502 and 504 are the statuses Cloudflare answers with when a Pages Function
+   dies or the platform is unwell. Its "Bad gateway / Host Error" page carries
+   the same 502 this code would, so a 502 from the admin API is, from a browser,
+   indistinguishable from the platform falling over: seeing one tells you
+   nothing about whether our code ran at all.
+
+   That ambiguity cost real hours here. The panel's GitHub failures and a
+   genuine platform error looked identical, and the days spent deciding which
+   we were looking at were days not spent on the actual broken permission.
+
+   502 is an honest status to reach for when an upstream call fails — which is
+   exactly why this has to be a rule and not a memory. */
+
+for (const file of readdirSync(resolve(ROOT, "functions/api")).filter((f) => f.endsWith(".js"))) {
+  const src = read(`functions/api/${file}`);
+  const bad = [...src.matchAll(/\bstatus:\s*(502|504)\b|,\s*(502|504)\s*\)/g)];
+  check(!bad.length,
+    `functions/api/${file} returns ${bad.map((m) => m[1] || m[2]).join(", ")}, which a browser cannot tell apart from Cloudflare's own error page for a dead Function — use 500, so the status means our code answered`);
+}
+
 /* The admin panel imports those two directly. A moved or renamed file is a
    panel that fails to boot, and nothing else in the repository would notice. */
 for (const spec of [...read("admin/admin.js").matchAll(/from\s+"(\.\.\/[^"]+)"/g)].map((m) => m[1])) {
