@@ -271,7 +271,7 @@ started — so the app watches for a new run to appear and says so while it does
 rather than showing the previous run as though it were the new one.
 
 **Health** — every portal, in full: read, unavailable, not set up, or no
-listing; how many notices it read, how many were Jordan, and the failure reason
+listing; how many notices it read, how many were in scope, and the failure reason
 with the URL to check by hand. This table is the honesty mechanism and it is
 never summarised away.
 
@@ -279,6 +279,14 @@ never summarised away.
 remove one. **Every change is a commit to `portals.json`**, with a message
 saying what changed and why, and the resulting commit sha is shown back —
 "saved" is a claim, a sha is evidence.
+
+**This screen is Jordan-only, and says so when it cannot help.** It edits
+`jordan_tender_monitor/portals.json`. Point Settings at another monitor and it
+refuses rather than showing that file: the Syria monitor keeps its portals in
+`syria_tender_monitor/config.yml`, in a format this screen cannot describe, and
+a save here would have committed to Jordan's configuration while the app was
+running Syria's. **Test it** is refused for the same reason — `--probe` is a
+Jordan-only mode.
 
 Adding a portal has a **Test it** step, and Save is not available until it has
 run. It dispatches a `--probe` run that fetches the page on GitHub's runner and

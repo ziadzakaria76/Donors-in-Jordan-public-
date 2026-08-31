@@ -552,6 +552,43 @@ def test_an_arabic_notice_is_rendered_right_to_left():
           "rtl: the pipeline's own renderers still branch on Arabic")
 
 
+def test_every_android_resource_file_is_well_formed_xml():
+    """A malformed resource fails the Android build, and only the Android build.
+
+    This suite runs in seconds and offline; the Android toolchain does not run
+    here at all (its Gradle plugin will not resolve through the proxy), so a
+    resource error is invisible until CI compiles the app minutes later.
+
+    That is not hypothetical. A comment added to strings.xml contained "--",
+    which XML forbids inside comments -- the repository writes dashes that way
+    everywhere else, and Kotlin and Python do not care. mergeDebugResources
+    failed the build with "The string \"--\" is not permitted within comments",
+    costing a full CI cycle for a punctuation mark. Parsing the files here is
+    the cheapest place to find that.
+    """
+    from xml.dom.minidom import parse
+
+    # APP is .../src/main/java/jo/tendermonitor, so main is two above java.
+    main = APP.parents[2]
+    res = main / "res"
+    files = sorted(res.rglob("*.xml")) if res.is_dir() else []
+    manifest = main / "AndroidManifest.xml"
+    if manifest.is_file():
+        files.append(manifest)
+
+    check(len(files) >= 5,
+          "contract: the app's XML resources were found",
+          f"looked in {res}, found {len(files)}")
+
+    for path in files:
+        try:
+            parse(str(path))
+            ok, detail = True, ""
+        except Exception as error:            # noqa: BLE001 - reported, not raised
+            ok, detail = False, str(error)
+        check(ok, f"xml: {path.name} parses", detail)
+
+
 def test_the_apps_workflow_inputs_match_the_workflow():
     """A choice input is matched literally. A typo is a 422 at the moment you tap Run."""
     import io
@@ -605,5 +642,6 @@ TESTS = [
     test_the_app_can_find_the_files_the_run_actually_produces,
     test_every_policy_decision_is_one_the_app_actually_makes,
     test_an_arabic_notice_is_rendered_right_to_left,
+    test_every_android_resource_file_is_well_formed_xml,
     test_the_apps_workflow_inputs_match_the_workflow,
 ]

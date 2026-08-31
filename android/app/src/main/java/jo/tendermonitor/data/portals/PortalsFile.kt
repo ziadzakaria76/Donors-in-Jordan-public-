@@ -31,6 +31,30 @@ object PortalsFile {
     /** The path in the repository. Also what the commit message names. */
     const val PATH = "jordan_tender_monitor/portals.json"
 
+    /**
+     * The editable portal list for a monitor, or null where it has none.
+     *
+     * THIS SCREEN EDITS ONE COUNTRY'S CONFIGURATION AND THE APP NOW DRIVES TWO.
+     * `PATH` is a constant and `workflowFile` is a setting, so nothing tied
+     * them together: with Settings pointed at syria-monitor.yml the Portals
+     * screen still read Jordan's file, showed Jordan's thirteen portals as
+     * though they were the running monitor's, and -- because every edit here is
+     * a commit through the Contents API -- silently rewrote the OTHER country's
+     * configuration. A save that lands, on the wrong country's file, reads as
+     * success.
+     *
+     * The Syria monitor has no portals.json at all; its portals live in
+     * syria_tender_monitor/config.yml and are not in this file's schema. So the
+     * honest answer for it is "not editable from here", not a best guess at a
+     * path. Null means exactly that, and callers must say so rather than
+     * falling back to PATH.
+     */
+    fun pathFor(workflowFile: String): String? =
+        when (workflowFile.trim().removePrefix(".github/workflows/")) {
+            "monitor.yml" -> PATH
+            else -> null
+        }
+
     // prettyPrintIndent is still marked experimental. Opted in explicitly
     // rather than left as a warning: the two-space indent is what keeps a
     // portals.json edited from a phone diffing cleanly against one edited by
