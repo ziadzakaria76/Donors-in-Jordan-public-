@@ -11,14 +11,15 @@
  *
  * One rule about `status`: never 502, and never 504.
  *
- * Those are the statuses Cloudflare treats as "the thing behind me is broken",
- * and it answers them with its own branded error page — the grey "Bad gateway,
- * Host Error" one — in place of whatever body we sent. So a carefully worded
- * explanation returned with a 502 arrives as a page that says nothing at all,
- * and the failure looks like the platform falling over rather than an answer
- * the panel is trying to give. This endpoint is not a gateway; when a call to
- * GitHub fails, that is *our* request failing, and 500 says so without handing
- * the body to Cloudflare to throw away.
+ * Not because the body is lost — it is not — but because those two statuses are
+ * the ones Cloudflare itself answers with when a Pages Function dies or the
+ * platform is unwell, and its "Bad gateway / Host Error" page carries the same
+ * 502 this code would. So a 502 from here is indistinguishable, from a browser,
+ * from the platform failing: seeing one tells you nothing about whether this
+ * code ran at all. Hours went into that ambiguity on this project.
+ *
+ * 500 is also the more accurate word. This is not a gateway. When a call to
+ * GitHub fails, that is our own request failing, and the panel owns it.
  */
 export const json = (body, status = 200) =>
   new Response(JSON.stringify(body, null, 2), {
@@ -196,96 +197,134 @@ async function gh(cfg, path, init = {}) {
 }
 
 /**
- * Ask GitHub whether the token actually works, and say what is wrong if not.
+ * Make the three calls the panel depends on, and report each one by name.
  *
  * `repoConfig` only proves the variables are set, which is a much weaker claim
  * than it looks: a token can be present and expired, present and truncated by a
- * copy-paste, or present and never granted this repository. All three read as
- * "configured" and then fail at the first real call — which is the end of a
- * long edit, the worst possible moment to find out.
+ * copy-paste, or present and granted the wrong permissions. All of those read
+ * as "configured" and then fail at the first real call — the end of a long
+ * edit, which is the worst moment to find out.
  *
- * The failure this is really written for is GitHub's 404. A fine-grained token
- * is not told that a repository it cannot see exists, so "no access" and "no
- * such repository" arrive as the same reply, and the bare status leaves you
- * guessing which you have. Naming both possibilities is the difference between
- * a fix and an afternoon.
+ * It probes each API separately because they do not fail together. Loading the
+ * panel reads Contents; the deploy list reads Actions; saving writes Contents.
+ * Those are three distinct permissions on a fine-grained token, and a token
+ * carrying one and not another produces a panel that half works — which is
+ * exactly the shape of the failure this was written during, where /api/content
+ * answered and /api/deploys did not.
  *
- * Never throws. This runs inside the one endpoint that still answers when
- * everything else is broken, and it must not become the reason it stops.
+ * Special care goes to GitHub's 404. A fine-grained token is not told that a
+ * repository it cannot see exists, so "misspelt name" and "never granted"
+ * arrive as the identical reply, and reporting only the status leaves the
+ * reader guessing which they have. Naming both is the difference between a fix
+ * and an afternoon.
+ *
+ * Never throws, and never hangs: this runs inside the one endpoint that still
+ * answers when the others do not, and it must not become the reason it stops.
  */
 export async function probeRepo(cfg) {
-  let res;
-  try {
-    res = await fetch(`https://api.github.com/repos/${cfg.repo}`, {
-      headers: {
-        authorization: `Bearer ${cfg.token}`,
-        accept: "application/vnd.github+json",
-        "user-agent": "general-sherman-admin",
-      },
-    });
-  } catch (e) {
-    return { ok: false, problem: `Could not reach api.github.com at all: ${e?.message || e}` };
+  const checks = [];
+  let expires = null;
+
+  /** One call, reported rather than thrown. A timeout is a result, not a hang. */
+  const call = async (name, path, need) => {
+    let res;
+    try {
+      res = await fetch(`https://api.github.com/repos/${cfg.repo}${path}`, {
+        headers: {
+          authorization: `Bearer ${cfg.token}`,
+          accept: "application/vnd.github+json",
+          "user-agent": "general-sherman-admin",
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+    } catch (e) {
+      const timedOut = e?.name === "TimeoutError" || e?.name === "AbortError";
+      checks.push({
+        name, ok: false,
+        detail: timedOut
+          ? "api.github.com did not answer within eight seconds."
+          : `Could not reach api.github.com: ${e?.message || e}`,
+      });
+      return null;
+    }
+
+    /* Fine-grained tokens carry their own expiry in a response header, so "has
+       it expired?" is answerable here rather than by asking someone to look. */
+    expires = res.headers.get("github-authentication-token-expiration") || expires;
+
+    if (res.ok) {
+      checks.push({ name, ok: true });
+      return res;
+    }
+
+    const msg = await headline(res);
+
+    /* GitHub spends 403 on two unrelated things: a token without the
+       permission, and a caller who has made too many requests. Reading the
+       first as the second sends someone into the token settings to fix a
+       permission that was never wrong, so the rate limit has to be ruled out
+       before the word "permission" is used at all. */
+    const rateLimited = (res.status === 403 || res.status === 429)
+      && (res.headers.get("x-ratelimit-remaining") === "0" || /rate limit|secondary rate/i.test(msg));
+
+    let detail;
+    if (res.status === 401) {
+      detail = "GitHub rejected the token as bad credentials, so the stored value is not a usable token. " +
+        "Most often it was truncated on the way into the dashboard, or it has been revoked.";
+    } else if (rateLimited) {
+      const reset = Number(res.headers.get("x-ratelimit-reset"));
+      const when = Number.isFinite(reset) && reset > 0
+        ? ` It clears at ${new Date(reset * 1000).toISOString().slice(11, 16)} UTC.`
+        : " It clears on its own shortly.";
+      detail = `GitHub is rate-limiting these requests, so this says nothing about the token's permissions.${when}`;
+    } else if (res.status === 404) {
+      detail = "GitHub answered 404. Because a fine-grained token is not told that something it cannot see " +
+        `exists, this reads as either a wrong name or a missing permission: check GITHUB_REPO is exactly ` +
+        `"${cfg.repo}" (case does not matter, every other character does, including a trailing hyphen), and ` +
+        `that the token grants ${need} on this repository.`;
+    } else if (res.status === 403) {
+      detail = `GitHub refused with 403, which usually means the token is missing ${need}. ${msg}`;
+    } else {
+      detail = `GitHub answered ${res.status}. ${msg}`;
+    }
+    checks.push({ name, ok: false, detail });
+    return null;
+  };
+
+  const repoRes = await call("repository", "", "Contents: Read");
+  if (repoRes) {
+    const repo = await repoRes.json();
+    /* Seeing the repository is not enough to save into it. Reading is the
+       weaker permission, and the panel only ever fails on the write. */
+    checks.push(repo.permissions?.push === true
+      ? { name: "write access", ok: true }
+      : {
+        name: "write access", ok: false,
+        detail: `The token can read ${repo.full_name} but not write to it. Set Repository permissions → ` +
+          "Contents to 'Read and write' — 'Read-only' loads the panel and cannot save from it.",
+      });
+
+    const refRes = await call(`branch ${cfg.branch}`, `/git/ref/heads/${cfg.branch}`, "Contents: Read");
+    if (!refRes && checks.at(-1)?.detail?.includes("404")) {
+      checks.at(-1).detail += ` The default branch of ${repo.full_name} is "${repo.default_branch}" — if that ` +
+        "is the one you meant, set GITHUB_BRANCH to it or remove the variable and let it default.";
+    }
   }
 
-  /* Fine-grained tokens carry their own expiry in a response header, so "has it
-     expired?" is answerable here rather than by asking someone to go and look. */
-  const expires = res.headers.get("github-authentication-token-expiration") || null;
+  /* The deploy list is the one call that needs a permission nobody thinks to
+     grant: Actions, not Contents. Probing it separately means a missing
+     Actions grant reads as itself instead of as the panel being broken. */
+  await call("deploy history", "/actions/workflows/deploy-website.yml/runs?per_page=1", "Actions: Read");
 
-  if (res.status === 401) {
-    return {
-      ok: false, expires,
-      problem: "GitHub rejected GITHUB_TOKEN as bad credentials, so the stored value is not a usable token. " +
-        "Most often it was truncated on the way into the dashboard, or it has been revoked. Issue a new " +
-        "fine-grained token and paste it again, checking the whole string arrives — they start with github_pat_ " +
-        "and are long enough to be easy to clip.",
-    };
-  }
-  if (res.status === 404) {
-    return {
-      ok: false, expires,
-      problem: `GitHub answered 404 for the repository "${cfg.repo}". Because a fine-grained token is not told ` +
-        "that a repository it cannot see exists, this is either of two things and both are worth checking: " +
-        "GITHUB_REPO is misspelt (owner/name — case does not matter, but every character does, including a " +
-        "trailing hyphen), or the token was never granted this repository. In the token's settings, Repository " +
-        "access must list it under 'Only select repositories', with Repository permissions → Contents set to " +
-        "'Read and write'.",
-    };
-  }
-  if (!res.ok) {
-    return { ok: false, expires, problem: `GitHub answered ${res.status} for the repository. ${await headline(res)}` };
-  }
-
-  const repo = await res.json();
-
-  /* Being able to see the repository is not enough to save into it. Reading is
-     the weaker permission, and the panel only ever fails on the write. */
-  if (repo.permissions?.push !== true) {
-    return {
-      ok: false, expires, repo: repo.full_name,
-      problem: `The token can see ${repo.full_name} but cannot write to it. Set Repository permissions → ` +
-        "Contents to 'Read and write' — 'Read-only' is enough to load the panel and not enough to save.",
-    };
-  }
-
-  let branchOk = null;
-  try {
-    const ref = await fetch(
-      `https://api.github.com/repos/${cfg.repo}/git/ref/heads/${cfg.branch}`,
-      { headers: { authorization: `Bearer ${cfg.token}`, accept: "application/vnd.github+json", "user-agent": "general-sherman-admin" } },
-    );
-    branchOk = ref.ok;
-  } catch {
-    /* Leave it unknown. One flaky call should not be reported as a missing branch. */
-  }
-  if (branchOk === false) {
-    return {
-      ok: false, expires, repo: repo.full_name,
-      problem: `The token works, but there is no branch "${cfg.branch}" in ${repo.full_name} — the default ` +
-        `branch there is "${repo.default_branch}". Set GITHUB_BRANCH to that, or remove it and let it default.`,
-    };
-  }
-
-  return { ok: true, expires, repo: repo.full_name, branch: cfg.branch };
+  const failed = checks.filter((c) => !c.ok);
+  return {
+    ok: failed.length === 0,
+    checks,
+    expires,
+    problem: failed.length
+      ? failed.map((c) => `${c.name}: ${c.detail}`).join(" ")
+      : null,
+  };
 }
 
 /** The first useful line of a GitHub error body, for putting inside a sentence. */

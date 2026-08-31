@@ -649,7 +649,22 @@ addEventListener("beforeunload", (e) => { if (dirty()) e.preventDefault(); });
       }
     }
 
-    if (!session.ready) { main.replaceChildren(el("p", { class: "empty", text: session.error })); return; }
+    /* Every call reported by name, not just the verdict. "The panel does not
+       work" and "the deploy list needs one more permission" are very different
+       afternoons, and only the list of checks tells them apart. */
+    /* Explicitly false, not merely falsy: ?probe=0 answers with null to mean
+       "GitHub was not asked", and that is not a failure to report. */
+    if (session.ready === false) {
+      const failed = (session.checks || []).filter((c) => !c.ok);
+      main.replaceChildren(el("div", { class: "card" },
+        el("h3", { text: "The panel cannot reach the repository" }),
+        ...(failed.length
+          ? failed.map((c) => el("p", {}, el("strong", { text: `${c.name}: ` }), c.detail))
+          : [el("p", { text: session.error })]),
+        el("p", { class: "sub", text: `Checked ${session.repo} on branch ${session.branch}. Fix this in the token's settings on GitHub, or under Settings → Variables and Secrets on the Pages project, then reload.` }),
+      ));
+      return;
+    }
 
     const { content, commit } = await api("/api/content");
     state.content = content;
