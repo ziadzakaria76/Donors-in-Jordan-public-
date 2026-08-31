@@ -74,7 +74,7 @@ fun PortalHealthScreen(
                 Text(
                     if (broken == 0) {
                         "All read successfully. A portal reading 0 read fine and had " +
-                            "nothing for Jordan -- that is different from a failure."
+                            "nothing in scope -- that is different from a failure."
                     } else {
                         "$broken could not be read. Anything they published is missing " +
                             "from this report, and the report cannot tell you what."
@@ -178,18 +178,25 @@ private fun PortalRow(portal: PortalStatus, onOpenUrl: (String) -> Unit) {
 private fun countSentence(portal: PortalStatus): String {
     val scanned = portal.scanned
     return when {
+        // "IN SCOPE", NOT A COUNTRY NAME. This app drives two monitors, and
+        // these sentences named Jordan unconditionally -- so a Syria run's
+        // Health tab, the screen this file's own header calls the honesty
+        // mechanism, reported "85 Jordan notices" over Syrian ones. The report
+        // does not carry a country for the run, only per tender, and inventing
+        // one here would be the same mistake in a different place. The
+        // pipeline's own word for what survived its country gate is "in scope".
         scanned == null && portal.count == 0 ->
-            "Read successfully. No Jordan notices, and this portal does not report " +
+            "Read successfully. Nothing in scope, and this portal does not report " +
                 "how many it looked at."
         scanned == null ->
-            "${portal.count} Jordan notice${plural(portal.count)}."
+            "${portal.count} notice${plural(portal.count)} in scope."
         scanned == portal.count ->
-            "${portal.count} notice${plural(portal.count)}, all of them Jordan."
+            "${portal.count} notice${plural(portal.count)}, all of them in scope."
         portal.count == 0 ->
-            "Read $scanned notice${plural(scanned)}; none were Jordan. The portal " +
+            "Read $scanned notice${plural(scanned)}; none in scope. The portal " +
                 "worked -- there was simply nothing here."
         else ->
-            "${portal.count} Jordan of $scanned read " +
+            "${portal.count} in scope of $scanned read " +
                 "(${portal.filteredOut} filtered out)."
     }
 }

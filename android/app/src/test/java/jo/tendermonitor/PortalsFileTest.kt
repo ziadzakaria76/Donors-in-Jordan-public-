@@ -2,6 +2,7 @@ package jo.tendermonitor
 
 import jo.tendermonitor.data.portals.EntryRules
 import jo.tendermonitor.data.portals.PortalsFile
+import jo.tendermonitor.data.portals.PortalsRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -275,5 +276,58 @@ class EntryRulesTest {
         assertNull(EntryRules.tierProblem(3))
         assertNotNull(EntryRules.tierProblem(0))
         assertNotNull(EntryRules.tierProblem(9))
+    }
+}
+
+/**
+ * Which country's portal file the app edits.
+ *
+ * The Portals screen commits through the Contents API, and `PATH` was a
+ * constant while `workflowFile` was a setting -- so with Settings pointed at
+ * the Syria monitor the screen read Jordan's list, showed Jordan's portals as
+ * though they were the running monitor's, and a save rewrote the OTHER
+ * country's configuration. A commit that lands, on the wrong file, reads as
+ * success.
+ */
+class PortalsFilePathTest {
+
+    @Test
+    fun `the Jordan monitor edits the Jordan portal file`() {
+        assertEquals(
+            "jordan_tender_monitor/portals.json",
+            PortalsFile.pathFor("monitor.yml"),
+        )
+    }
+
+    @Test
+    fun `a workflow given with its directory still resolves`() {
+        assertEquals(
+            PortalsFile.PATH,
+            PortalsFile.pathFor(".github/workflows/monitor.yml"),
+        )
+    }
+
+    @Test
+    fun `the Syria monitor has no editable portal file, and does not borrow Jordan's`() {
+        // Syria's portals live in syria_tender_monitor/config.yml, which this
+        // file's schema cannot describe. Null is the honest answer; falling
+        // back to PATH is the bug.
+        assertNull(
+            PortalsFile.pathFor("syria-monitor.yml"),
+        )
+    }
+
+    @Test
+    fun `an unknown or blank workflow is refused rather than defaulted`() {
+        assertNull(PortalsFile.pathFor("other.yml"))
+        assertNull(PortalsFile.pathFor(""))
+    }
+
+    @Test
+    fun `the refusal names both the file it edits and the workflow in use`() {
+        val problem = PortalsRepository.notThisMonitorsFile("syria-monitor.yml")
+        assertTrue(problem.detail.contains("jordan_tender_monitor/portals.json"))
+        assertTrue(problem.detail.contains("syria-monitor.yml"))
+        assertTrue(problem.fixHint.orEmpty().contains("monitor.yml"))
     }
 }

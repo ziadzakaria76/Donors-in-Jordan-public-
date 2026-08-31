@@ -48,8 +48,10 @@ class PortalsRepository(
 
     suspend fun load(): Outcome<LoadedFile> = withContext(Dispatchers.IO) {
         val config = settings.settings()
+        val path = PortalsFile.pathFor(config.workflowFile)
+            ?: return@withContext Outcome.Failed(notThisMonitorsFile(config.workflowFile))
         val response = client.call("reading the portal list") { api ->
-            api.fileContents(config.repoOwner, config.repoName, PortalsFile.PATH)
+            api.fileContents(config.repoOwner, config.repoName, path)
         }
         when (response) {
             is Outcome.Failed -> response
@@ -99,12 +101,18 @@ class PortalsRepository(
         message: String,
     ): Outcome<CommitResult> = withContext(Dispatchers.IO) {
         val config = settings.settings()
+        // Checked again on the way out, not only on the way in: load() is what
+        // normally stops this screen being reachable, but a save is the call
+        // that writes to somebody's repository and it must not depend on an
+        // earlier screen having done the right thing.
+        val path = PortalsFile.pathFor(config.workflowFile)
+            ?: return@withContext Outcome.Failed(notThisMonitorsFile(config.workflowFile))
         val encoded = Base64.getEncoder()
             .encodeToString(PortalsFile.serialise(root).toByteArray(Charsets.UTF_8))
 
         val response = client.call("saving the portal list") { api ->
             api.putFile(
-                config.repoOwner, config.repoName, PortalsFile.PATH,
+                config.repoOwner, config.repoName, path,
                 PutFileRequest(message = message, content = encoded, sha = sha),
             )
         }
@@ -197,6 +205,14 @@ class PortalsRepository(
      */
     suspend fun startProbe(candidate: JsonObject, ref: String = "main"): Outcome<Long?> {
         val config = settings.settings()
+        // Refused here rather than by the workflow. syria-monitor.yml declares
+        // this mode only so the dispatch is not rejected as an unknown input,
+        // and fails the run with a message saying --probe is Jordan-only. That
+        // is the right server-side answer, but it costs a run and a wait to
+        // deliver news the app already had.
+        if (PortalsFile.pathFor(config.workflowFile) == null) {
+            return Outcome.Failed(notThisMonitorsFile(config.workflowFile))
+        }
         val before = client.call("listing the workflow's runs") { api ->
             api.workflowRuns(config.repoOwner, config.repoName, config.workflowFile, 1)
         }.valueOrNull()?.runs?.firstOrNull()?.id
@@ -318,5 +334,25 @@ class PortalsRepository(
     companion object {
         /** Must match monitor.yml exactly; a choice input is matched literally. */
         const val PROBE_MODE = "test a candidate portal (--probe)"
+
+        /**
+         * Said plainly, because the alternative is worse than an error.
+         *
+         * Falling back to Jordan's file would show one country's portals while
+         * the app is running another's, and a save would commit to it. The
+         * screen is not broken and neither is the monitor -- this monitor keeps
+         * its portals somewhere this file's schema cannot describe.
+         */
+        fun notThisMonitorsFile(workflowFile: String) = Problem(
+            headline = "This monitor's portals are not editable here",
+            detail = "The Portals screen edits ${PortalsFile.PATH}, which belongs " +
+                "to the Jordan monitor. Settings is pointed at " +
+                "${workflowFile.ifBlank { "no workflow" }}, whose portals are " +
+                "configured in its own config.yml and are not in this file's " +
+                "format.",
+            kind = Kind.NOT_FOUND,
+            fixHint = "Point Settings at monitor.yml to edit the Jordan portal " +
+                "list. The other monitor's portals are edited in the repository.",
+        )
     }
 }

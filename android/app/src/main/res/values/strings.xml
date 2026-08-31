@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Jordan Tenders</string>
+    <!-- The launcher label, and the only place the app names itself to the
+         user. It drives two monitors now: pointing Settings at
+         syria-monitor.yml is supported and works, so a label reading
+         "Jordan Tenders" over a screen of Syria notices is wrong.
+         The applicationId stays jo.tendermonitor deliberately -- changing
+         it installs a SECOND app rather than upgrading this one, losing
+         the stored token and the run history. Only the label moves. -->
+    <string name="app_name">Tender Monitor</string>
 </resources>
