@@ -20,6 +20,32 @@ plugins {
 val apkVersionCode = (System.getenv("APK_VERSION_CODE") ?: "1").toIntOrNull() ?: 1
 val apkVersionName = System.getenv("APK_VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "dev"
 
+/**
+ * The signing key, shared across builds so one can upgrade another.
+ *
+ * WITHOUT THIS, NO CI BUILD COULD EVER UPDATE ANOTHER. Gradle signs debug
+ * builds with ~/.android/debug.keystore and GENERATES ONE AT RANDOM when the
+ * file is absent. Every GitHub runner is a fresh machine with no keystore, so
+ * every run produced an APK signed by a different throwaway key, and Android
+ * refuses to install one over another: "App not installed", with nothing said
+ * about signatures. The only way through was uninstall and re-authenticate --
+ * on every single update.
+ *
+ * The old comment here said debug signing was deliberate because "a release
+ * keystore that is lost means never updating that install again". The reasoning
+ * was sound; the setup delivered exactly the outcome it feared, every build.
+ *
+ * The key is not in the repository -- this one is public. CI restores it from
+ * the ANDROID_KEYSTORE_BASE64 secret. With no secret set the build still works
+ * and still produces an installable APK; it just cannot upgrade a previous one,
+ * and the workflow says so rather than letting it be discovered on a handset.
+ */
+private val sharedKeystore: java.io.File? =
+    System.getenv("ANDROID_KEYSTORE_PATH")
+        ?.takeIf { it.isNotBlank() }
+        ?.let(::File)
+        ?.takeIf { it.isFile }
+
 android {
     namespace = "jo.tendermonitor"
     compileSdk = 35
@@ -37,13 +63,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (sharedKeystore != null) {
+            create("shared") {
+                storeFile = sharedKeystore
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
-            // Debug-signed, and that is deliberate for now: the APK is
-            // installed from the phone by the one person who builds it, and a
-            // release keystore that is lost means never updating that install
-            // again. See ANDROID.md.
+            // Debug BUILD TYPE, but not necessarily the throwaway debug KEY.
+            // When CI has restored the shared keystore this is signed with it,
+            // so this build can upgrade the last one. See ANDROID.md.
             isMinifyEnabled = false
+            if (sharedKeystore != null) {
+                signingConfig = signingConfigs.getByName("shared")
+            }
         }
         release {
             isMinifyEnabled = false

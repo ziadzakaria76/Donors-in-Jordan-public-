@@ -83,8 +83,30 @@ jobs:
       # Debug-signed, deliberately, and the release notes say so. A release
       # keystore that is lost means every existing install can never be
       # updated again -- see ANDROID.md before changing this.
+      - name: Restore the shared signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          # NO SECRET IS NOT A BUILD FAILURE, but it is worth saying out loud.
+          # Without the shared key Gradle invents a throwaway debug key, and the
+          # APK cannot be installed over any earlier one -- Android answers
+          # "App not installed" and names no cause.
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set. This release APK is signed with a throwaway key and CANNOT upgrade an existing install."
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/shared.jks"
+          echo "path=$RUNNER_TEMP/shared.jks" >> "$GITHUB_OUTPUT"
+
       - name: Build the APK
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleDebug
 
       - name: Name it after the version, and checksum it
