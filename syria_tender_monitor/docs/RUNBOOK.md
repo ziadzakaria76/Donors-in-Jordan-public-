@@ -36,7 +36,7 @@ and are unrelated.
 ```bash
 cd syria_tender_monitor                 # every path below is relative to here
 pip install -r requirements-dev.txt
-python -m pytest tests/ -q              # expect: 508 passed, 1 skipped
+python -m pytest tests/ -q              # expect: 511 passed, 1 skipped
                                         # (the skip is the browser test; it
                                         #  passes once Playwright is installed)
 python -m pyflakes src/ tests/          # expect: no output
