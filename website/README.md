@@ -281,9 +281,19 @@ formEndpoint: "https://api.web3forms.com/submit",
 formFields: { access_key: "a61a7c6f-…" },
 ```
 
-**To change which inbox receives them,** do it in the Web3Forms dashboard, not
-here — the key identifies the form, not the address, so the recipient can move
-without a deploy. They currently go to the account that created the form.
+**The key decides which inbox receives them, and nothing here records which
+inbox that is.** It was issued against the account that set the form up, not
+against the address the site publishes. Treat the destination as unverified
+until a test enquiry has actually arrived somewhere — reading this file cannot
+tell you, and neither can the admin panel.
+
+**To move it:** have Web3Forms issue a key to the address you want at
+web3forms.com, then replace the key above. An earlier version of this section
+said the recipient could be changed in a dashboard while the key stayed the
+same. That was never verified and is probably wrong — Web3Forms issues a key
+against an email address, so reissuing is the route known to work. If a
+recipient setting does exist on your plan it saves a deploy, but confirm it with
+a test enquiry rather than assuming.
 
 **Emptying the key switches capture off, it does not break it.** A blank key
 would otherwise still POST to a real URL, be rejected for the missing key, and
