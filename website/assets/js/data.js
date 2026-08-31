@@ -58,9 +58,16 @@ const COMPANY = {
      not open one. So it belongs here rather than in a secret a static host has
      no way to read, and anything the browser must send is visible anyway.
 
-     Enquiries currently land in ziadzakaria76@gmail.com, the account that
-     created the form. Change the recipient in the Web3Forms dashboard, not
-     here — the key stays the same.
+     This key decides where enquiries land, and nothing in this repository
+     records which inbox that is. It was issued against the account that set
+     the form up, which is not the address the site publishes — so treat the
+     destination as unverified until a real test enquiry has arrived somewhere.
+
+     To move it: have Web3Forms issue a key to the address you want, and put
+     that key here. An earlier note claimed the recipient could be changed in a
+     dashboard while the key stayed the same; that was never verified, and
+     Web3Forms issues a key against an email address, so reissuing is the route
+     that is known to work.
 
      Emptying this switches capture off rather than breaking it: captureReady()
      skips the POST entirely, and every form still hands the enquiry to
