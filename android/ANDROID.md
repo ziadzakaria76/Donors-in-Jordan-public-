@@ -400,3 +400,53 @@ cd android
 
 Needs JDK 17 and an Android SDK with API 35. CI does both on every push that
 touches `android/`.
+
+
+## Signing, and why an update used to fail
+
+**Every CI build used to be signed with a different key.** Gradle signs debug
+builds with `~/.android/debug.keystore` and *generates one at random when the
+file is absent*. Every GitHub runner is a fresh machine with no keystore, so
+each run produced an APK signed by a throwaway key — and Android refuses to
+install one over another. The symptom is `App not installed`, which names no
+cause; the only way through was uninstall and re-authenticate, on every update.
+
+The build now signs with a shared key when CI can supply one, restored from a
+repository secret. The key is **not in this repository** — it is public.
+
+### Setting it up (once)
+
+Create four repository secrets under **Settings → Secrets and variables →
+Actions**:
+
+| Secret | What it holds |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | the keystore file, base64-encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | its store password |
+| `ANDROID_KEY_ALIAS` | the key alias inside it |
+| `ANDROID_KEY_PASSWORD` | the key password |
+
+To make a keystore yourself, on any machine with a JDK:
+
+```bash
+keytool -genkeypair -v -keystore signing.jks -alias tender-monitor \
+  -keyalg RSA -keysize 4096 -validity 10950 \
+  -dname "CN=Tender Monitor"
+base64 -w0 signing.jks        # paste this into ANDROID_KEYSTORE_BASE64
+```
+
+**Keep the file.** Losing it means the same problem again: no future build can
+upgrade the installs signed with it, and everyone re-installs from scratch.
+
+### With no secret set
+
+The build still succeeds and still produces an installable APK. It just cannot
+upgrade an earlier install, and the workflow emits a warning saying so — the
+failure is announced at build time rather than discovered on a handset.
+
+### Changing the key later
+
+Any change of signing key breaks upgrades for every existing install, exactly
+as the random-key situation did. There is no migration; it is uninstall and
+re-authenticate for each device.
+

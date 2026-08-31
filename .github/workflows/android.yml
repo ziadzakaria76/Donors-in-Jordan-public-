@@ -103,7 +103,29 @@ jobs:
             echo 'Full report: the "android-test-report" artifact on this run.'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Restore the shared signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          # NO SECRET IS NOT A BUILD FAILURE, but it is worth saying out loud.
+          # Without the shared key Gradle invents a throwaway debug key, and the
+          # APK cannot be installed over any earlier one -- Android answers
+          # "App not installed" and names no cause.
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set. This APK is signed with a throwaway key and CANNOT upgrade an existing install -- it needs an uninstall first, which loses the stored token. See android/ANDROID.md."
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/shared.jks"
+          echo "path=$RUNNER_TEMP/shared.jks" >> "$GITHUB_OUTPUT"
+
       - name: Build the debug APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.signing.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon assembleDebug
 
       # Named after the version it reports, not after the run: the run number
