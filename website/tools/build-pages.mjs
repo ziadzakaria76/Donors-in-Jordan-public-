@@ -61,11 +61,28 @@ const COMPARE = `<!-- Comparison. A table, not three cards side by side: the que
 
 const SITE = "https://general-sherman-housing.com";
 
-function head({ file, title, desc, keywords = "", noindex = false }) {
+/** Escape a string for use inside a double-quoted HTML attribute. */
+const attr = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
+/* The served <title> stays Arabic on every page, and the English one rides
+   along in an attribute for the switcher to use.
+
+   Both languages live in one file here, chosen in the browser, so the title in
+   the markup is the one a crawler sees — and Arabic is this site's primary
+   language, named in <html lang> and in the canonical of every page. Rendering
+   an English title into the file to please the switcher would hand crawlers the
+   wrong language for the wrong URL.
+
+   What the reader gets is a different question. Switching to English used to
+   leave the browser tab in Arabic, so a bookmark or a second tab still read as
+   Arabic while the page in front of them did not. i18n.js reads these two
+   attributes and sets document.title, which changes what the reader sees and
+   nothing that is served. */
+function head({ file, title, titleEn, desc, keywords = "", noindex = false }) {
   const url = `${SITE}/${file === "index.html" ? "" : file}`;
   return `<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title}</title>
+<title data-title-ar="${attr(title)}" data-title-en="${attr(titleEn)}">${title}</title>
 <meta name="description" content="${desc}">${keywords ? `\n<meta name="keywords" content="${keywords}">` : ""}
 ${noindex ? '<meta name="robots" content="noindex">' : `<link rel="canonical" href="${url}">
 <link rel="alternate" hreflang="ar" href="${url}">
@@ -142,6 +159,7 @@ const PAGES = [];
 PAGES.push({
   file: "projects.html",
   title: "مشاريعنا | شركة جنرال شيرمان للإسكان",
+  titleEn: "Our projects | General Sherman Housing",
   desc: "مشاريع شركة جنرال شيرمان للإسكان في غرب عمّان. تُنشر تفاصيل كل مشروع ووحداته على هذه الصفحة فور اعتمادها.",
   keywords: "مشاريع سكنية عمان, شقق للبيع في عمان, شركة إسكان الأردن",
   scripts: ["pages.js"],
@@ -170,6 +188,7 @@ ${pageHero({
 PAGES.push({
   file: "project.html",
   title: "تفاصيل المشروع | شركة جنرال شيرمان للإسكان",
+  titleEn: "Project details | General Sherman Housing",
   desc: "تفاصيل المشروع: المخططات، الوحدات المتاحة، جدول التوفّر، والموقع على الخريطة.",
   scripts: ["pages.js", "project.js"],
   modals: [ENQUIRY, LIGHTBOX],
@@ -331,6 +350,7 @@ PAGES.push({
 PAGES.push({
   file: "units.html",
   title: "الوحدات المتاحة — شقق للبيع في عمّان بالمساحة والسعر | جنرال شيرمان",
+  titleEn: "Available units — apartments for sale in Amman, by size and price | General Sherman",
   desc: "الوحدات المتاحة للبيع في مشاريع شركة جنرال شيرمان للإسكان في مرج الحمام، بمساحاتها وأسعارها وطوابقها.",
   keywords: "شقق للبيع في عمان, أسعار الشقق في عمان, شقق 3 غرف عمان, شقق بحديقة عمان",
   scripts: ["pages.js", "units.js", "compare.js"],
@@ -379,6 +399,7 @@ ${pageHero({
 PAGES.push({
   file: "gallery.html",
   title: "معرض الصور — مشاريع شركة جنرال شيرمان للإسكان في عمّان",
+  titleEn: "Gallery — General Sherman Housing projects in Amman",
   desc: "معالجات معمارية للواجهات والمساحات الداخلية والمرافق المشتركة من شركة جنرال شيرمان للإسكان.",
   scripts: ["pages.js"],
   modals: [LIGHTBOX],
@@ -411,6 +432,7 @@ ${pageHero({
 PAGES.push({
   file: "about.html",
   title: "عن الشركة — كيف تبني شركة جنرال شيرمان للإسكان في عمّان",
+  titleEn: "About us — how General Sherman Housing builds in Amman",
   desc: "كيف تختار جنرال شيرمان الأرض، وكيف تبني، وما الذي تضمنه بعد التسليم: أربعة التزامات ومسار واضح من الزيارة الأولى إلى تسليم المفتاح.",
   scripts: ["pages.js"],
   modals: [],
@@ -505,6 +527,7 @@ ${pageHero({
 PAGES.push({
   file: "contact.html",
   title: "اتصل بنا — شركة جنرال شيرمان للإسكان، عمّان",
+  titleEn: "Contact us — General Sherman Housing, Amman",
   desc: "تواصل مع فريق مبيعات جنرال شيرمان: هاتف، واتساب، بريد إلكتروني، أو احجز زيارة لأحد المشاريع في عمّان.",
   scripts: ["pages.js"],
   modals: [],
@@ -598,6 +621,7 @@ ${pageHero({
 PAGES.push({
   file: "404.html",
   title: "الصفحة غير موجودة | شركة جنرال شيرمان للإسكان",
+  titleEn: "Page not found | General Sherman Housing",
   desc: "الصفحة المطلوبة غير موجودة.",
   noindex: true,
   scripts: ["pages.js"],
@@ -621,6 +645,7 @@ PAGES.push({
 PAGES.push({
   file: "faq.html",
   title: "أسئلة شائعة — شراء شقة من شركة جنرال شيرمان للإسكان",
+  titleEn: "Frequently asked questions — buying an apartment from General Sherman Housing",
   desc: "التملّك لغير الأردنيين، وما يشمله السعر، وتعديل التشطيبات، والضمانات بعد التسليم، والشراء بغرض التأجير.",
   keywords: "تملك الأجانب في الأردن, ضمانات التسليم, شراء شقة في عمّان",
   scripts: ["pages.js"],
