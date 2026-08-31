@@ -4,8 +4,10 @@
          user. It drives two monitors now: pointing Settings at
          syria-monitor.yml is supported and works, so a label reading
          "Jordan Tenders" over a screen of Syria notices is wrong.
-         The applicationId stays jo.tendermonitor deliberately -- changing
-         it installs a SECOND app rather than upgrading this one, losing
-         the stored token and the run history. Only the label moves. -->
+         The applicationId stays jo.tendermonitor deliberately, because
+         changing it installs a SECOND app rather than upgrading this one,
+         losing the stored token and the run history. Only the label moves.
+         (No double hyphen anywhere above: XML forbids it inside a comment,
+         and the resource merger fails the build rather than warning.) -->
     <string name="app_name">Tender Monitor</string>
 </resources>
