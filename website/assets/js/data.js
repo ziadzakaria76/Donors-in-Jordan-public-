@@ -407,7 +407,7 @@ const PROCESS = [
 
 const FAQS = [
   {
-    q: { ar: "هل يمكن لغير الأردنيين تملّك شقة؟", en: "Can non-Jordanians buy an apartment?" },
+    q: { ar: "1- هل يمكن لغير الأردنيين تملّك شقة؟", en: "Can non-Jordanians buy an apartment?" },
     a: {
       ar: "نعم. يستطيع مواطنو الدول العربية والأجانب التملّك في الأردن بموافقة من رئاسة الوزراء، ونتولى نحن تجهيز المعاملة ومتابعتها. المدة المعتادة بين شهرين وأربعة أشهر.",
       en: "Yes. Arab and foreign nationals may own property in Jordan subject to Cabinet approval, and we prepare and follow up the application for you. It usually takes two to four months.",
