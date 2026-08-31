@@ -347,6 +347,14 @@ class UngmPortal(HtmlPortal):
         # The sibling Jordan monitor reached this the expensive way: its text
         # filter was discarding 51 of 70 notices, and the kept count ROSE when
         # the bug was introduced (3 to 19), so it read as an improvement.
+        #
+        # DECLARED, because the gate cannot tell this apart from a country the
+        # page actually printed. The live run of 2026-08-31 kept 85 of 85 rows,
+        # and the report's third and sixth entries were a "Global and Regional"
+        # child-wasting study and an IMO greenhouse-gas study -- neither of them
+        # this country's work. Whether to keep admitting those is a judgement
+        # about recall against precision; reporting the count is not.
         if not record.get("country") and MULTI_DESTINATION_RE.search(row.text or ""):
             record["country"] = self.profile.get("name", "")
+            record["country_inferred"] = "ungm_multiple_destinations"
         return record

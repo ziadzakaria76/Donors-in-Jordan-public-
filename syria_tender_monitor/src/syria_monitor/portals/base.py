@@ -45,6 +45,13 @@ class PortalOutcome:
         if not self.available:
             return f"{self.label}: UNAVAILABLE -- {self.error} ({self.url})"
         suffix = " [rendered in a browser]" if self.rendered_with_browser else ""
+        # Counted here rather than left to the spreadsheet: "85 kept of 85" reads
+        # as a portal working perfectly, and gives no hint that most of those
+        # rows never named this country and were admitted on an inference.
+        inferred = sum(1 for t in self.tenders
+                       if any(f.startswith("country_inferred:") for f in t.flags))
+        if inferred:
+            suffix += f" ({inferred} country inferred)"
         return (f"{self.label}: ok -- {len(self.tenders)} kept of "
                 f"{self.stats.seen} fetched{suffix}")
 
@@ -110,6 +117,15 @@ class BasePortal:
             tender.add_flag(f"value_{value.currency}_{value.amount:,.0f}")
         if closing is None:
             tender.add_flag("deadline_not_published")
+        # A COUNTRY THE PORTAL INFERRED IS NOT A COUNTRY THE PORTAL PUBLISHED.
+        # gate.py reads the country FIELD as authoritative and consults text only
+        # when no field exists, so a portal that writes a country in for a row
+        # that never named one has manufactured the strongest signal the gate
+        # has -- and every later check is bypassed. That can be the right call
+        # (see ungm.row_to_record), but it must not be invisible: downstream,
+        # country_fields shows the value and nothing shows where it came from.
+        if record.get("country_inferred"):
+            tender.add_flag(f"country_inferred:{record['country_inferred']}")
         for f in value.flags:
             tender.add_flag(f)
         return tender
