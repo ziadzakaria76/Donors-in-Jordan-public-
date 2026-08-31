@@ -91,7 +91,23 @@ export async function identify(request, env) {
     return { error: "Unreadable Access assertion.", status: 401 };
   }
 
-  const keys = await accessKeys(env.ACCESS_TEAM_DOMAIN);
+  /* Fetching Cloudflare's signing keys is the one step here that reaches the
+     network, so it is the one that can fail for reasons nothing else explains:
+     a mistyped ACCESS_TEAM_DOMAIN, or Cloudflare having a moment. Letting it
+     throw hands the browser an opaque 502 from the platform — the failure says
+     nothing, and the person reading it has no idea which of five variables to
+     look at. Naming the domain that failed is the whole difference. */
+  let keys;
+  try {
+    keys = await accessKeys(env.ACCESS_TEAM_DOMAIN);
+  } catch (e) {
+    return {
+      error: `Could not fetch Cloudflare Access signing keys from ${env.ACCESS_TEAM_DOMAIN} (${e.message || e}). ` +
+        "Check ACCESS_TEAM_DOMAIN — it should be your team domain with no https:// and no trailing slash, " +
+        "and it must match the one in Zero Trust -> Settings -> Team domain.",
+      status: 502,
+    };
+  }
   const key = keys.get(head.kid);
   if (!key) return { error: "Access assertion signed by an unknown key.", status: 401 };
 
@@ -225,6 +241,26 @@ export async function commitFiles(cfg, { files, message, expect, author }) {
   });
 
   return { commit: commit.sha };
+}
+
+/**
+ * Run a route so that nothing it throws reaches the platform.
+ *
+ * An uncaught throw in a Pages Function becomes a Cloudflare error page: a bare
+ * 502 with no body, no clue, and nothing the person configuring this can act
+ * on. Every other failure in this panel names itself; these should too.
+ */
+export function guard(handler) {
+  return async (context) => {
+    try {
+      return await handler(context);
+    } catch (e) {
+      return json({
+        error: `The admin API failed unexpectedly: ${e?.message || e}`,
+        where: new URL(context.request.url).pathname,
+      }, 500);
+    }
+  };
 }
 
 export { gh };

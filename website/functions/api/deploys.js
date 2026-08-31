@@ -10,9 +10,9 @@
  * commit you just made has actually reached the site.
  */
 
-import { json, identify, repoConfig, gh } from "./_lib.js";
+import { json, identify, repoConfig, gh , guard } from "./_lib.js";
 
-export async function onRequest({ request, env }) {
+export const onRequest = guard(async ({ request, env }) => {
   const who = await identify(request, env);
   if (who.error) return json({ error: who.error }, who.status);
 
@@ -34,4 +34,4 @@ export async function onRequest({ request, env }) {
   } catch (e) {
     return json({ error: String(e.message || e) }, 502);
   }
-}
+});

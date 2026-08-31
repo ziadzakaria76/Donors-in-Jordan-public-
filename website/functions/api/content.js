@@ -8,14 +8,14 @@
  * `git revert` rather than a support request.
  */
 
-import { json, identify, repoConfig, readFile, commitFiles } from "./_lib.js";
+import { json, identify, repoConfig, readFile, commitFiles, guard } from "./_lib.js";
 import { render } from "../../tools/render-data.mjs";
 import { validate } from "../../tools/validate-content.mjs";
 
 const CONTENT = "website/content.json";
 const DATA = "website/assets/js/data.js";
 
-export async function onRequest({ request, env }) {
+export const onRequest = guard(async ({ request, env }) => {
   const who = await identify(request, env);
   if (who.error) return json({ error: who.error }, who.status);
 
@@ -97,4 +97,4 @@ export async function onRequest({ request, env }) {
   } catch (e) {
     return json({ error: String(e.message || e) }, 502);
   }
-}
+});
