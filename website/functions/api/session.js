@@ -6,9 +6,9 @@
  * than a save button that fails at the end of a long edit.
  */
 
-import { json, identify, repoConfig } from "./_lib.js";
+import { json, identify, repoConfig , guard } from "./_lib.js";
 
-export async function onRequest({ request, env }) {
+export const onRequest = guard(async ({ request, env }) => {
   const who = await identify(request, env);
   if (who.error) return json({ error: who.error }, who.status);
 
@@ -20,4 +20,4 @@ export async function onRequest({ request, env }) {
     ready: !cfg.error,
     error: cfg.error || null,
   });
-}
+});
