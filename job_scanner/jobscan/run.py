@@ -83,13 +83,22 @@ class RunLog:
         return sorted(self._records.values(), key=lambda r: r.source_key)
 
     def totals(self) -> dict[str, int]:
+        """Counts over real sources only.
+
+        Run-level messages are recorded against a "__run__" pseudo-source so
+        they reach the sheet, but counting it as an employer makes the report
+        claim more sources than sources.yaml contains.
+        """
+        real = [r for r in self._records.values() if not r.source_key.startswith("__")]
+        by_status = lambda status: sum(1 for r in real if r.status == status)  # noqa: E731
         return {
-            "sources": len(self._records),
-            "ok": sum(1 for r in self._records.values() if r.status == "ok"),
-            "empty": sum(1 for r in self._records.values() if r.status == "empty"),
-            "error": sum(1 for r in self._records.values() if r.status == "error"),
-            "blocked": sum(1 for r in self._records.values() if r.status == "blocked"),
-            "skipped": sum(1 for r in self._records.values() if r.status == "skipped"),
-            "fetched": sum(r.fetched for r in self._records.values()),
-            "kept": sum(r.kept for r in self._records.values()),
+            "sources": len(real),
+            "ok": by_status("ok"),
+            "empty": by_status("empty"),
+            "error": by_status("error"),
+            "blocked": by_status("blocked"),
+            "skipped": by_status("skipped"),
+            "attempted": by_status("ok") + by_status("empty") + by_status("error") + by_status("blocked"),
+            "fetched": sum(r.fetched for r in real),
+            "kept": sum(r.kept for r in real),
         }

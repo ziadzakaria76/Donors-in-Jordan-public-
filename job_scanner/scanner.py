@@ -45,6 +45,28 @@ def note(source_key: str, message: str) -> None:
     _ACTIVE_RUN.note(source_key, message)
 
 
+# Reading these apart matters for what you do next. A gateway refusal is not
+# the employer's doing and no amount of reconfiguring the adapter will fix it;
+# a login wall means the vacancies are behind a session; a missing endpoint
+# means discovery has not been run yet. Lumping all three under "error" sends
+# the next person to debug the wrong layer.
+_BLOCKED_MARKERS = (
+    "proxy refused",
+    "connect_rejected",
+    "tunnel connection failed",
+    "403 to connect",
+    "connection failed",
+)
+_AUTH_MARKERS = ("http 401", "http 403", "sign in", "log in", "login", "authentication")
+
+
+def _classify(error: str) -> str:
+    low = error.lower()
+    if any(marker in low for marker in _BLOCKED_MARKERS):
+        return "blocked"
+    return "error"
+
+
 def _scan_source(source: dict, fetcher: Fetcher, run_log: RunLog) -> list:
     key = source["key"]
     record = run_log.record(
@@ -81,8 +103,20 @@ def _scan_source(source: dict, fetcher: Fetcher, run_log: RunLog) -> list:
         adapter = adapters.get(source["platform"])
         postings = adapter(source, fetcher, record.note)
     except AdapterError as exc:
-        record.status = "error"
+        record.status = _classify(str(exc))
         record.error = str(exc)
+        if record.status == "blocked":
+            record.note(
+                "refused before the request reached the site -- this is a network or "
+                "egress-policy block, not an employer-side failure. Re-run from a "
+                "network that can reach the host."
+            )
+        elif any(marker in str(exc).lower() for marker in _AUTH_MARKERS):
+            record.note(
+                "the response looks like an authentication wall: these vacancies need a "
+                "login or an established session, which is a different problem from "
+                "needing a different capture approach"
+            )
         record.duration_ms = int((time.monotonic() - started) * 1000)
         return []
     except Exception as exc:  # an adapter bug must not end the run
@@ -107,11 +141,39 @@ def scan(cfg, only=None, delay=None):
     scorer = Scorer(cfg.profile)
 
     selected = cfg.select(only)
+    selected_keys = {s["key"] for s in selected}
+
+    # Account for every configured source, not just the ones attempted. A
+    # source that is silently absent from Run status is indistinguishable from
+    # one that was checked and found empty -- and "why is this employer not in
+    # the report?" is the first question the sheet should answer.
+    for source in cfg.sources:
+        if source["key"] in selected_keys:
+            continue
+        record = run_log.record(
+            source["key"],
+            name=source.get("name", ""),
+            platform=source.get("platform", ""),
+            verified=source.get("verified", "unconfirmed"),
+            endpoint=source.get("careers_url") or "",
+            status="skipped",
+        )
+        if source.get("permanently_disabled"):
+            record.note("permanently disabled; not attempted")
+        elif not source.get("enabled"):
+            record.note("disabled in sources.yaml; not attempted")
+        else:
+            record.note("not selected by --only")
+        reason = str(source.get("note", "")).strip()
+        if reason:
+            record.note(reason)
+
     if not selected:
         note(
             "__run__",
-            "no sources selected: every source in sources.yaml is disabled, and no "
-            "--only was given",
+            "no sources were attempted: every source in sources.yaml is disabled and no "
+            "--only was given. This is a configuration state, not an employer with no "
+            "vacancies.",
         )
 
     collected: list = []
@@ -162,8 +224,9 @@ def _report(run_log, postings) -> None:
             f"{record.kept:>5}  {detail[:110]}"
         )
     print(
-        f"\n{totals['sources']} source(s) attempted · {totals['ok']} ok · "
-        f"{totals['empty']} empty · {totals['error']} error · {totals['skipped']} skipped"
+        f"\n{totals['sources']} source(s) in report · {totals['attempted']} attempted · "
+        f"{totals['ok']} ok · {totals['empty']} empty · {totals['error']} error · "
+        f"{totals['blocked']} blocked · {totals['skipped']} skipped"
     )
     print(
         f"{len(postings)} posting(s) scored · "

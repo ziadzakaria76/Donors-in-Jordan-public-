@@ -125,7 +125,13 @@ def fetch(source: dict[str, Any], fetcher, note: Callable[[str], None]) -> list[
     skipped = 0
 
     for row in rows:
-        cells = row.select("td") or row.select("th")
+        # A row of th and no td is the header. Selectors like "table tr" match it
+        # alongside the real rows, and without this guard it becomes a vacancy
+        # titled "Position" -- which then scores, and can reach the shortlist.
+        if row.find("td") is None:
+            skipped += 1
+            continue
+        cells = row.select("td")
 
         def by_field(name: str) -> str:
             node = _cell(row, fields.get(name))

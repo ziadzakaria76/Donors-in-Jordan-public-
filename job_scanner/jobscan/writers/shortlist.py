@@ -45,8 +45,9 @@ def write_docx(path, postings, run_log, config) -> Path:
     )
     _meta_line(
         document,
-        f"Scored {len(postings)} posting(s) from {totals['sources']} source(s); "
-        f"{totals['ok']} returned data, {totals['error'] + totals['blocked']} failed. "
+        f"Scored {len(postings)} posting(s); {totals['attempted']} of "
+        f"{totals['sources']} source(s) were attempted, {totals['ok']} returned data, "
+        f"{totals['error'] + totals['blocked']} failed. "
         f"Shortlist threshold: score ≥ {config.shortlist_min_score}.",
     )
 

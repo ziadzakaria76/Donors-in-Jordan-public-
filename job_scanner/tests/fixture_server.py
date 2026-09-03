@@ -21,6 +21,9 @@ ROUTES = {
     "/orc/requisitions": ("oracle_orc_requisitions.json", "application/json", 200),
     "/elevatus/api/job-posts": ("elevatus_job_posts.json", "application/json", 200),
     "/careers": ("careers_table.html", "text/html; charset=utf-8", 200),
+    # An XHR-driven board: the HTML carries no vacancies, a fetch supplies them.
+    # This is the shape discover_playwright.py exists to crack.
+    "/xhr-careers": (None, "text/html; charset=utf-8", 200),
     # Failure shapes the adapters must report rather than swallow.
     "/empty": (None, "application/json", 200),
     "/forbidden": (None, "application/json", 403),
@@ -42,6 +45,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
             body = b'{"jobs": []}'
         elif path == "/forbidden":
             body = b'{"error": "Access denied for this site number"}'
+        elif path == "/xhr-careers":
+            body = (
+                b"<!doctype html><html><head><title>Careers</title></head><body>"
+                b"<h1>Search our vacancies</h1><div id='results'>Loading...</div>"
+                b"<script>fetch('/sf/search').then(r=>r.json()).then(d=>{"
+                b"document.getElementById('results').textContent = "
+                b"d.jobs.map(j=>j.jobTitle).join(', ');});</script>"
+                b"</body></html>"
+            )
         elif path == "/notjson":
             body = b"<html><body>Sign in to continue</body></html>"
         else:

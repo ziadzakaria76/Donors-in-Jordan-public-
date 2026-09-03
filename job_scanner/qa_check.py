@@ -351,6 +351,23 @@ def _adapter_html():
     _with_server(run)
 
 
+@check("a table header row never becomes a vacancy")
+def _header_row_not_a_job():
+    def run(base):
+        notes = []
+        # "table tr" matches the header alongside the data rows -- and it is
+        # exactly what discovery emits for a plain table, so the adapter has to
+        # survive it. Without the guard this yields a posting titled "Position".
+        source = {"key": "kfshrc", "country": "Saudi Arabia", "platform": "html_table",
+                  "html": {"url": base + "/careers", "row_selector": "table tr"}}
+        out = adapters.get("html_table")(source, Fetcher(), notes.append)
+        titles = [p.title for p in out]
+        expect(len(out) == 3, f"expected 3 vacancies, got {len(out)}: {titles}")
+        for header in ("Position", "Department", "Location", "Date Posted"):
+            expect(header not in titles, f"the header cell {header!r} became a vacancy")
+    _with_server(run)
+
+
 @check("a failing source raises rather than returning an innocent empty list")
 def _adapter_failures_are_loud():
     def run(base):
@@ -477,6 +494,24 @@ def _empty_run_is_labelled():
             "does NOT mean there are no vacancies" in text.replace("\n", " "),
             "an all-failed run produced a shortlist that reads as 'nothing available'",
         )
+
+
+@check("run-level messages are not counted as employers")
+def _pseudo_source_not_counted():
+    log = RunLog()
+    log.record("kfshrc", status="ok", fetched=3, kept=2)
+    log.note("__run__", "a run-level message that must not inflate the source count")
+    totals = log.totals()
+    expect(
+        totals["sources"] == 1,
+        f"totals counted {totals['sources']} sources; the __run__ pseudo-source was "
+        "counted as an employer",
+    )
+    expect(totals["attempted"] == 1, f"attempted={totals['attempted']}, expected 1")
+    expect(
+        any(r.source_key == "__run__" for r in log.records),
+        "the run-level message was dropped from the report entirely",
+    )
 
 
 @check("--only can reach a disabled source, but not a permanently disabled one")

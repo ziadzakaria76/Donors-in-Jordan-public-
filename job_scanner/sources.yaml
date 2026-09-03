@@ -135,13 +135,24 @@ profile:
 #
 # Sixteen employers plus one recruiter-alert mailbox.
 #
-# EVERY entry below is enabled: false / verified: unconfirmed. This
-# environment's egress policy refuses CONNECT to all of these hosts
-# (403 at the gateway), so not one careers URL has been loaded and not
-# one search API has been called from here. The careers_url values are
-# recorded as targets to be confirmed, NOT as confirmed facts -- see
-# each note. Confirming them is the first step on a network that can
-# reach them.
+# EVERY entry below is enabled: false / verified: unconfirmed.
+#
+# Evidence, gathered rather than assumed. All sixteen careers hosts were
+# probed directly: every one returned curl status 000, and the proxy
+# status endpoint recorded each as "connect_rejected -- gateway answered
+# 403 to CONNECT". Headless Chromium reaches them no differently:
+# navigating to hmg.com gave net::ERR_TUNNEL_CONNECTION_FAILED, so the
+# browser is blocked at the same layer as plain requests.
+#
+# Not one careers URL has been loaded and not one search API has been
+# called. The careers_url values below are therefore TARGETS TO BE
+# CONFIRMED, not confirmed facts -- several were assembled from the
+# employer's known domain and may be wrong in path or host. Confirming
+# them is the first step on a network that can reach them.
+#
+# The platform values tell the same story: `unknown` is recorded wherever
+# nothing was observed, rather than a plausible guess that would later
+# read as a finding.
 # =======================================================================
 sources:
 
@@ -206,7 +217,10 @@ sources:
       Runs on Elevatus. The adapter's api_path default (/api/job-posts) is
       an UNVERIFIED guess and must be confirmed against a live tenant
       before use. Once confirmed, every Elevatus tenant resolves from its
-      slug alone. Not confirmable here: egress blocked.
+      slug alone. Attempted here with discover_playwright.py: the page
+      never loaded (net::ERR_TUNNEL_CONNECTION_FAILED), so nothing was
+      observed and the api_path remains unconfirmed. The tenant slug is
+      also unknown -- it is not derivable from the careers URL.
 
   - key: mngha
     name: Ministry of National Guard Health Affairs
