@@ -55,3 +55,12 @@ android/.idea/
 android/out/
 android/app/release/
 local.properties
+
+# Job scanner
+#
+# Named explicitly, per the lesson recorded above: a broad pattern here would
+# swallow source. runs/ is deliberately NOT ignored -- the workflow commits it.
+job_scanner/site/
+job_scanner/alert_state.json
+job_scanner/scan_recovery.json
+job_scanner/tests/fixtures/live/

@@ -1,0 +1,17 @@
+{
+  "totalCount": 3,
+  "jobs": [
+    {"jobReqId": "REQ-40122", "jobTitle": "Consultant Gastroenterologist",
+     "location": "Dhahran, Eastern Province", "department": "Medical Services",
+     "postedDate": "2026-08-14", "employmentType": "Full-time",
+     "applyUrl": "https://example.invalid/job/REQ-40122"},
+    {"jobReqId": "REQ-40155", "jobTitle": "Staff Nurse - Endoscopy Unit",
+     "location": "Dhahran", "department": "Gastroenterology",
+     "postedDate": "2026-08-20", "employmentType": "Full-time",
+     "applyUrl": "https://example.invalid/job/REQ-40155"},
+    {"jobReqId": "REQ-39001", "jobTitle": "Consultant Hepatology",
+     "location": "Al Hasa", "department": "Internal Medicine",
+     "postedDate": "2019-03-02", "employmentType": "Full-time",
+     "applyUrl": "https://example.invalid/job/REQ-39001"}
+  ]
+}
