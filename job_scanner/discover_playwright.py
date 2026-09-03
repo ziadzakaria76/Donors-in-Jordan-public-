@@ -22,7 +22,6 @@ for those the tool emits an html_table block instead. A tool that reported
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import re
 import sys
@@ -186,7 +185,7 @@ def analyse_html(html: str, page_url: str) -> dict | None:
 
 def _yaml_block(key: str, page_url: str, best: dict | None, html_hint: dict | None) -> str:
     host = urlparse(page_url).netloc
-    lines = [f"  - key: {key}", f"    name: TODO  # employer name", "    country: TODO",
+    lines = [f"  - key: {key}", "    name: TODO  # employer name", "    country: TODO",
              f"    careers_url: \"{page_url}\""]
 
     if best:

@@ -496,6 +496,43 @@ def _empty_run_is_labelled():
         )
 
 
+@check("the weekly run does not depend on a browser")
+def _no_browser_at_runtime():
+    # Requirement lines only. requirements.txt explains in a comment why the
+    # browser is absent, and a naive substring search fires on that prose.
+    lines = [
+        line.split("#")[0].strip().lower()
+        for line in (ROOT / "requirements.txt").read_text().splitlines()
+    ]
+    declared = [line for line in lines if line]
+    expect(
+        not any("playwright" in line for line in declared),
+        f"playwright is declared in requirements.txt ({declared}). Endpoints are "
+        "hard-coded once found precisely so the scheduled scan stays a handful of "
+        "HTTP requests; the browser belongs in requirements-browser.txt only.",
+    )
+    expect(
+        (ROOT / "requirements-browser.txt").exists(),
+        "requirements-browser.txt is missing; discovery has no declared dependencies",
+    )
+
+    # Import the scanner with playwright made unimportable. If it still loads,
+    # no runtime path reaches the browser.
+    import subprocess
+    probe = (
+        "import sys; sys.modules['playwright'] = None; "
+        f"sys.path.insert(0, {str(ROOT)!r}); import scanner; print('ok')"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, cwd=ROOT
+    )
+    expect(
+        result.returncode == 0,
+        "scanner.py could not be imported with playwright unavailable, so the "
+        f"weekly run depends on a browser:\n{result.stderr[-600:]}",
+    )
+
+
 @check("run-level messages are not counted as employers")
 def _pseudo_source_not_counted():
     log = RunLog()

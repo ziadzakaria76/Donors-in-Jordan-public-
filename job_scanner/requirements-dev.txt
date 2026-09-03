@@ -1,0 +1,3 @@
+# Test-only. Kept out of requirements.txt so a deployment does not install it.
+-r requirements.txt
+pyflakes>=3.0
