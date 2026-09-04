@@ -1,0 +1,359 @@
+# Job scanner configuration.
+#
+# Two halves, governed by different rules:
+#
+#   profile:  FROZEN. Never edited, including max_age_days. See CLAUDE.md.
+#   sources:  edited freely as endpoints are discovered and confirmed.
+#
+# The `verified` field on a source is a claim about evidence, not a wish:
+#
+#   unconfirmed   nothing has been checked
+#   url-confirmed careers URL and platform confirmed from the live site;
+#                 THE SEARCH API HAS NOT BEEN CALLED
+#   true          a call was made and it returned postings
+#
+# Nothing in this file is `true` until a real response carried real jobs.
+
+profile:
+  # ---------------------------------------------------------------------
+  # FROZEN BLOCK -- do not edit any value below, including max_age_days.
+  #
+  # max_age_days exists because stale portals report healthy. A mirror
+  # whose newest vacancy closed in 2019 returns HTTP 200, a well-formed
+  # payload and a page full of jobs; nothing in the transport layer is
+  # wrong. Age is the only signal that separates it from a live board,
+  # so the moment this number is relaxed to "get more results" the
+  # scanner loses its one defence against confidently reporting a
+  # graveyard as a job market.
+  #
+  # 90 days is chosen against the specific hiring pattern here: Gulf
+  # consultant physician vacancies routinely stay open for two to three
+  # months, so a tighter window would discard genuinely open roles --
+  # while still flagging a portal years out of date on the first run.
+  # ---------------------------------------------------------------------
+  target: "Consultant Gastroenterologist"
+  ranking_mode: role_fit_only   # discipline match decides rank; grade is not weighted
+  max_age_days: 90
+  shortlist_min_score: 55
+
+  specialty:
+    core:
+      - gastroenterology
+      - gastroenterologist
+      - hepatology
+      - hepatologist
+      - gastrointestinal
+      - digestive diseases
+      - digestive disease
+      - luminal gastroenterology
+    procedures:
+      - endoscopy
+      - endoscopist
+      - colonoscopy
+      - ercp
+      - endoscopic ultrasound
+      - therapeutic endoscopy
+      - advanced endoscopy
+      - interventional endoscopy
+    subspecialties:
+      - inflammatory bowel disease
+      - transplant hepatology
+      - pancreatobiliary
+      - hepatobiliary
+      - gi oncology
+      - gi motility
+      - neurogastroenterology
+      - liver transplant
+      - paediatric gastroenterology
+      - pediatric gastroenterology
+    abbreviations:   # matched whole-word only, never as substrings
+      - gi
+      - ibd
+      - eus
+      - nafld
+      - masld
+
+  # Weaker signal. Surfaced and scored, but on its own never enough to
+  # reach the shortlist threshold.
+  adjacent:
+    - internal medicine
+    - general medicine
+    - acute medicine
+    - hepatobiliary surgery
+
+  # Titles that are never this role however well they keyword-match.
+  # Deliberately narrow: it excludes non-physician and in-training posts,
+  # not subspecialties. Paediatric GI is a consultant post and stays in.
+  exclude:
+    - nurse
+    - nursing
+    - technician
+    - technologist
+    - endoscopy technician
+    - assistant
+    - secretary
+    - receptionist
+    - housekeeping
+    - porter
+    - clerk
+    - coordinator
+    - dietitian
+    - dietician
+    - resident
+    - registrar
+    - intern
+    - trainee
+    - fellow
+    - student
+    - medical records
+    - sales
+    - representative
+
+  # Recorded on each posting for the report. NOT scored -- ranking_mode
+  # is role_fit_only, so a Specialist post competes with a Consultant
+  # post purely on discipline fit.
+  grades:
+    - consultant
+    - senior consultant
+    - associate consultant
+    - specialist
+    - senior specialist
+    - attending
+    - staff physician
+
+  locations:
+    - saudi arabia
+    - united arab emirates
+    - qatar
+    - oman
+    - bahrain
+    - kuwait
+    - jordan
+
+# =======================================================================
+# SOURCES
+#
+# Sixteen employers plus one recruiter-alert mailbox.
+#
+# EVERY entry below is enabled: false / verified: unconfirmed.
+#
+# Evidence, gathered rather than assumed. All sixteen careers hosts were
+# probed directly: every one returned curl status 000, and the proxy
+# status endpoint recorded each as "connect_rejected -- gateway answered
+# 403 to CONNECT". Headless Chromium reaches them no differently:
+# navigating to hmg.com gave net::ERR_TUNNEL_CONNECTION_FAILED, so the
+# browser is blocked at the same layer as plain requests.
+#
+# Not one careers URL has been loaded and not one search API has been
+# called. The careers_url values below are therefore TARGETS TO BE
+# CONFIRMED, not confirmed facts -- several were assembled from the
+# employer's known domain and may be wrong in path or host. Confirming
+# them is the first step on a network that can reach them.
+#
+# The platform values tell the same story: `unknown` is recorded wherever
+# nothing was observed, rather than a plausible guess that would later
+# read as a finding.
+# =======================================================================
+sources:
+
+  - key: kfshrc
+    name: King Faisal Specialist Hospital & Research Centre
+    country: Saudi Arabia
+    platform: html_table
+    careers_url: "https://www.kfshrc.edu.sa/en/home/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Target for first contact. Egress policy refused CONNECT to
+      www.kfshrc.edu.sa:443 (gateway 403), so the URL is unconfirmed and
+      the html_table platform is an expectation, not an observation.
+
+  - key: jhah
+    name: Johns Hopkins Aramco Healthcare
+    country: Saudi Arabia
+    platform: successfactors
+    careers_url: "https://www.jhah.com/en/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Target for first contact. Egress refused CONNECT to www.jhah.com:443
+      and career5.successfactors.eu:443. Results tables are expected to be
+      server-rendered HTML rather than XHR-driven; that expectation is
+      untested here and is the designed validation case for
+      discover_playwright.py emitting an html_table config.
+
+  - key: seha
+    name: SEHA - Abu Dhabi Health Services
+    country: United Arab Emirates
+    platform: oracle_orc
+    careers_url: "https://www.seha.ae/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Target for first contact. Egress refused CONNECT to the Oracle ORC
+      host (ekfk.fa.em2.oraclecloud.com:443). Oracle Recruiting Cloud
+      tenant host and site number both need confirming from the live
+      redirect before any request is well-formed.
+
+  - key: mediclinic
+    name: Mediclinic Middle East
+    country: United Arab Emirates
+    platform: successfactors
+    careers_url: "https://www.mediclinic.ae/en/corporate/careers.html"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Target for first contact. Egress refused CONNECT to
+      www.mediclinic.ae:443. SuccessFactors tenant/company id unconfirmed.
+
+  - key: hmg_habib
+    name: Dr Sulaiman Al Habib Medical Group
+    country: Saudi Arabia
+    platform: elevatus
+    careers_url: "https://hmg.com/en/Pages/careers.aspx"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Runs on Elevatus. The adapter's api_path default (/api/job-posts) is
+      an UNVERIFIED guess and must be confirmed against a live tenant
+      before use. Once confirmed, every Elevatus tenant resolves from its
+      slug alone. Attempted here with discover_playwright.py: the page
+      never loaded (net::ERR_TUNNEL_CONNECTION_FAILED), so nothing was
+      observed and the api_path remains unconfirmed. The tenant slug is
+      also unknown -- it is not derivable from the careers URL.
+
+  - key: mngha
+    name: Ministry of National Guard Health Affairs
+    country: Saudi Arabia
+    platform: unknown
+    careers_url: "https://ngha.med.sa/English/Careers/Pages/default.aspx"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy, not by the absence of a browser.
+
+  - key: burjeel
+    name: Burjeel Holdings
+    country: United Arab Emirates
+    platform: unknown
+    careers_url: "https://burjeelholdings.com/careers/"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: ccad
+    name: Cleveland Clinic Abu Dhabi
+    country: United Arab Emirates
+    platform: unknown
+    careers_url: "https://www.clevelandclinicabudhabi.ae/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: hmc
+    name: Hamad Medical Corporation
+    country: Qatar
+    platform: unknown
+    careers_url: "https://www.hamad.qa/EN/careers/Pages/default.aspx"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: nmc
+    name: NMC Healthcare
+    country: United Arab Emirates
+    platform: unknown
+    careers_url: "https://nmc.ae/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: dubai_health
+    name: Dubai Health
+    country: United Arab Emirates
+    platform: unknown
+    careers_url: "https://www.dubaihealth.ae/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: ahd
+    name: Abu Dhabi Health Data / Advanced Health
+    country: United Arab Emirates
+    platform: unknown
+    careers_url: "https://www.adhealth.ae/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy. Employer identity itself needs confirming
+      from the live site before the URL is trusted.
+
+  - key: fakeeh
+    name: Fakeeh Care Group
+    country: Saudi Arabia
+    platform: unknown
+    careers_url: "https://www.fakeeh.care/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: squh
+    name: Sultan Qaboos University Hospital
+    country: Oman
+    platform: unknown
+    careers_url: "https://www.squh.om/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: khuh
+    name: King Hamad University Hospital
+    country: Bahrain
+    platform: unknown
+    careers_url: "https://www.khuh.org.bh/careers"
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      Job list loads over JavaScript XHR; needs browser capture. Blocked
+      here by egress policy.
+
+  - key: sidra
+    name: Sidra Medicine
+    country: Qatar
+    platform: unknown
+    careers_url: "https://www.sidra.org/careers"
+    enabled: false
+    verified: unconfirmed
+    permanently_disabled: true
+    note: >-
+      STAYS OFF. The portal is a stale mirror whose newest vacancy closed
+      in 2019. This is exactly the failure max_age_days defends against:
+      it serves HTTP 200 and a full page of jobs, none of them real. Do
+      not re-enable on the strength of a healthy-looking response.
+
+  - key: recruiter_alerts
+    name: Recruiter alert mailbox
+    country: n/a
+    platform: imap
+    careers_url: null
+    enabled: false
+    verified: unconfirmed
+    note: >-
+      STAYS OFF here. IMAP credentials are not set in this environment
+      and are never committed. See SUBSCRIPTIONS.md.

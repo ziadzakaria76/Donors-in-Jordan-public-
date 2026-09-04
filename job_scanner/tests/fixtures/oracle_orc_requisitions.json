@@ -1,0 +1,14 @@
+{
+  "items": [
+    {"requisitionList": [
+      {"Id": "300001", "Title": "Consultant, Gastroenterology & Hepatology",
+       "PrimaryLocation": "Abu Dhabi, United Arab Emirates",
+       "Department": "Digestive Disease Institute",
+       "PostingEndDate": "2026-11-30", "WorkerType": "Regular"},
+      {"Id": "300002", "Title": "Specialist Interventional Endoscopy",
+       "PrimaryLocation": "Al Ain, United Arab Emirates",
+       "Department": "Gastroenterology", "PostingEndDate": "2026-10-15",
+       "WorkerType": "Regular"}
+    ]}
+  ]
+}

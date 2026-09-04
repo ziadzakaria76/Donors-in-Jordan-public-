@@ -1,6 +1,6 @@
 # Donors in Jordan
 
-Five projects share this repository. None of them builds, imports or deploys
+Six projects share this repository. None of them builds, imports or deploys
 another, and no two share a line of code. They are not all unrelated, though,
 and the relations are in content rather than code: the website and the GS3
 Marketing Ops app are for the same company and share a unit schedule and its
@@ -13,6 +13,7 @@ Arabic wording, and the two tender monitors solve the same problem twice.
 | **[Jordan Tender Intelligence Monitor](#jordan-tender-intelligence-monitor)** | A Python system that watches 13 donor and IFI procurement portals for Jordan-related consulting work | [`jordan_tender_monitor/`](jordan_tender_monitor/) |
 | **[Syria Tender Intelligence Monitor](#syria-tender-intelligence-monitor)** | A separate Python system, country-agnostic by design, watching 10 portals for Syria-related work | [`syria_tender_monitor/`](syria_tender_monitor/) |
 | **Doc2MD** | A standalone PWA that converts PDF, Word and Excel to token-efficient Markdown, entirely in the browser | [`doc2md/`](doc2md/README.md) |
+| **Job Scanner** | A Python scanner watching 16 Gulf hospital groups for Consultant Gastroenterologist vacancies | [`job_scanner/`](job_scanner/CLAUDE.md) |
 
 The two tender monitors are **separate codebases that solve the same problem
 twice**, not one system with two configurations. They share no module, no
