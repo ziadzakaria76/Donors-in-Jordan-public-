@@ -1,0 +1,10 @@
+# Endpoint discovery only -- see discover_playwright.py.
+#
+# Never add this file to the weekly run. Endpoints are hard-coded into
+# sources.yaml once discovered, precisely so the scheduled scan stays a
+# handful of HTTP requests instead of a browser fleet.
+#
+#   pip install -r requirements-browser.txt
+#   playwright install chromium
+#   playwright install-deps        # Linux only, needs sudo
+playwright>=1.40

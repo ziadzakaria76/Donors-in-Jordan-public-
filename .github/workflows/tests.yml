@@ -232,6 +232,53 @@ jobs:
           PYTHONPATH: src
         run: python -m syria_monitor.cli --self-test
 
+  # The job scanner is the fourth Python project here, and like the other three
+  # it gets its own job and its own dependency set rather than more steps on an
+  # existing one: a tender-monitor dependency change must not be able to turn
+  # this red, or the reverse.
+  #
+  # qa_check.py is the whole gate. It uses no network, no browser and no
+  # credentials -- it serves its own fixtures over 127.0.0.1 -- so it runs
+  # anywhere. Among the things it asserts: that the frozen profile block has
+  # not been edited, that no source claims verified: true without an endpoint
+  # to have called, and that a closing deadline has not been mapped to a
+  # posting date.
+  job-scanner:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    defaults:
+      run:
+        working-directory: job_scanner
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: job_scanner/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: python -m pyflakes .
+
+      - name: Check battery
+        run: python qa_check.py
+
+      # qa_check.py also asserts that the weekly run needs no browser --
+      # playwright absent from requirements.txt, and scanner.py importable with
+      # it unavailable. That check lives in the battery rather than here so it
+      # runs locally too.
+
   # The browser fallback is the one scraping path verified end to end, and the
   # job above skips it (no Playwright, deliberately -- the suite must run
   # without a browser). This job installs one so the verification is not merely

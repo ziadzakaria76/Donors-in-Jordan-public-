@@ -1,0 +1,7 @@
+{"data": [
+  {"id": "ab12", "title": "Consultant Gastroenterologist", "city": "Riyadh",
+   "department": "Gastroenterology", "published_at": 1786060800,
+   "url": "https://example.invalid/p/ab12", "type": "Full Time"},
+  {"id": "ab13", "title": "Medical Records Clerk", "city": "Riyadh",
+   "department": "HIM", "published_at": 1786060800, "url": "https://example.invalid/p/ab13"}
+]}
